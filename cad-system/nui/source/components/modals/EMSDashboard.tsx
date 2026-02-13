@@ -141,17 +141,6 @@ export function EMSDashboard() {
     }
   };
 
-  const filteredPatients = createMemo(() => {
-    const query = patientSearchQuery().toLowerCase().trim();
-    if (!query) return activePatients();
-    
-    return activePatients().filter(p => 
-      p.name.toLowerCase().includes(query) ||
-      p.patientId.toLowerCase().includes(query) ||
-      p.chiefComplaint.toLowerCase().includes(query)
-    );
-  });
-
   const submitPoliceCall = async () => {
     const reason = policeCallReason().trim();
     if (!reason) {
@@ -477,6 +466,17 @@ export function EMSDashboard() {
         return new Date(a.triagedAt).getTime() - new Date(b.triagedAt).getTime();
       })
   );
+
+  const filteredPatients = createMemo(() => {
+    const query = patientSearchQuery().toLowerCase().trim();
+    if (!query) return activePatients();
+    
+    return activePatients().filter(p => 
+      p.name.toLowerCase().includes(query) ||
+      p.patientId.toLowerCase().includes(query) ||
+      p.chiefComplaint.toLowerCase().includes(query)
+    );
+  });
 
   const inTreatmentPatients = createMemo(() =>
     Object.values(emsState.patients)
