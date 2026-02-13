@@ -1,0 +1,267 @@
+import { createSignal, createMemo, For, Show, onMount } from 'solid-js';
+import { terminalActions, terminalState } from '~/stores/terminalStore';
+import { cadState, cadActions, type Vehicle } from '~/stores/cadStore';
+
+export function VehicleSearch() {
+  const [searchQuery, setSearchQuery] = createSignal('');
+  const [selectedVehicle, setSelectedVehicle] = createSignal<Vehicle | null>(null);
+  const [activeTab, setActiveTab] = createSignal<'info' | 'owner'>('info');
+
+  const searchResults = createMemo(() => {
+    const query = searchQuery().toLowerCase();
+    if (!query) return [];
+    
+    return Object.values(cadState.vehicles).filter(v => 
+      v.plate.toLowerCase().includes(query) ||
+      v.model.toLowerCase().includes(query) ||
+      v.make.toLowerCase().includes(query) ||
+      v.vin.toLowerCase().includes(query) ||
+      v.ownerName.toLowerCase().includes(query)
+    );
+  });
+
+  const closeModal = () => {
+    terminalActions.setActiveModal(null);
+    cadActions.clearSearchResults();
+  };
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString();
+  };
+
+  onMount(() => {
+    const modalData = (terminalState.modalData as { plate?: string; ownerId?: string; query?: string } | null) || null;
+    if (!modalData) {
+      return;
+    }
+
+    const vehicles = Object.values(cadState.vehicles);
+
+    if (modalData.plate && modalData.plate.trim() !== '') {
+      const plateQuery = modalData.plate.trim();
+      const lowerPlate = plateQuery.toLowerCase();
+      setSearchQuery(plateQuery);
+
+      const exact = vehicles.find((v) => v.plate.toLowerCase() === lowerPlate);
+      if (exact) {
+        setSelectedVehicle(exact);
+        setActiveTab('info');
+        return;
+      }
+    }
+
+    if (modalData.ownerId && modalData.ownerId.trim() !== '') {
+      const ownerQuery = modalData.ownerId.trim();
+      const lowerOwner = ownerQuery.toLowerCase();
+      setSearchQuery(ownerQuery);
+
+      const ownerVehicle = vehicles.find((v) => v.ownerId.toLowerCase() === lowerOwner);
+      if (ownerVehicle) {
+        setSelectedVehicle(ownerVehicle);
+        setActiveTab('owner');
+        return;
+      }
+    }
+
+    if (modalData.query && modalData.query.trim() !== '') {
+      setSearchQuery(modalData.query.trim());
+    }
+  });
+
+  return (
+    <div class="modal-overlay" onClick={closeModal}>
+      <div class="modal-content vehicle-search" onClick={(e) => e.stopPropagation()}>
+        <div class="modal-header">
+          <h2>=== VEHICLE SEARCH (DMV) ===</h2>
+          <button class="modal-close" onClick={closeModal}>[X]</button>
+        </div>
+
+        <div class="search-toolbar">
+          <div class="search-input-group">
+            <input
+              type="text"
+              class="dos-input search-input"
+              value={searchQuery()}
+              onInput={(e) => setSearchQuery(e.currentTarget.value)}
+              placeholder="Enter plate, model, or owner name..."
+            />
+          </div>
+          <Show when={searchResults().length > 0}>
+            <div class="search-stats">
+              {searchResults().length} result(s) found
+            </div>
+          </Show>
+        </div>
+
+        <div class="search-content">
+          <div class="search-results-panel">
+            <Show when={searchResults().length === 0 && searchQuery()}>
+              <div class="empty-state">No vehicles found</div>
+            </Show>
+            
+            <For each={searchResults()}>
+              {(vehicle) => (
+                <div 
+                  class={`result-item ${selectedVehicle()?.plate === vehicle.plate ? 'selected' : ''}`}
+                  onClick={() => { setSelectedVehicle(vehicle); setActiveTab('info'); }}
+                >
+                  <div class="result-plate">
+                    {vehicle.plate}
+                    <Show when={vehicle.stolen}>
+                      <span class="stolen-badge">[STOLEN]</span>
+                    </Show>
+                  </div>
+                  <div class="result-vehicle">
+                    {vehicle.year} {vehicle.make} {vehicle.model}
+                  </div>
+                  <div class="result-color">Color: {vehicle.color}</div>
+                </div>
+              )}
+            </For>
+          </div>
+
+          <Show when={selectedVehicle()}>
+            <div class="vehicle-details-panel">
+              <div class="vehicle-header">
+                <h3>
+                  {selectedVehicle()!.plate}
+                  <Show when={selectedVehicle()!.stolen}>
+                    <span class="stolen-badge-large">STOLEN VEHICLE</span>
+                  </Show>
+                </h3>
+                <div class="vehicle-model">
+                  {selectedVehicle()!.year} {selectedVehicle()!.make} {selectedVehicle()!.model}
+                </div>
+              </div>
+
+              <div class="detail-tabs">
+                <button 
+                  class={`tab ${activeTab() === 'info' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('info')}
+                >
+                  [VEHICLE INFO]
+                </button>
+                <button 
+                  class={`tab ${activeTab() === 'owner' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('owner')}
+                >
+                  [OWNER INFO]
+                </button>
+              </div>
+
+              <div class="tab-content">
+                <Show when={activeTab() === 'info'}>
+                  <div class="info-grid">
+                    <div class="info-item">
+                      <label>License Plate:</label>
+                      <span class="value plate-value">{selectedVehicle()!.plate}</span>
+                    </div>
+                    <div class="info-item">
+                      <label>VIN:</label>
+                      <span class="value">{selectedVehicle()!.vin}</span>
+                    </div>
+                    <div class="info-item">
+                      <label>Make:</label>
+                      <span class="value">{selectedVehicle()!.make}</span>
+                    </div>
+                    <div class="info-item">
+                      <label>Model:</label>
+                      <span class="value">{selectedVehicle()!.model}</span>
+                    </div>
+                    <div class="info-item">
+                      <label>Year:</label>
+                      <span class="value">{selectedVehicle()!.year}</span>
+                    </div>
+                    <div class="info-item">
+                      <label>Color:</label>
+                      <span class="value">{selectedVehicle()!.color}</span>
+                    </div>
+                    <div class="info-item">
+                      <label>Registration:</label>
+                      <span class={`value status-${selectedVehicle()!.registrationStatus.toLowerCase()}`}>
+                        {selectedVehicle()!.registrationStatus}
+                      </span>
+                    </div>
+                    <div class="info-item">
+                      <label>Insurance:</label>
+                      <span class={`value status-${selectedVehicle()!.insuranceStatus.toLowerCase()}`}>
+                        {selectedVehicle()!.insuranceStatus}
+                      </span>
+                    </div>
+                    <Show when={selectedVehicle()!.stolen}>
+                      <div class="info-item full-width stolen-info">
+                        <label>Stolen Reported:</label>
+                        <span class="value">
+                          {selectedVehicle()!.stolenReportedAt ? formatDate(selectedVehicle()!.stolenReportedAt!) : 'Unknown'}
+                        </span>
+                      </div>
+                    </Show>
+                    <Show when={selectedVehicle()!.flags.length > 0}>
+                      <div class="info-item full-width">
+                        <label>Flags:</label>
+                        <span class="value flags">
+                          {selectedVehicle()!.flags.join(', ')}
+                        </span>
+                      </div>
+                    </Show>
+                  </div>
+                </Show>
+
+                <Show when={activeTab() === 'owner'}>
+                  <div class="owner-info">
+                    <div class="owner-name">{selectedVehicle()!.ownerName}</div>
+                    <div class="owner-id">Citizen ID: {selectedVehicle()!.ownerId}</div>
+                    <div class="owner-actions">
+                      <button 
+                        class="btn btn-primary"
+                        onClick={() => {
+                          terminalActions.setActiveModal('PERSON_SNAPSHOT', {
+                            citizenId: selectedVehicle()!.ownerId,
+                          });
+                        }}
+                      >
+                        [VIEW OWNER RECORD]
+                      </button>
+                      <button
+                        class="btn"
+                        onClick={() => {
+                          terminalActions.setActiveModal('BOLO_MANAGER', {
+                            type: 'PERSON',
+                            identifier: selectedVehicle()!.ownerId,
+                            reason: `Associated to vehicle ${selectedVehicle()!.plate}`,
+                          });
+                        }}
+                      >
+                        [CREATE OWNER BOLO]
+                      </button>
+                      <button
+                        class="btn"
+                        onClick={() => {
+                          terminalActions.setActiveModal('POLICE_DASHBOARD', {
+                            create: 'warrant',
+                            citizenId: selectedVehicle()!.ownerId,
+                            personName: selectedVehicle()!.ownerName,
+                            reason: `Warrant requested from vehicle stop ${selectedVehicle()!.plate}`,
+                          });
+                        }}
+                      >
+                        [ISSUE WARRANT]
+                      </button>
+                    </div>
+                  </div>
+                </Show>
+              </div>
+            </div>
+          </Show>
+        </div>
+
+        <div class="modal-footer">
+          <span style={{ color: '#808080' }}>
+            DMV System v1.0
+          </span>
+          <button class="btn" onClick={closeModal}>[CLOSE]</button>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,27 @@
+{
+  "name": "cad-frontend",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bunx --bun vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --ext ts,tsx"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4",
+    "solid-js": "^1.9.11",
+    "tuicss": "latest"
+  },
+  "devDependencies": {
+    "@types/leaflet": "^1.9.21",
+    "@types/node": "^25.2.2",
+    "@typescript-eslint/eslint-plugin": "^8.54.0",
+    "@typescript-eslint/parser": "^8.54.0",
+    "eslint": "^10.0.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1",
+    "vite-plugin-solid": "^2.11.10"
+  }
+}

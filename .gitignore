@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+src/node_modules/
+
+# Build outputs
+src/dist/
+cad-system/nui/build/*
+!cad-system/nui/build/.gitkeep
+!cad-system/nui/build/assets/
+cad-system/nui/build/assets/*
+!cad-system/nui/build/assets/.gitkeep
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Cache
+.cache/
+*.tsbuildinfo

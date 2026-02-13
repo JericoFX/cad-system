@@ -1,0 +1,178 @@
+
+
+.tui-map-container {
+  border: 2px solid var(--tui-border-color, #fff);
+  background: var(--tui-bg-secondary, #000);
+  position: relative;
+  overflow: hidden;
+}
+
+.tui-map {
+  background: #0a0a0a;
+}
+
+.tui-map-dos-mode .tui-map {
+  filter: contrast(1.2) brightness(0.9);
+}
+
+.tui-map-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+.tui-map-scanlines .tui-map-scanlines-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.15),
+    rgba(0, 0, 0, 0.15) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  pointer-events: none;
+}
+
+.tui-map-curvature {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 20px;
+  box-shadow: 
+    inset 0 0 50px rgba(0, 0, 0, 0.5),
+    inset 0 0 100px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+}
+
+.tui-map-phosphor-green .tui-map {
+  filter: sepia(100%) hue-rotate(80deg) saturate(300%) contrast(1.2);
+}
+
+.tui-map-phosphor-amber .tui-map {
+  filter: sepia(100%) hue-rotate(10deg) saturate(300%) contrast(1.2);
+}
+
+.tui-map-phosphor-white .tui-map {
+  filter: grayscale(100%) contrast(1.2);
+}
+
+.tui-map-filter-soft.tui-map-phosphor-green .tui-map {
+  filter: sepia(50%) hue-rotate(80deg) saturate(150%) contrast(1.1) brightness(1.1);
+}
+
+.tui-map-filter-soft.tui-map-phosphor-amber .tui-map {
+  filter: sepia(50%) hue-rotate(10deg) saturate(150%) contrast(1.1) brightness(1.1);
+}
+
+.tui-map-filter-soft.tui-map-phosphor-white .tui-map {
+  filter: grayscale(100%) contrast(1.1) brightness(1.1);
+}
+
+.tui-map-filter-none.tui-map-phosphor-green .tui-map,
+.tui-map-filter-none.tui-map-phosphor-amber .tui-map,
+.tui-map-filter-none.tui-map-phosphor-white .tui-map {
+  filter: contrast(1.2) brightness(0.95);
+}
+
+.tui-map-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+.tui-map-marker-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-shadow: 2px 2px 0 #000;
+}
+
+.tui-map-marker-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.tui-map-marker-label {
+  font-size: 10px;
+  font-weight: bold;
+  color: white;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 2px 4px;
+  margin-top: 2px;
+  white-space: nowrap;
+  font-family: var(--tui-font-family, monospace);
+}
+
+.tui-map-marker-dispatch .tui-map-marker-icon {
+  animation: tui-map-pulse 2s infinite;
+}
+
+.tui-map-marker-unit .tui-map-marker-content {
+  color: var(--tui-accent-primary, #0ff);
+}
+
+.tui-map-marker-vehicle .tui-map-marker-content {
+  color: var(--tui-warning-color, #ff0);
+}
+
+@keyframes tui-map-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.8;
+  }
+}
+
+.tui-map-tooltip {
+  background: var(--tui-bg-primary, #000080) !important;
+  border: 2px solid var(--tui-border-color, #fff) !important;
+  color: var(--tui-fg-primary, #fff) !important;
+  font-family: var(--tui-font-family, monospace) !important;
+  font-size: 12px !important;
+  padding: 8px 12px !important;
+  border-radius: 0 !important;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.5) !important;
+}
+
+.tui-map-tooltip:before {
+  border-top-color: var(--tui-border-color, #fff) !important;
+}
+
+.tui-map .leaflet-control-zoom {
+  border: 2px solid var(--tui-border-color, #fff);
+  background: var(--tui-bg-secondary, #a8a8a8);
+  border-radius: 0;
+}
+
+.tui-map .leaflet-control-zoom a {
+  background: var(--tui-bg-secondary, #a8a8a8);
+  color: var(--tui-fg-secondary, #000);
+  border: none;
+  border-radius: 0;
+  width: 30px;
+  height: 30px;
+  line-height: 30px;
+  font-family: var(--tui-font-family, monospace);
+  font-weight: bold;
+}
+
+.tui-map .leaflet-control-zoom a:hover {
+  background: var(--tui-accent-primary, #0ff);
+  color: var(--tui-fg-primary, #fff);
+}
+
+.tui-map .leaflet-control-zoom-in {
+  border-bottom: 2px solid var(--tui-border-color, #fff) !important;
+}
