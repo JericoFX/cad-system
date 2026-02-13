@@ -405,7 +405,7 @@ export function FileExplorer(props: FileExplorerProps) {
         </div>
       </Show>
 
-      <div class={state.classFor('content')}>
+      <div class={state.classFor('content')} style={{ 'flex': '1', 'min-height': '0', 'overflow': 'auto' }}>
         <Show when={state.viewMode === 'details'} fallback={
           <div class={state.classFor('iconsView')}>
             <For each={state.data}>
