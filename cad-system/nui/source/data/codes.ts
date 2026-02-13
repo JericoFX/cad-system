@@ -1,0 +1,184 @@
+export const TEN_CODES = {
+  '10-0': 'Disappeared / Caution',
+  '10-1': 'Frequency change',
+  '10-2': 'Signal good',
+  '10-3': 'Stop transmitting',
+  '10-4': 'Affirmative / Acknowledgement',
+  '10-5': 'Relay message',
+  '10-6': 'Busy',
+  '10-7': 'Out of service',
+  '10-8': 'In service',
+  '10-9': 'Repeat last transmission',
+  '10-10': 'Negative',
+  '10-11': 'Employee number',
+  '10-12': 'Standby',
+  '10-13': 'Weather conditions',
+  '10-14': 'Message / Information',
+  '10-15': 'Disturbance',
+  '10-16': 'Domestic problem',
+  '10-17': 'Stray animal',
+  '10-18': 'Traffic incident',
+  '10-19': 'Return to station',
+  '10-20': 'Location',
+  '10-21': 'Phone call',
+  '10-22': 'Cancel',
+  '10-23': 'Arrived at scene',
+  '10-24': 'Assignment complete',
+  '10-25': 'Meet with',
+  '10-26': 'ETA',
+  '10-27': 'License check',
+  '10-28': 'Registration check',
+  '10-29': 'Stolen vehicle check',
+  '10-30': 'Wanted person check',
+  '10-31': 'Crime in progress',
+  '10-32': 'Person with weapon',
+  '10-33': 'Emergency - officer needs help',
+  '10-34': 'Riot',
+  '10-35': 'Major crime alert',
+  '10-36': 'Correct time',
+  '10-37': 'Suspicious vehicle',
+  '10-38': 'Stopping suspicious vehicle',
+  '10-39': 'Urgent - use lights and siren',
+  '10-40': 'Silent run - no lights/siren',
+  '10-41': 'Beginning patrol',
+  '10-42': 'Ending patrol',
+  '10-43': 'Information',
+  '10-44': 'Permission to leave',
+  '10-45': 'Animal carcass',
+  '10-46': 'Assist motorist',
+  '10-47': 'Emergency road repair',
+  '10-48': 'Traffic standard repair',
+  '10-49': 'Traffic light out',
+  '10-50': 'Accident',
+  '10-51': 'Tow truck needed',
+  '10-52': 'Ambulance needed',
+  '10-53': 'Road blocked',
+  '10-54': 'Hit and run',
+  '10-55': 'Intoxicated driver',
+  '10-56': 'Intoxicated pedestrian',
+  '10-57': 'Pedestrian traffic',
+  '10-58': 'Direct traffic',
+  '10-59': 'Escort',
+  '10-60': 'Squad in vicinity',
+  '10-61': 'Personnel in area',
+  '10-62': 'Reply to message',
+  '10-63': 'Prepare to copy',
+  '10-64': 'Message for local delivery',
+  '10-65': 'Net message assignment',
+  '10-66': 'Message cancellation',
+  '10-67': 'Clear to read net message',
+  '10-68': 'Dispatch information',
+  '10-69': 'Message received',
+  '10-70': 'Prowler',
+  '10-71': 'Shooting',
+  '10-72': 'Gun involved',
+  '10-73': 'Deadly weapon',
+  '10-74': 'Negative',
+  '10-75': 'In contact with',
+  '10-76': 'En route',
+  '10-77': 'ETA',
+  '10-78': 'Need assistance',
+  '10-79': 'Bomb threat',
+  '10-80': 'Explosion',
+  '10-81': 'Traffic stop',
+  '10-82': 'Pedestrian stop',
+  '10-83': 'Stakeout',
+  '10-84': 'Officer on scene',
+  '10-85': 'Arrival delayed',
+  '10-86': 'Officer on approach',
+  '10-87': 'Pickup',
+  '10-88': 'Present phone number',
+  '10-89': 'Bomb threat',
+  '10-90': 'Bank alarm',
+  '10-91': 'Pick up prisoner',
+  '10-92': 'Parking complaint',
+  '10-93': 'Blockade',
+  '10-94': 'Drag racing',
+  '10-95': 'Prisoner transport',
+  '10-96': 'Mental patient',
+  '10-97': 'Arrived at scene',
+  '10-98': 'Prison break',
+  '10-99': 'Wanted/stolen indicated',
+  '10-100': 'Mute',
+};
+
+export const PRIORITY_CODES = {
+  'CODE-1': 'Non-urgent, respond without lights/siren',
+  'CODE-2': 'Urgent, no lights/siren unless necessary',
+  'CODE-3': 'Emergency, lights and siren required',
+  'CODE-4': 'No further assistance needed',
+  'CODE-5': 'Felony stop / High risk',
+  'CODE-6': 'Out of vehicle investigation',
+  'CODE-7': 'Meal break',
+  'CODE-8': 'Fire alarm',
+  'CODE-9': 'Mental patient / Psychiatric',
+  'CODE-10': 'Bomb threat',
+  'CODE-20': 'Notify news media',
+  'CODE-30': 'Riot',
+  'CODE-33': 'Emergency - clear the channel',
+  'CODE-99': 'Officer needs help - emergency!',
+};
+
+export function getRandomCaseCode(): { code: string; description: string } {
+  const entries = Object.entries(TEN_CODES);
+  const randomEntry = entries[Math.floor(Math.random() * entries.length)];
+  return { code: randomEntry[0], description: randomEntry[1] };
+}
+
+export function formatCaseCode(code: string): string {
+  const description = TEN_CODES[code as keyof typeof TEN_CODES];
+  return description ? `${code} - ${description}` : code;
+}
+
+export const CASE_TYPES: Record<string, string> = {
+  '10-31': 'Crime in progress',
+  '10-32': 'Person with weapon',
+  '10-50': 'Traffic accident',
+  '10-54': 'Hit and run',
+  '10-55': 'Intoxicated driver',
+  '10-70': 'Prowler',
+  '10-71': 'Shooting',
+  '10-78': 'Officer needs assistance',
+  'ROBBERY': 'Robbery',
+  'BURGLARY': 'Burglary',
+  'ASSAULT': 'Assault',
+  'HOMICIDE': 'Homicide',
+  'KIDNAPPING': 'Kidnapping',
+  'NARCOTICS': 'Narcotics',
+  'DISTURBANCE': 'Disturbance',
+  'DOMESTIC': 'Domestic disturbance',
+  'SUSPICIOUS': 'Suspicious activity',
+  'WELFARE': 'Welfare check',
+  'MISSING': 'Missing person',
+  'GENERAL': 'General incident',
+};
+
+export function getCaseTypeDescription(code: string): string {
+  return CASE_TYPES[code] || code;
+}
+
+export function getRandomCaseType(): { code: string; description: string } {
+  const entries = Object.entries(CASE_TYPES);
+  const [code, description] = entries[Math.floor(Math.random() * entries.length)];
+  return { code, description };
+}
+
+export function getAllCaseTypes(): Array<{ code: string; description: string }> {
+  return Object.entries(CASE_TYPES).map(([code, description]) => ({
+    code,
+    description
+  }));
+}
+
+export const STATUS_CODES: Record<string, { label: string; color: string }> = {
+  '10-8': { label: 'In Service', color: '#00ff00' },
+  '10-7': { label: 'Out of Service', color: '#ff0000' },
+  '10-6': { label: 'Busy', color: '#ffff00' },
+  '10-23': { label: 'On Scene', color: '#00ffff' },
+  '10-97': { label: 'Arrived', color: '#00ffff' },
+  '10-42': { label: 'Off Duty', color: '#808080' },
+};
+
+export function getStatusInfo(code: string): { label: string; color: string } | undefined {
+  return STATUS_CODES[code];
+}

@@ -1,0 +1,315 @@
+import { createSignal, For, Show, createMemo, onMount } from 'solid-js';
+import { terminalActions, terminalState } from '~/stores/terminalStore';
+import { cadState, cadActions } from '~/stores/cadStore';
+import { userActions } from '~/stores/userStore';
+import type { BOLO } from '~/stores/cadStore';
+
+export function BoloManager() {
+  const [activeTab, setActiveTab] = createSignal<'all' | 'person' | 'vehicle'>('all');
+  const [showCreateForm, setShowCreateForm] = createSignal(false);
+  const [selectedBolo, setSelectedBolo] = createSignal<BOLO | null>(null);
+  
+  const [boloType, setBoloType] = createSignal<'PERSON' | 'VEHICLE'>('PERSON');
+  const [identifier, setIdentifier] = createSignal('');
+  const [reason, setReason] = createSignal('');
+  const [priority, setPriority] = createSignal<'LOW' | 'MEDIUM' | 'HIGH'>('MEDIUM');
+
+  onMount(() => {
+    const modalData = (terminalState.modalData as {
+      type?: 'PERSON' | 'VEHICLE';
+      identifier?: string;
+      reason?: string;
+      priority?: 'LOW' | 'MEDIUM' | 'HIGH';
+    } | null) || null;
+
+    if (!modalData) {
+      return;
+    }
+
+    if (modalData.type === 'PERSON' || modalData.type === 'VEHICLE') {
+      setBoloType(modalData.type);
+    }
+
+    if (typeof modalData.identifier === 'string' && modalData.identifier.trim() !== '') {
+      setIdentifier(modalData.identifier.trim().toUpperCase());
+      setShowCreateForm(true);
+    }
+
+    if (typeof modalData.reason === 'string' && modalData.reason.trim() !== '') {
+      setReason(modalData.reason.trim());
+    }
+
+    if (modalData.priority === 'LOW' || modalData.priority === 'MEDIUM' || modalData.priority === 'HIGH') {
+      setPriority(modalData.priority);
+    }
+  });
+
+  const bolos = createMemo(() => {
+    const all = Object.values(cadState.bolos).filter(b => b.active);
+    switch (activeTab()) {
+      case 'person':
+        return all.filter(b => b.type === 'PERSON');
+      case 'vehicle':
+        return all.filter(b => b.type === 'VEHICLE');
+      default:
+        return all;
+    }
+  });
+
+  const closeModal = () => {
+    terminalActions.setActiveModal(null);
+  };
+
+  const createBOLO = () => {
+    if (!identifier().trim() || !reason().trim()) {
+      terminalActions.addLine('Error: Identifier and reason are required', 'error');
+      return;
+    }
+
+    const bolo: BOLO = {
+      boloId: `BOLO_${Date.now()}`,
+      type: boloType(),
+      identifier: identifier().toUpperCase(),
+      reason: reason(),
+      issuedBy: userActions.getCurrentUserId(),
+      issuedByName: userActions.getCurrentUserName(),
+      issuedAt: new Date().toISOString(),
+      priority: priority(),
+      active: true,
+    };
+
+    cadActions.addBOLO(bolo);
+    terminalActions.addLine(`✓ BOLO issued: ${bolo.boloId}`, 'system');
+    
+    setIdentifier('');
+    setReason('');
+    setPriority('MEDIUM');
+    setShowCreateForm(false);
+  };
+
+  const removeBOLO = (boloId: string) => {
+    cadActions.removeBOLO(boloId);
+    setSelectedBolo(null);
+    terminalActions.addLine('BOLO removed', 'system');
+  };
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleString();
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'HIGH': return '#ff0000';
+      case 'MEDIUM': return '#ff8800';
+      case 'LOW': return '#ffff00';
+      default: return '#808080';
+    }
+  };
+
+  return (
+    <div class="modal-overlay" onClick={closeModal}>
+      <div class="modal-content bolo-manager" onClick={(e) => e.stopPropagation()}>
+        <div class="modal-header">
+          <h2>=== BOLO MANAGER ===</h2>
+          <button class="modal-close" onClick={closeModal}>[X]</button>
+        </div>
+
+        <div class="bolo-stats">
+          <div class="stat-item">
+            <span class="stat-number">{bolos().length}</span>
+            <span class="stat-label">ACTIVE</span>
+          </div>
+          <div class="stat-item high">
+            <span class="stat-number">{bolos().filter(b => b.priority === 'HIGH').length}</span>
+            <span class="stat-label">HIGH PRIORITY</span>
+          </div>
+        </div>
+
+        <div class="bolo-tabs">
+          <button 
+            class={`tab ${activeTab() === 'all' ? 'active' : ''}`}
+            onClick={() => setActiveTab('all')}
+          >
+            [ALL ({bolos().length})]
+          </button>
+          <button 
+            class={`tab ${activeTab() === 'person' ? 'active' : ''}`}
+            onClick={() => setActiveTab('person')}
+          >
+            [PERSONS ({bolos().filter(b => b.type === 'PERSON').length})]
+          </button>
+          <button 
+            class={`tab ${activeTab() === 'vehicle' ? 'active' : ''}`}
+            onClick={() => setActiveTab('vehicle')}
+          >
+            [VEHICLES ({bolos().filter(b => b.type === 'VEHICLE').length})]
+          </button>
+        </div>
+
+        <div class="bolo-actions">
+          <button 
+            class="btn btn-primary"
+            onClick={() => setShowCreateForm(!showCreateForm())}
+          >
+            {showCreateForm() ? '[CANCEL]' : '[+ CREATE BOLO]'}
+          </button>
+        </div>
+
+        <Show when={showCreateForm()}>
+          <div class="bolo-create-form">
+            <h3>=== CREATE NEW BOLO ===</h3>
+            
+            <div class="form-section">
+              <label class="form-label">[TYPE]</label>
+              <div class="radio-group">
+                <label class="radio-label">
+                  <input 
+                    type="radio" 
+                    name="boloType" 
+                    value="PERSON"
+                    checked={boloType() === 'PERSON'}
+                    onChange={() => setBoloType('PERSON')}
+                  />
+                  PERSON
+                </label>
+                <label class="radio-label">
+                  <input 
+                    type="radio" 
+                    name="boloType" 
+                    value="VEHICLE"
+                    checked={boloType() === 'VEHICLE'}
+                    onChange={() => setBoloType('VEHICLE')}
+                  />
+                  VEHICLE
+                </label>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <label class="form-label">[{boloType() === 'PERSON' ? 'CITIZEN ID' : 'LICENSE PLATE'}]</label>
+              <input
+                type="text"
+                class="dos-input"
+                value={identifier()}
+                onInput={(e) => setIdentifier(e.currentTarget.value)}
+                placeholder={boloType() === 'PERSON' ? 'Enter citizen ID...' : 'Enter plate number...'}
+              />
+            </div>
+
+            <div class="form-section">
+              <label class="form-label">[REASON]</label>
+              <textarea
+                class="dos-textarea"
+                value={reason()}
+                onInput={(e) => setReason(e.currentTarget.value)}
+                placeholder="Describe reason for BOLO..."
+                rows={3}
+              />
+            </div>
+
+            <div class="form-section">
+              <label class="form-label">[PRIORITY]</label>
+              <select
+                class="dos-select"
+                value={priority()}
+                onChange={(e) => setPriority(e.currentTarget.value as 'LOW' | 'MEDIUM' | 'HIGH')}
+              >
+                <option value="LOW">🔵 LOW</option>
+                <option value="MEDIUM">🟡 MEDIUM</option>
+                <option value="HIGH">🔴 HIGH</option>
+              </select>
+            </div>
+
+            <div class="form-actions">
+              <button class="btn btn-primary" onClick={createBOLO}>
+                [ISSUE BOLO]
+              </button>
+            </div>
+          </div>
+        </Show>
+
+        <div class="bolos-list">
+          <Show when={bolos().length === 0}>
+            <div class="empty-state">No active BOLOs</div>
+          </Show>
+
+          <For each={bolos()}>
+            {(bolo) => (
+              <div 
+                class={`bolo-card ${selectedBolo()?.boloId === bolo.boloId ? 'selected' : ''}`}
+                onClick={() => setSelectedBolo(selectedBolo()?.boloId === bolo.boloId ? null : bolo)}
+              >
+                <div class="bolo-header">
+                  <span class="bolo-type">{bolo.type}</span>
+                  <span 
+                    class="bolo-priority"
+                    style={{ color: getPriorityColor(bolo.priority) }}
+                  >
+                    {bolo.priority === 'HIGH' ? '🔴' : bolo.priority === 'MEDIUM' ? '🟡' : '🔵'} {bolo.priority}
+                  </span>
+                  <span class="bolo-id">{bolo.boloId.substring(0, 12)}</span>
+                </div>
+
+                <div class="bolo-main">
+                  <div class="bolo-identifier">{bolo.identifier}</div>
+                  <div class="bolo-reason">{bolo.reason}</div>
+                </div>
+
+                <div class="bolo-meta">
+                  <span>Issued: {formatDate(bolo.issuedAt)}</span>
+                  <span>By: {bolo.issuedByName}</span>
+                </div>
+
+                <Show when={selectedBolo()?.boloId === bolo.boloId}>
+                  <div class="bolo-actions-row">
+                    <button class="btn" onClick={() => removeBOLO(bolo.boloId)}>
+                      [REMOVE BOLO]
+                    </button>
+                    <button 
+                      class="btn btn-primary"
+                      onClick={() => {
+                        if (bolo.type === 'PERSON') {
+                          terminalActions.setActiveModal('PERSON_SEARCH', {
+                            citizenId: bolo.identifier,
+                            query: bolo.identifier,
+                          });
+                        } else {
+                          terminalActions.setActiveModal('VEHICLE_SEARCH', { plate: bolo.identifier });
+                        }
+                      }}
+                    >
+                      [SEARCH {bolo.type}]
+                    </button>
+                    <Show when={bolo.type === 'PERSON'}>
+                      <button 
+                        class="btn btn-primary"
+                        style={{ 'background-color': '#ff0000', 'border-color': '#ff0000' }}
+                        onClick={() => {
+                          const person = Object.values(cadState.persons).find(p => p.citizenid === bolo.identifier);
+                          terminalActions.setActiveModal('ARREST_WIZARD', { 
+                            citizenId: bolo.identifier,
+                            personName: person ? `${person.firstName} ${person.lastName}` : 'Unknown',
+                            boloId: bolo.boloId
+                          });
+                        }}
+                      >
+                        [ARREST]
+                      </button>
+                    </Show>
+                  </div>
+                </Show>
+              </div>
+            )}
+          </For>
+        </div>
+
+        <div class="modal-footer">
+          <span style={{ color: '#808080' }}>
+            Total Active: {bolos().length} BOLOs
+          </span>
+          <button class="btn" onClick={closeModal}>[CLOSE]</button>
+        </div>
+      </div>
+    </div>
+  );
+}
