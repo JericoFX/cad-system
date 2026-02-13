@@ -40,6 +40,12 @@ export function EMSDashboard() {
   const [selectedPatient, setSelectedPatient] = createSignal<Patient | null>(null);
   const [bloodRequests, setBloodRequests] = createSignal<BloodSampleRequest[]>([]);
   const [bloodLoading, setBloodLoading] = createSignal(false);
+  const [bloodUpdateModalOpen, setBloodUpdateModalOpen] = createSignal(false);
+  const [pendingBloodUpdate, setPendingBloodUpdate] = createSignal<{
+    request: BloodSampleRequest;
+    status: BloodSampleStatus;
+  } | null>(null);
+  const [bloodUpdateNotes, setBloodUpdateNotes] = createSignal('');
   const [nowMs, setNowMs] = createSignal(Date.now());
   const hasActiveBloodAnalysis = createMemo(() =>
     bloodRequests().some((request) => request.status === 'IN_PROGRESS')
@@ -57,6 +63,11 @@ export function EMSDashboard() {
     allergies: '',
     medications: ''
   });
+
+  const [patientSearchQuery, setPatientSearchQuery] = createSignal('');
+  const [showPoliceCallModal, setShowPoliceCallModal] = createSignal(false);
+  const [policeCallReason, setPoliceCallReason] = createSignal('');
+  const [policeCallPriority, setPoliceCallPriority] = createSignal<'LOW' | 'MEDIUM' | 'HIGH'>('MEDIUM');
 
   const closeModal = () => {
     terminalActions.setActiveModal(null);
@@ -80,6 +91,105 @@ export function EMSDashboard() {
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
+  const readPatientIdFromReader = async () => {
+    try {
+      const context = await fetchNui<{
+        ok: boolean;
+        terminalId?: string;
+        error?: string;
+      }>('cad:getComputerContext');
+
+      if (!context?.ok || !context.terminalId) {
+        terminalActions.addLine(`ID reader unavailable: ${context?.error || 'no_terminal_context'}`, 'error');
+        return;
+      }
+
+      const response = await fetchNui<{
+        ok: boolean;
+        person?: {
+          citizenid: string;
+          firstName: string;
+          lastName: string;
+          dateOfBirth: string;
+          bloodType?: string;
+          allergies?: string;
+        };
+        source?: string;
+        item?: { name?: string; slot?: number };
+        error?: string;
+      }>('cad:idreader:read', {
+        terminalId: context.terminalId,
+      });
+
+      if (!response?.ok || !response.person) {
+        terminalActions.addLine(`Failed to read ID: ${response?.error || 'unknown_error'}`, 'error');
+        return;
+      }
+
+      setPatientForm({
+        ...patientForm(),
+        name: `${response.person.firstName} ${response.person.lastName}`,
+        allergies: response.person.allergies || '',
+      });
+
+      terminalActions.addLine(
+        `✓ ID read for patient: ${response.person.firstName} ${response.person.lastName} (${response.person.citizenid})`,
+        'output'
+      );
+    } catch (error) {
+      terminalActions.addLine(`Failed to read ID: ${error}`, 'error');
+    }
+  };
+
+  const filteredPatients = createMemo(() => {
+    const query = patientSearchQuery().toLowerCase().trim();
+    if (!query) return activePatients();
+    
+    return activePatients().filter(p => 
+      p.name.toLowerCase().includes(query) ||
+      p.patientId.toLowerCase().includes(query) ||
+      p.chiefComplaint.toLowerCase().includes(query)
+    );
+  });
+
+  const submitPoliceCall = async () => {
+    const reason = policeCallReason().trim();
+    if (!reason) {
+      terminalActions.addLine('Please provide a reason for the police call', 'error');
+      return;
+    }
+
+    try {
+      const response = await fetchNui<{
+        ok: boolean;
+        callId?: string;
+        error?: string;
+      }>('cad:dispatch:createCall', {
+        type: 'POLICE_ASSISTANCE',
+        priority: policeCallPriority(),
+        title: `EMS Request - ${reason.substring(0, 50)}`,
+        description: reason,
+        location: 'Hospital / EMS Facility',
+        requestingUnit: 'EMS',
+      });
+
+      if (!response?.ok) {
+        terminalActions.addLine(`Failed to call police: ${response?.error || 'unknown_error'}`, 'error');
+        return;
+      }
+
+      terminalActions.addLine(
+        `✓ Police assistance requested (${response.callId || 'CALL'}) - Priority: ${policeCallPriority()}`,
+        'output'
+      );
+      setShowPoliceCallModal(false);
+      setPoliceCallReason('');
+      setPoliceCallPriority('MEDIUM');
+    } catch (error) {
+      terminalActions.addLine(`Failed to call police: ${error}`, 'error');
+    }
+  };
+
   const getBloodStatusColor = (status: BloodSampleStatus) => {
     switch (status) {
       case 'PENDING':
@@ -99,7 +209,7 @@ export function EMSDashboard() {
   };
 
   const getBloodAnalysisProgress = (request: BloodSampleRequest) => {
-    // Barra tranqui: tiempo pasado / tiempo total.
+    // Progress bar: elapsed time / total duration.
     const durationMs = Number(request.analysisDurationMs || 0);
     if (durationMs <= 0) {
       return 0;
@@ -150,9 +260,11 @@ export function EMSDashboard() {
     }
   };
 
-  const updateBloodRequestStatus = async (request: BloodSampleRequest, status: BloodSampleStatus) => {
-    const notes = window.prompt('Notas de actualizacion (opcional):', request.notes || '') ?? '';
-
+  const updateBloodRequestStatus = async (
+    request: BloodSampleRequest,
+    status: BloodSampleStatus,
+    notes: string
+  ): Promise<boolean> => {
     try {
       const response = await fetchNui<{
         ok: boolean;
@@ -174,14 +286,46 @@ export function EMSDashboard() {
         } else {
           terminalActions.addLine(`Failed to update request: ${response?.error || 'unknown_error'}`, 'error');
         }
-        return;
+        return false;
       }
 
       setBloodRequests((prev) => prev.map((item) => (item.requestId === request.requestId ? response.request! : item)));
       terminalActions.addLine(`✓ Blood request ${request.requestId} => ${status}`, 'output');
+      return true;
     } catch (error) {
       terminalActions.addLine(`Failed to update request: ${error}`, 'error');
+      return false;
     }
+  };
+
+  const openBloodUpdateModal = (request: BloodSampleRequest, status: BloodSampleStatus) => {
+    setPendingBloodUpdate({ request, status });
+    setBloodUpdateNotes(request.notes || '');
+    setBloodUpdateModalOpen(true);
+  };
+
+  const cancelBloodUpdateModal = () => {
+    setBloodUpdateModalOpen(false);
+    setPendingBloodUpdate(null);
+    setBloodUpdateNotes('');
+  };
+
+  const submitBloodUpdateModal = async () => {
+    const pending = pendingBloodUpdate();
+    if (!pending) {
+      return;
+    }
+
+    const ok = await updateBloodRequestStatus(
+      pending.request,
+      pending.status,
+      bloodUpdateNotes().trim()
+    );
+    if (!ok) {
+      return;
+    }
+
+    cancelBloodUpdateModal();
   };
 
   onMount(() => {
@@ -197,7 +341,7 @@ export function EMSDashboard() {
 
   createEffect(() => {
     const refreshMs = hasActiveBloodAnalysis() ? 3000 : 12000;
-    // Si hay analisis en curso, refresca rapido para que el ETA no mienta.
+    // Refresh faster while analysis is running to keep ETA accurate.
     const refreshTimer = window.setInterval(() => {
       void loadBloodRequests();
     }, refreshMs);
@@ -219,9 +363,9 @@ export function EMSDashboard() {
 
   const getPriorityColor = (priority: number) => {
     switch (priority) {
-      case 1: return '#ff0000'; // critico
-      case 2: return '#ffaa00'; // serio
-      case 3: return '#00ff00'; // estable
+      case 1: return '#ff0000'; // critical
+      case 2: return '#ffaa00'; // serious
+      case 3: return '#00ff00'; // stable
       default: return '#808080';
     }
   };
@@ -299,7 +443,7 @@ export function EMSDashboard() {
   };
 
   const handleHandoff = (patient: Patient) => {
-    // Sin caso activo no mandamos handoff, asi no se pierde el reporte.
+    // Require an active case to avoid orphaning the handoff report.
     if (!cadState.currentCase) {
       terminalActions.addLine('No active case. Create or select a case first.', 'error');
       terminalActions.addLine('Use: case create <type> <title>', 'output');
@@ -414,17 +558,45 @@ export function EMSDashboard() {
           </button>
         </div>
 
+        <Show when={activeTab() === 'patients'}>
+          <div class="search-toolbar" style={{ 'margin-bottom': '10px', 'padding': '0 10px' }}>
+            <div class="search-input-group">
+              <input
+                type="text"
+                class="dos-input search-input"
+                value={patientSearchQuery()}
+                onInput={(e: any) => setPatientSearchQuery(e.currentTarget.value)}
+                placeholder="Search patients by name, ID, or complaint..."
+              />
+              <button 
+                class="btn"
+                onClick={() => setShowPoliceCallModal(true)}
+                style={{ 'margin-left': 'auto' }}
+              >
+                [CALL POLICE]
+              </button>
+            </div>
+            <Show when={patientSearchQuery()}>
+              <div class="search-stats">
+                {filteredPatients().length} result(s) found
+              </div>
+            </Show>
+          </div>
+        </Show>
+
         <div class="tab-content">
           <Show when={activeTab() === 'patients'}>
             <div class="section-header">
               [ALL ACTIVE PATIENTS - SORTED BY PRIORITY]
             </div>
-            <Show when={activePatients().length === 0}>
-              <div class="empty-state">No active patients</div>
+            <Show when={filteredPatients().length === 0}>
+              <div class="empty-state">
+                {patientSearchQuery() ? 'No patients match your search' : 'No active patients'}
+              </div>
             </Show>
             
             <div class="patients-list">
-              <For each={activePatients()}>
+              <For each={filteredPatients()}>
                 {(patient) => (
                   <div 
                     class={`patient-card ${patient.condition.toLowerCase()} priority-${patient.triagePriority}`}
@@ -500,13 +672,23 @@ export function EMSDashboard() {
               
               <div class="form-section">
                 <label>Patient Name *</label>
-                <input
-                  type="text"
-                  class="dos-input"
-                  placeholder="Enter full name..."
-                  value={patientForm().name}
-                  onInput={(e: any) => setPatientForm({ ...patientForm(), name: e.currentTarget.value })}
-                />
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    type="text"
+                    class="dos-input"
+                    style={{ flex: 1 }}
+                    placeholder="Enter full name..."
+                    value={patientForm().name}
+                    onInput={(e: any) => setPatientForm({ ...patientForm(), name: e.currentTarget.value })}
+                  />
+                  <button 
+                    class="btn"
+                    onClick={() => void readPatientIdFromReader()}
+                    title="Read ID from card reader"
+                  >
+                    [READ ID]
+                  </button>
+                </div>
               </div>
 
               <div class="form-section">
@@ -730,22 +912,22 @@ export function EMSDashboard() {
                     </Show>
                     <div class="inventory-actions">
                       <Show when={request.status === 'PENDING'}>
-                        <button class="btn-small" onClick={() => void updateBloodRequestStatus(request, 'ACKNOWLEDGED')}>
+                        <button class="btn-small" onClick={() => openBloodUpdateModal(request, 'ACKNOWLEDGED')}>
                           [ACK]
                         </button>
                       </Show>
                       <Show when={request.status === 'PENDING' || request.status === 'ACKNOWLEDGED'}>
-                        <button class="btn-small" onClick={() => void updateBloodRequestStatus(request, 'IN_PROGRESS')}>
+                        <button class="btn-small" onClick={() => openBloodUpdateModal(request, 'IN_PROGRESS')}>
                           [START ANALYSIS]
                         </button>
                       </Show>
                       <Show when={request.status === 'IN_PROGRESS' && request.analysisReady}>
-                        <button class="btn-small btn-primary" onClick={() => void updateBloodRequestStatus(request, 'COMPLETED')}>
+                        <button class="btn-small btn-primary" onClick={() => openBloodUpdateModal(request, 'COMPLETED')}>
                           [SEND TO POLICE]
                         </button>
                       </Show>
                       <Show when={request.status === 'PENDING' || request.status === 'ACKNOWLEDGED' || request.status === 'IN_PROGRESS'}>
-                        <button class="btn-small" onClick={() => void updateBloodRequestStatus(request, 'DECLINED')}>
+                        <button class="btn-small" onClick={() => openBloodUpdateModal(request, 'DECLINED')}>
                           [DECLINE]
                         </button>
                       </Show>
@@ -756,6 +938,96 @@ export function EMSDashboard() {
             </div>
           </Show>
         </div>
+
+        <Show when={bloodUpdateModalOpen() && pendingBloodUpdate()}>
+          <div class="modal-overlay" onClick={cancelBloodUpdateModal}>
+            <div class="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div class="modal-header">
+                <h3>=== BLOOD REQUEST UPDATE ===</h3>
+                <button class="modal-close" onClick={cancelBloodUpdateModal}>[X]</button>
+              </div>
+              <div class="modal-body">
+                <p>
+                  Request: <strong>{pendingBloodUpdate()!.request.requestId}</strong>
+                </p>
+                <p>
+                  New status: <strong>{pendingBloodUpdate()!.status}</strong>
+                </p>
+                <div class="form-group">
+                  <label>Update notes (optional):</label>
+                  <textarea
+                    class="dos-textarea"
+                    rows={3}
+                    value={bloodUpdateNotes()}
+                    onInput={(e) => setBloodUpdateNotes(e.currentTarget.value)}
+                    placeholder="Add handling notes..."
+                  />
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button class="btn" onClick={cancelBloodUpdateModal}>[CANCEL]</button>
+                <button class="btn btn-primary" onClick={() => void submitBloodUpdateModal()}>
+                  [APPLY UPDATE]
+                </button>
+              </div>
+            </div>
+          </div>
+        </Show>
+
+        <Show when={showPoliceCallModal()}>
+          <div class="modal-overlay" onClick={() => setShowPoliceCallModal(false)}>
+            <div class="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div class="modal-header">
+                <h3>=== REQUEST POLICE ASSISTANCE ===</h3>
+                <button class="modal-close" onClick={() => setShowPoliceCallModal(false)}>[X]</button>
+              </div>
+              <div class="modal-body">
+                <div class="form-group">
+                  <label>Priority:</label>
+                  <div class="condition-selector">
+                    <button
+                      class={`condition-btn ${policeCallPriority() === 'LOW' ? 'selected' : ''}`}
+                      onClick={() => setPoliceCallPriority('LOW')}
+                      style={{ color: policeCallPriority() === 'LOW' ? '#00ff00' : undefined }}
+                    >
+                      LOW
+                    </button>
+                    <button
+                      class={`condition-btn ${policeCallPriority() === 'MEDIUM' ? 'selected' : ''}`}
+                      onClick={() => setPoliceCallPriority('MEDIUM')}
+                      style={{ color: policeCallPriority() === 'MEDIUM' ? '#ffaa00' : undefined }}
+                    >
+                      MEDIUM
+                    </button>
+                    <button
+                      class={`condition-btn ${policeCallPriority() === 'HIGH' ? 'selected' : ''}`}
+                      onClick={() => setPoliceCallPriority('HIGH')}
+                      style={{ color: policeCallPriority() === 'HIGH' ? '#ff0000' : undefined }}
+                    >
+                      HIGH
+                    </button>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Reason for assistance:</label>
+                  <textarea
+                    class="dos-textarea"
+                    rows={4}
+                    value={policeCallReason()}
+                    onInput={(e) => setPoliceCallReason(e.currentTarget.value)}
+                    placeholder="Describe the situation requiring police assistance..."
+                  />
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button class="btn" onClick={() => setShowPoliceCallModal(false)}>[CANCEL]</button>
+                <button class="btn btn-primary" onClick={() => void submitPoliceCall()}>
+                  [CALL POLICE]
+                </button>
+              </div>
+            </div>
+          </div>
+        </Show>
 
         <Show when={selectedPatient() && activeTab() !== 'admit'}>
           <div class="patient-detail-overlay" onClick={() => setSelectedPatient(null)}>

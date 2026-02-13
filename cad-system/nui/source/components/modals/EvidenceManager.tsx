@@ -7,6 +7,22 @@ import type { Evidence, Case, StagingEvidence, CustodyEvent } from '~/stores/cad
 import { userActions } from '~/stores/userStore';
 import type { FileItem } from '../FileExplorer.types';
 
+function isEvidence(value: unknown): value is Evidence {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const record = value as Partial<Evidence>;
+  return (
+    typeof record.evidenceId === 'string' &&
+    typeof record.caseId === 'string' &&
+    typeof record.evidenceType === 'string' &&
+    typeof record.attachedBy === 'string' &&
+    typeof record.attachedAt === 'string' &&
+    Array.isArray(record.custodyChain)
+  );
+}
+
 type SelectedEvidence = Evidence | StagingEvidence;
 
 const FileExplorer = (await import('../FileExplorer')).FileExplorer;
@@ -187,6 +203,10 @@ export function EvidenceManager() {
       const hasDocumentPayload =
         ev.evidenceType === 'DOCUMENT' ||
         ev.evidenceType === 'DIGITAL' ||
+        ev.evidenceType === 'BIOLOGICAL' ||
+        ev.evidenceType === 'DNA' ||
+        ev.evidenceType === 'BLOOD' ||
+        ev.evidenceType === 'FINGERPRINT' ||
         (typeof data.content === 'string' && data.content.trim() !== '') ||
         (typeof data.text === 'string' && data.text.trim() !== '') ||
         (typeof data.description === 'string' && data.description.trim() !== '') ||
@@ -233,13 +253,16 @@ export function EvidenceManager() {
         caseId: currentCase()!.caseId
       });
 
-      if (result) {
-        cadActions.removeStagingEvidence(stagingItem.stagingId);
-        cadActions.addCaseEvidence(currentCase()!.caseId, result as Evidence);
-        terminalActions.addLine(`Evidence attached to case ${currentCase()!.caseId}`, 'output');
-        setSelectedEvidence(null);
-        setCurrentPath(''); // Go back to root to see updated structure
+      if (!isEvidence(result)) {
+        terminalActions.addLine('Failed to attach evidence: invalid response payload', 'error');
+        return;
       }
+
+      cadActions.removeStagingEvidence(stagingItem.stagingId);
+      cadActions.addCaseEvidence(currentCase()!.caseId, result);
+      terminalActions.addLine(`Evidence attached to case ${currentCase()!.caseId}`, 'output');
+      setSelectedEvidence(null);
+      setCurrentPath(''); // Go back to root to see updated structure
     } catch (error) {
       terminalActions.addLine(`Failed to attach evidence: ${error}`, 'error');
     }
@@ -331,7 +354,7 @@ export function EvidenceManager() {
             <FileExplorer
               data={filteredFiles()}
               currentPath={currentPath()}
-              height="400px"
+              height="100%"
               viewMode="details"
               showSearch={true}
               searchPlaceholder="Search evidence..."
