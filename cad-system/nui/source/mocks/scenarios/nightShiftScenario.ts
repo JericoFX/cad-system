@@ -1,0 +1,67 @@
+import type { Scenario } from '../types';
+
+export const nightShiftScenario: Scenario = {
+  id: 'NIGHT_SHIFT',
+  name: 'Night Shift',
+  description: 'Quiet night shift with minimal units on duty and few active calls',
+  icon: '🌙',
+  data: {
+    cases: {
+      'CASE_NIGHT_001': {
+        caseId: 'CASE_NIGHT_001',
+        caseType: 'NOISE',
+        title: 'Noise Complaint - Apartment Building',
+        description: 'Neighbor reports loud music at 2 AM',
+        status: 'OPEN',
+        priority: 3,
+        createdBy: 'OFFICER_NIGHT_01',
+        assignedTo: null,
+        createdAt: new Date(Date.now() - 7200000).toISOString(),
+        updatedAt: new Date(Date.now() - 7200000).toISOString(),
+        notes: [],
+        evidence: [],
+        tasks: [],
+      },
+    },
+    calls: {
+      'CALL_NIGHT_001': {
+        callId: 'CALL_NIGHT_001',
+        type: '911',
+        priority: 3,
+        title: 'Suspicious Person',
+        description: 'Individual seen checking car doors in parking lot',
+        location: '24/7 Store - Vinewood Blvd',
+        coordinates: { x: 120.5, y: -320.2, z: 45.0 },
+        status: 'PENDING',
+        assignedUnits: {},
+        createdAt: new Date(Date.now() - 3600000).toISOString(),
+      },
+    },
+    units: {
+      'UNIT_NIGHT_01': {
+        unitId: 'UNIT_NIGHT_01',
+        badge: 'LSPD-N01',
+        name: 'Officer Night Shift 1',
+        status: 'AVAILABLE',
+        type: 'PATROL',
+        location: { x: 50.0, y: -50.0, z: 45.0 },
+      },
+      'UNIT_NIGHT_02': {
+        unitId: 'UNIT_NIGHT_02',
+        badge: 'LSPD-N02',
+        name: 'Officer Night Shift 2',
+        status: 'AVAILABLE',
+        type: 'PATROL',
+        location: { x: -50.0, y: 50.0, z: 45.0 },
+      },
+    },
+    persons: {},
+    vehicles: {},
+    evidence: [],
+    traces: {},
+    alerts: [],
+    bloodRequests: {},
+    fines: {},
+    warrants: {},
+  },
+};

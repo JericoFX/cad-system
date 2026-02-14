@@ -1,3 +1,10 @@
+--[[
+C.A.D. System
+Created by JericoFX
+GitHub: https://github.com/JericoFX
+License: GNU GPL v3
+]]
+
 CAD = CAD or {}
 
 function CAD.GenerateId(prefix)
@@ -8,6 +15,10 @@ end
 function CAD.DeepCopy(value)
     if type(value) ~= 'table' then
         return value
+    end
+
+    if lib and lib.table and lib.table.deepclone then
+        return lib.table.deepclone(value)
     end
 
     local out = {}
@@ -21,6 +32,11 @@ function CAD.TableContains(list, target)
     if type(list) ~= 'table' then
         return false
     end
+
+    if lib and lib.table and lib.table.contains then
+        return lib.table.contains(list, target)
+    end
+
     for i = 1, #list do
         if list[i] == target then
             return true

@@ -1,9 +1,13 @@
 import { createMemo, createSignal, Show } from 'solid-js';
-import { terminalActions } from '~/stores/terminalStore';
+import { terminalActions, terminalState } from '~/stores/terminalStore';
 import { cadState, cadActions } from '~/stores/cadStore';
 import { userState } from '~/stores/userStore';
 import type { MapMarker, MapRef } from '../Map.types';
 import type { DispatchCall } from '~/stores/cadStore';
+
+type MapModalData = {
+  returnModal?: string;
+};
 
 const Map = (await import('../Map')).default;
 
@@ -127,6 +131,12 @@ export function MapModal() {
   const allMarkers = createMemo(() => [...unitMarkers(), ...callMarkers()]);
 
   const closeModal = () => {
+    const modalData = (terminalState.modalData as MapModalData | null) || null;
+    if (modalData?.returnModal) {
+      terminalActions.setActiveModal(modalData.returnModal);
+      return;
+    }
+
     terminalActions.setActiveModal(null);
   };
 
@@ -319,6 +329,13 @@ export function MapModal() {
                 </button>
               </Show>
             </Show>
+            <button
+              class='modal-close'
+              onClick={() => terminalActions.setActiveModal('DISPATCH_PANEL')}
+              style={{ 'margin-right': '10px', color: '#00ffff' }}
+            >
+              [DISPATCH]
+            </button>
             <button
               class='modal-close'
               onClick={handleCreateMarker}

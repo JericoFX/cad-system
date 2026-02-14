@@ -6,6 +6,21 @@ import { Kanban } from '../Kanban';
 import type { KanbanColumn, KanbanItem } from '../Kanban.types';
 import type { DispatchUnit, DispatchCall } from '~/stores/cadStore';
 
+function isDispatchCall(value: unknown): value is DispatchCall {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const record = value as Partial<DispatchCall>;
+  return (
+    typeof record.callId === 'string' &&
+    typeof record.title === 'string' &&
+    typeof record.status === 'string' &&
+    !!record.assignedUnits &&
+    typeof record.assignedUnits === 'object'
+  );
+}
+
 export function DispatchPanel() {
   const availableUnits = createMemo(() => 
     Object.values(cadState.dispatchUnits).filter(u => u.status === 'AVAILABLE')
@@ -143,14 +158,17 @@ export function DispatchPanel() {
   const assignUnitToCall = async (unitId: string, callId: string) => {
     try {
       const result = await fetchNui('cad:assignUnitToCall', { callId, unitId });
-      if (result) {
-        cadActions.updateDispatchCall(callId, result as DispatchCall);
-        cadActions.updateDispatchUnit(unitId, { 
-          status: 'BUSY', 
-          currentCall: callId 
-        });
-        terminalActions.addLine(`Unit ${unitId} assigned to call ${callId}`, 'output');
+      if (!isDispatchCall(result)) {
+        terminalActions.addLine('Invalid dispatch response while assigning unit', 'error');
+        return;
       }
+
+      cadActions.updateDispatchCall(callId, result);
+      cadActions.updateDispatchUnit(unitId, {
+        status: 'BUSY',
+        currentCall: callId,
+      });
+      terminalActions.addLine(`Unit ${unitId} assigned to call ${callId}`, 'output');
     } catch (error) {
       terminalActions.addLine(`Failed to assign unit: ${error}`, 'error');
     }
@@ -159,14 +177,17 @@ export function DispatchPanel() {
   const unassignUnitFromCall = async (unitId: string, callId: string) => {
     try {
       const result = await fetchNui('cad:unassignUnitFromCall', { callId, unitId });
-      if (result) {
-        cadActions.updateDispatchCall(callId, result as DispatchCall);
-        cadActions.updateDispatchUnit(unitId, { 
-          status: 'AVAILABLE', 
-          currentCall: undefined 
-        });
-        terminalActions.addLine(`Unit ${unitId} unassigned from call ${callId}`, 'output');
+      if (!isDispatchCall(result)) {
+        terminalActions.addLine('Invalid dispatch response while unassigning unit', 'error');
+        return;
       }
+
+      cadActions.updateDispatchCall(callId, result);
+      cadActions.updateDispatchUnit(unitId, {
+        status: 'AVAILABLE',
+        currentCall: undefined,
+      });
+      terminalActions.addLine(`Unit ${unitId} unassigned from call ${callId}`, 'output');
     } catch (error) {
       terminalActions.addLine(`Failed to unassign unit: ${error}`, 'error');
     }

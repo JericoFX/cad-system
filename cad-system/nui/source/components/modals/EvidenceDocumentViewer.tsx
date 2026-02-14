@@ -1,5 +1,6 @@
 import { Show, createMemo } from 'solid-js';
 import { terminalActions, terminalState } from '~/stores/terminalStore';
+import { t } from '~/utils/i18n';
 
 type DocumentModalData = {
   title?: string;
@@ -56,6 +57,49 @@ export function EvidenceDocumentViewer() {
     return null;
   });
 
+  const forensicRows = createMemo(() => {
+    const data = payload();
+    const type = String(modalData()?.evidenceType || '').toUpperCase();
+    const rows: Array<{ label: string; value: string }> = [];
+
+    const pushRow = (label: string, value: unknown) => {
+      if (value === undefined || value === null) return;
+      const text = String(value).trim();
+      if (!text) return;
+      rows.push({ label, value: text });
+    };
+
+    const shouldShow =
+      type === 'BIOLOGICAL' ||
+      type === 'DNA' ||
+      type === 'BLOOD' ||
+      type === 'FINGERPRINT' ||
+      type === 'CASING' ||
+      type === 'BULLET' ||
+      type === 'FIBERS';
+
+    if (!shouldShow) {
+      return rows;
+    }
+
+    pushRow(t('evidence.forensic.description'), data.description);
+    pushRow(t('evidence.forensic.labStatus'), data.labStatus);
+    pushRow(t('evidence.forensic.dnaHash'), data.dnaHash);
+    pushRow(t('evidence.forensic.profile'), data.profile);
+    pushRow(t('evidence.forensic.sampleType'), data.sampleType);
+    pushRow(t('evidence.forensic.sampleSource'), data.sampleSource);
+    pushRow(t('evidence.forensic.collectedAt'), data.collectedAt);
+    pushRow(t('evidence.forensic.collectedBy'), data.collectedBy);
+    pushRow(t('evidence.forensic.bloodType'), data.bloodType);
+    pushRow(t('evidence.forensic.quality'), data.quality);
+    pushRow(t('evidence.forensic.caliber'), data.caliber);
+    pushRow(t('evidence.forensic.markings'), data.markings);
+    pushRow(t('evidence.forensic.fiberColor'), data.color || data.fiberColor);
+    pushRow(t('evidence.forensic.material'), data.material);
+
+    return rows;
+  });
+
   const closeModal = () => {
     terminalActions.setActiveModal(null);
   };
@@ -64,7 +108,7 @@ export function EvidenceDocumentViewer() {
     <div class="modal-overlay" onClick={closeModal}>
       <div class="modal-content notepad-viewer" onClick={(event) => event.stopPropagation()}>
         <div class="modal-header">
-          <h2>=== EVIDENCE DOCUMENT ===</h2>
+          <h2>{t('evidence.documentTitle')}</h2>
           <button class="modal-close" onClick={closeModal}>[X]</button>
         </div>
 
@@ -84,13 +128,30 @@ export function EvidenceDocumentViewer() {
             </div>
           </Show>
 
+          <Show when={forensicRows().length > 0}>
+            <div class="notepad-sheet" style={{ 'margin-bottom': '12px' }}>
+              <div style={{ color: '#ffff00', 'font-weight': 'bold', 'margin-bottom': '8px' }}>
+                {t('evidence.forensic.title')}
+              </div>
+              <Show when={forensicRows().length > 0}>
+                <div style={{ display: 'grid', gap: '4px' }}>
+                  {forensicRows().map((row) => (
+                    <div>
+                      <strong>{row.label}:</strong> {row.value}
+                    </div>
+                  ))}
+                </div>
+              </Show>
+            </div>
+          </Show>
+
           <div class="notepad-sheet">
             {documentText()}
           </div>
 
           <Show when={externalUrl()}>
             <div class="notepad-meta" style={{ 'margin-top': '12px' }}>
-              <div>External URL:</div>
+              <div>{t('evidence.externalUrl')}</div>
               <a
                 href={externalUrl() || '#'}
                 target="_blank"
@@ -104,7 +165,7 @@ export function EvidenceDocumentViewer() {
         </div>
 
         <div class="modal-footer">
-          <button class="btn" onClick={closeModal}>[CLOSE]</button>
+          <button class="btn" onClick={closeModal}>{t('evidence.close')}</button>
         </div>
       </div>
     </div>

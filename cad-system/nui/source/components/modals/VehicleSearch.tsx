@@ -5,7 +5,8 @@ import { cadState, cadActions, type Vehicle } from '~/stores/cadStore';
 export function VehicleSearch() {
   const [searchQuery, setSearchQuery] = createSignal('');
   const [selectedVehicle, setSelectedVehicle] = createSignal<Vehicle | null>(null);
-  const [activeTab, setActiveTab] = createSignal<'info' | 'owner'>('info');
+  const [activeTab, setActiveTab] = createSignal<'info' | 'owner' | 'notes'>('info');
+  const [newVehicleNote, setNewVehicleNote] = createSignal('');
 
   const searchResults = createMemo(() => {
     const query = searchQuery().toLowerCase();
@@ -27,6 +28,34 @@ export function VehicleSearch() {
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString();
+  };
+
+  const vehicleNotes = createMemo(() => {
+    const vehicle = selectedVehicle();
+    if (!vehicle) return [];
+    return (vehicle.notes || []).slice().sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  });
+
+  const addVehicleNote = () => {
+    const vehicle = selectedVehicle();
+    const content = newVehicleNote().trim();
+    if (!vehicle || !content) {
+      terminalActions.addLine('Write a note first', 'error');
+      return;
+    }
+
+    const note = {
+      id: `VNOTE_${Date.now()}`,
+      content,
+      author: 'OFFICER_001',
+      timestamp: new Date().toISOString(),
+    };
+
+    cadActions.addVehicleNote(vehicle.plate, note);
+    setSelectedVehicle({ ...vehicle, notes: [...(vehicle.notes || []), note] });
+    setNewVehicleNote('');
+    setActiveTab('notes');
+    terminalActions.addLine(`✓ Note added to vehicle ${vehicle.plate}`, 'output');
   };
 
   onMount(() => {
@@ -147,6 +176,12 @@ export function VehicleSearch() {
                 >
                   [OWNER INFO]
                 </button>
+                <button
+                  class={`tab ${activeTab() === 'notes' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('notes')}
+                >
+                  [NOTES ({vehicleNotes().length})]
+                </button>
               </div>
 
               <div class="tab-content">
@@ -248,6 +283,35 @@ export function VehicleSearch() {
                         [ISSUE WARRANT]
                       </button>
                     </div>
+                  </div>
+                </Show>
+
+                <Show when={activeTab() === 'notes'}>
+                  <div class="records-list">
+                    <div class="add-note-form">
+                      <textarea
+                        class="dos-textarea"
+                        rows={3}
+                        value={newVehicleNote()}
+                        onInput={(e) => setNewVehicleNote(e.currentTarget.value)}
+                        placeholder="Write a quick note for this vehicle..."
+                      />
+                      <button class="btn btn-primary" onClick={addVehicleNote}>[SAVE NOTE]</button>
+                    </div>
+
+                    <Show when={vehicleNotes().length === 0}>
+                      <div class="empty-state">No vehicle notes yet</div>
+                    </Show>
+
+                    <For each={vehicleNotes()}>
+                      {(note) => (
+                        <div class="record-item">
+                          <div class="record-date">{formatDate(note.timestamp)}</div>
+                          <div class="record-sentence">{note.content}</div>
+                          <div class="record-officer">By: {note.author}</div>
+                        </div>
+                      )}
+                    </For>
                   </div>
                 </Show>
               </div>

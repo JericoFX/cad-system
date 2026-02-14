@@ -1,3 +1,10 @@
+--[[
+C.A.D. System
+Created by JericoFX
+GitHub: https://github.com/JericoFX
+License: GNU GPL v3
+]]
+
 CAD = CAD or {}
 CAD.Cases = CAD.Cases or {}
 
@@ -46,38 +53,47 @@ local function ensureCase(caseId)
 end
 
 local function saveCaseDb(caseObj)
-    MySQL.insert.await([[
-        INSERT INTO cad_cases (
-            case_id, case_type, title, description, status, priority,
-            created_by, assigned_to, linked_call_id, person_id, person_name,
-            created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-            case_type = VALUES(case_type),
-            title = VALUES(title),
-            description = VALUES(description),
-            status = VALUES(status),
-            priority = VALUES(priority),
-            assigned_to = VALUES(assigned_to),
-            linked_call_id = VALUES(linked_call_id),
-            person_id = VALUES(person_id),
-            person_name = VALUES(person_name),
-            updated_at = VALUES(updated_at)
-    ]], {
-        caseObj.caseId,
-        caseObj.caseType,
-        caseObj.title,
-        caseObj.description,
-        caseObj.status,
-        caseObj.priority,
-        caseObj.createdBy,
-        caseObj.assignedTo,
-        caseObj.linkedCallId,
-        caseObj.personId,
-        caseObj.personName,
-        caseObj.createdAt,
-        caseObj.updatedAt,
-    })
+    local ok, err = pcall(function()
+        MySQL.insert.await([[
+            INSERT INTO cad_cases (
+                case_id, case_type, title, description, status, priority,
+                created_by, assigned_to, linked_call_id, person_id, person_name,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                case_type = VALUES(case_type),
+                title = VALUES(title),
+                description = VALUES(description),
+                status = VALUES(status),
+                priority = VALUES(priority),
+                assigned_to = VALUES(assigned_to),
+                linked_call_id = VALUES(linked_call_id),
+                person_id = VALUES(person_id),
+                person_name = VALUES(person_name),
+                updated_at = VALUES(updated_at)
+        ]], {
+            caseObj.caseId,
+            caseObj.caseType,
+            caseObj.title,
+            caseObj.description,
+            caseObj.status,
+            caseObj.priority,
+            caseObj.createdBy,
+            caseObj.assignedTo,
+            caseObj.linkedCallId,
+            caseObj.personId,
+            caseObj.personName,
+            caseObj.createdAt,
+            caseObj.updatedAt,
+        })
+    end)
+
+    if not ok then
+        CAD.Log('error', 'Failed saving case %s: %s', tostring(caseObj and caseObj.caseId), tostring(err))
+        return false, 'db_write_failed'
+    end
+
+    return true
 end
 
 lib.callback.register('cad:createCase', CAD.Auth.WithGuard('heavy', function(source, payload, officer)
@@ -121,17 +137,25 @@ lib.callback.register('cad:createCase', CAD.Auth.WithGuard('heavy', function(sou
         tasks = {},
     }
 
+    local saved, saveErr = saveCaseDb(caseObj)
+    if not saved then
+        return { ok = false, error = saveErr or 'db_write_failed' }
+    end
+
     cases[caseId] = caseObj
-    saveCaseDb(caseObj)
 
     return caseToClient(caseObj)
 end))
 
 lib.callback.register('cad:getCase', CAD.Auth.WithGuard('default', function(_, payload)
     local caseId = type(payload) == 'string' and payload or payload.caseId or payload.id
-    if not caseId then return nil end
+    if not caseId then
+        return { ok = false, error = 'case_id_required' }
+    end
     local caseObj = ensureCase(caseId)
-    if not caseObj then return nil end
+    if not caseObj then
+        return { ok = false, error = 'not_found' }
+    end
     return caseToClient(caseObj)
 end))
 
@@ -170,13 +194,15 @@ end))
 lib.callback.register('cad:updateCase', CAD.Auth.WithGuard('heavy', function(_, payload)
     local caseId = payload.caseId or payload.id
     if not caseId then
-        return nil
+        return { ok = false, error = 'case_id_required' }
     end
 
     local caseObj = ensureCase(caseId)
     if not caseObj then
-        return nil
+        return { ok = false, error = 'not_found' }
     end
+
+    local previous = cloneTable(caseObj)
 
     if payload.title then caseObj.title = CAD.Server.SanitizeString(payload.title, 255) end
     if payload.description then caseObj.description = CAD.Server.SanitizeString(payload.description, 2000) end
@@ -189,7 +215,16 @@ lib.callback.register('cad:updateCase', CAD.Auth.WithGuard('heavy', function(_, 
     if payload.notes ~= nil and type(payload.notes) == 'table' then caseObj.notes = payload.notes end
 
     caseObj.updatedAt = CAD.Server.ToIso()
-    saveCaseDb(caseObj)
+    local saved, saveErr = saveCaseDb(caseObj)
+    if not saved then
+        for key in pairs(caseObj) do
+            caseObj[key] = nil
+        end
+        for key, value in pairs(previous) do
+            caseObj[key] = value
+        end
+        return { ok = false, error = saveErr or 'db_write_failed' }
+    end
 
     return caseToClient(caseObj)
 end))
@@ -205,9 +240,89 @@ lib.callback.register('cad:closeCase', CAD.Auth.WithGuard('heavy', function(_, p
         return { ok = false, error = 'not_found' }
     end
 
+    local previousStatus = caseObj.status
+    local previousUpdatedAt = caseObj.updatedAt
     caseObj.status = 'CLOSED'
     caseObj.updatedAt = CAD.Server.ToIso()
-    saveCaseDb(caseObj)
+    local saved, saveErr = saveCaseDb(caseObj)
+    if not saved then
+        caseObj.status = previousStatus
+        caseObj.updatedAt = previousUpdatedAt
+        return { ok = false, error = saveErr or 'db_write_failed' }
+    end
 
-    return { success = true, caseId = caseId }
+    return { ok = true, success = true, caseId = caseId }
+end))
+
+-- Print case report callback
+lib.callback.register("cad:case:printReport", CAD.Auth.WithGuard("default", function(source, payload)
+    local caseId = payload and payload.caseId
+    if not caseId then
+        return { ok = false, error = "case_id_required" }
+    end
+    
+    local officer = CAD.Auth.GetOfficer(source)
+    if not officer then
+        return { ok = false, error = "officer_not_found" }
+    end
+    
+    -- Generate report content
+    local reportContent = string.format([[
+=== CASE REPORT ===
+Case ID: %s
+Type: %s
+Priority: P%d
+Status: %s
+Created: %s
+
+Title: %s
+
+Description:
+%s
+
+Notes: %d
+Evidence: %d
+
+Printed by: %s
+Badge: %s
+]], 
+        caseId,
+        payload.caseType or "N/A",
+        payload.priority or 1,
+        payload.status or "UNKNOWN",
+        payload.createdAt or "N/A",
+        payload.title or "N/A",
+        payload.description or "No description",
+        payload.notesCount or 0,
+        payload.evidenceCount or 0,
+        officer.name or "Unknown",
+        officer.badge or "N/A"
+    )
+    
+    -- Create paper item if ox_inventory available
+    local itemId = nil
+    if CAD.Config.Evidence and CAD.Config.Evidence.TicketItemName then
+        local itemName = CAD.Config.Evidence.TicketItemName
+        local metadata = {
+            caseId = caseId,
+            reportType = "CASE_REPORT",
+            printedBy = officer.name,
+            printedAt = CAD.Server.ToIso(),
+            description = string.format("Case %s Report", caseId)
+        }
+        
+        local success, result = pcall(function()
+            return exports.ox_inventory:AddItem(source, itemName, 1, metadata)
+        end)
+        
+        if success and result then
+            itemId = result
+        end
+    end
+    
+    return { 
+        ok = true, 
+        itemId = itemId,
+        report = reportContent
+    }
 end))

@@ -1,7 +1,45 @@
+--[[
+C.A.D. System
+Created by JericoFX
+GitHub: https://github.com/JericoFX
+License: GNU GPL v3
+]]
+
 CAD = CAD or {}
 
+local function safeJsonDecode(raw, fallback, context)
+    if type(raw) ~= 'string' or raw == '' then
+        return fallback
+    end
+
+    local ok, decoded = pcall(json.decode, raw)
+    if not ok then
+        CAD.Log('warn', 'Invalid JSON in %s: %s', tostring(context or 'unknown'), tostring(decoded))
+        return fallback
+    end
+
+    if decoded == nil then
+        return fallback
+    end
+
+    return decoded
+end
+
+local function safeQuery(sql, params, context)
+    local ok, rows = pcall(function()
+        return MySQL.query.await(sql, params or {})
+    end)
+
+    if not ok then
+        CAD.Log('error', 'Database bootstrap query failed (%s): %s', tostring(context or sql), tostring(rows))
+        return {}
+    end
+
+    return rows or {}
+end
+
 local function bootstrapFromDatabase()
-    local caseRows = MySQL.query.await('SELECT * FROM cad_cases', {}) or {}
+    local caseRows = safeQuery('SELECT * FROM cad_cases', {}, 'cad_cases')
     for i = 1, #caseRows do
         local row = caseRows[i]
         CAD.State.Cases[row.case_id] = {
@@ -24,7 +62,7 @@ local function bootstrapFromDatabase()
         }
     end
 
-    local noteRows = MySQL.query.await('SELECT * FROM cad_case_notes', {}) or {}
+    local noteRows = safeQuery('SELECT * FROM cad_case_notes', {}, 'cad_case_notes')
     for i = 1, #noteRows do
         local row = noteRows[i]
         local caseObj = CAD.State.Cases[row.case_id]
@@ -40,7 +78,7 @@ local function bootstrapFromDatabase()
         end
     end
 
-    local evidenceRows = MySQL.query.await('SELECT * FROM cad_evidence', {}) or {}
+    local evidenceRows = safeQuery('SELECT * FROM cad_evidence', {}, 'cad_evidence')
     for i = 1, #evidenceRows do
         local row = evidenceRows[i]
         local caseObj = CAD.State.Cases[row.case_id]
@@ -49,15 +87,15 @@ local function bootstrapFromDatabase()
                 evidenceId = row.evidence_id,
                 caseId = row.case_id,
                 evidenceType = row.evidence_type,
-                data = row.payload and json.decode(row.payload) or {},
+                data = safeJsonDecode(row.payload, {}, ('cad_evidence.payload:%s'):format(tostring(row.evidence_id))),
                 attachedBy = row.attached_by,
                 attachedAt = row.attached_at,
-                custodyChain = row.custody_chain and json.decode(row.custody_chain) or {},
+                custodyChain = safeJsonDecode(row.custody_chain, {}, ('cad_evidence.custody_chain:%s'):format(tostring(row.evidence_id))),
             }
         end
     end
 
-    local callRows = MySQL.query.await('SELECT * FROM cad_dispatch_calls WHERE status <> ?', { 'CLOSED' }) or {}
+    local callRows = safeQuery('SELECT * FROM cad_dispatch_calls WHERE status <> ?', { 'CLOSED' }, 'cad_dispatch_calls')
     for i = 1, #callRows do
         local row = callRows[i]
         CAD.State.Dispatch.Calls[row.call_id] = {
@@ -67,14 +105,14 @@ local function bootstrapFromDatabase()
             title = row.title,
             description = row.description or '',
             location = row.location,
-            coordinates = row.coordinates and json.decode(row.coordinates) or nil,
+            coordinates = safeJsonDecode(row.coordinates, nil, ('cad_dispatch_calls.coordinates:%s'):format(tostring(row.call_id))),
             status = row.status,
-            assignedUnits = row.assigned_units and json.decode(row.assigned_units) or {},
+            assignedUnits = safeJsonDecode(row.assigned_units, {}, ('cad_dispatch_calls.assigned_units:%s'):format(tostring(row.call_id))),
             createdAt = row.created_at,
         }
     end
 
-    local fineRows = MySQL.query.await('SELECT * FROM cad_fines WHERE status = ?', { 'PENDING' }) or {}
+    local fineRows = safeQuery('SELECT * FROM cad_fines WHERE status = ?', { 'PENDING' }, 'cad_fines')
     for i = 1, #fineRows do
         local row = fineRows[i]
         CAD.State.Fines[row.fine_id] = {
@@ -97,7 +135,7 @@ local function bootstrapFromDatabase()
         }
     end
 
-    local bloodRows = MySQL.query.await('SELECT * FROM cad_ems_blood_requests', {}) or {}
+    local bloodRows = safeQuery('SELECT * FROM cad_ems_blood_requests', {}, 'cad_ems_blood_requests')
     for i = 1, #bloodRows do
         local row = bloodRows[i]
         CAD.State.EMS.BloodRequests[row.request_id] = {
@@ -128,7 +166,7 @@ local function bootstrapFromDatabase()
             sampleStashId = row.sample_stash_id,
             sampleSlot = tonumber(row.sample_slot) or nil,
             sampleItemName = row.sample_item_name,
-            sampleMetadata = row.sample_metadata and json.decode(row.sample_metadata) or nil,
+            sampleMetadata = safeJsonDecode(row.sample_metadata, nil, ('cad_ems_blood_requests.sample_metadata:%s'):format(tostring(row.request_id))),
             evidenceId = row.evidence_id,
         }
     end
@@ -154,7 +192,10 @@ end))
 lib.callback.register('cad:getPlayerData', function(source)
     local officer = CAD.Auth.GetOfficerData(source)
     if not officer then
-        return nil
+        return {
+            ok = false,
+            error = 'not_authorized',
+        }
     end
 
     return {

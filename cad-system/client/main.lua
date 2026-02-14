@@ -1,3 +1,10 @@
+--[[
+C.A.D. System
+Created by JericoFX
+GitHub: https://github.com/JericoFX
+License: GNU GPL v3
+]]
+
 CAD = CAD or {}
 CAD.Client = CAD.Client or {}
 
@@ -33,7 +40,7 @@ local function setActiveTerminal(point, index)
 end
 
 local function getNearestTerminal()
-    local ped = PlayerPedId()
+    local ped = cache.ped
     if not ped or ped == 0 then
         return nil
     end
@@ -203,7 +210,7 @@ CreateThread(function()
     while true do
         Wait(CAD.Config.Dispatch.PositionBroadcastMs)
 
-        local ped = PlayerPedId()
+        local ped = cache.ped
         if ped and ped ~= 0 then
             local coords = GetEntityCoords(ped)
             TriggerServerEvent('cad:server:updatePosition', {

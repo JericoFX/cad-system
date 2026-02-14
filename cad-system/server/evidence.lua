@@ -1,3 +1,10 @@
+--[[
+C.A.D. System
+Created by JericoFX
+GitHub: https://github.com/JericoFX
+License: GNU GPL v3
+]]
+
 CAD = CAD or {}
 CAD.Evidence = CAD.Evidence or {}
 
@@ -11,28 +18,39 @@ end
 local function appendCaseEvidence(caseId, evidence)
     local caseObj = CAD.State.Cases[caseId]
     if not caseObj then
-        return false
+        return false, 'case_not_found'
     end
 
     caseObj.evidence = caseObj.evidence or {}
     caseObj.evidence[#caseObj.evidence + 1] = evidence
+    local insertedIndex = #caseObj.evidence
+    local previousUpdatedAt = caseObj.updatedAt
     caseObj.updatedAt = CAD.Server.ToIso()
 
-    MySQL.insert.await([[
-        INSERT INTO cad_evidence (evidence_id, case_id, evidence_type, payload, attached_by, attached_at, custody_chain)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-            payload = VALUES(payload),
-            custody_chain = VALUES(custody_chain)
-    ]], {
-        evidence.evidenceId,
-        evidence.caseId,
-        evidence.evidenceType,
-        json.encode(evidence.data or {}),
-        evidence.attachedBy,
-        evidence.attachedAt,
-        json.encode(evidence.custodyChain or {}),
-    })
+    local ok, err = pcall(function()
+        MySQL.insert.await([[
+            INSERT INTO cad_evidence (evidence_id, case_id, evidence_type, payload, attached_by, attached_at, custody_chain)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                payload = VALUES(payload),
+                custody_chain = VALUES(custody_chain)
+        ]], {
+            evidence.evidenceId,
+            evidence.caseId,
+            evidence.evidenceType,
+            json.encode(evidence.data or {}),
+            evidence.attachedBy,
+            evidence.attachedAt,
+            json.encode(evidence.custodyChain or {}),
+        })
+    end)
+
+    if not ok then
+        table.remove(caseObj.evidence, insertedIndex)
+        caseObj.updatedAt = previousUpdatedAt
+        CAD.Log('error', 'Failed saving evidence %s: %s', tostring(evidence and evidence.evidenceId), tostring(err))
+        return false, 'db_write_failed'
+    end
 
     return true
 end
@@ -83,12 +101,12 @@ lib.callback.register('cad:attachEvidence', CAD.Auth.WithGuard('heavy', function
     local stagingId = payload.stagingId
     local caseId = payload.caseId
     if not stagingId or not caseId then
-        return nil
+        return { ok = false, error = 'invalid_payload' }
     end
 
     local caseObj = CAD.State.Cases[caseId]
     if not caseObj then
-        return nil
+        return { ok = false, error = 'case_not_found' }
     end
 
     local bucket = getOfficerStaging(source)
@@ -102,7 +120,7 @@ lib.callback.register('cad:attachEvidence', CAD.Auth.WithGuard('heavy', function
     end
 
     if not selected then
-        return nil
+        return { ok = false, error = 'staging_not_found' }
     end
 
     local evidence = {
@@ -126,9 +144,9 @@ lib.callback.register('cad:attachEvidence', CAD.Auth.WithGuard('heavy', function
     }
     evidence.custodyChain[1].evidenceId = evidence.evidenceId
 
-    local ok = appendCaseEvidence(caseId, evidence)
+    local ok, appendErr = appendCaseEvidence(caseId, evidence)
     if not ok then
-        return nil
+        return { ok = false, error = appendErr or 'cannot_attach_evidence' }
     end
 
     table.remove(bucket, selectedIndex)

@@ -1,6 +1,7 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js';
 import { terminalActions } from '~/stores/terminalStore';
 import { cadActions, cadState, type DispatchCall, type DispatchUnit } from '~/stores/cadStore';
+import { radioActions } from '~/stores/radioStore';
 import { fetchNui } from '~/utils/fetchNui';
 
 type DispatchGuardError = {
@@ -487,6 +488,33 @@ export function DispatchTable() {
     return linkedCase ? 'OPEN CASE' : 'CREATE CASE';
   };
 
+  const getDispatchChannelForUnit = (unit: DispatchUnit) => {
+    return isEmsUnit(unit) ? 'CH-3' : 'CH-2';
+  };
+
+  const notifyCallToChannels = (call: DispatchCall, unitIds: string[], prefix = 'Assignment') => {
+    if (!call || unitIds.length === 0) {
+      return;
+    }
+
+    const unitLabels = unitIds.join(', ');
+    const msg = `${prefix}: ${call.callId} -> ${unitLabels} | ${call.title}`;
+
+    radioActions.injectSystemMessage('CH-1', msg, 'TEXT', 'DISPATCH', 'DSP');
+
+    const sentChannels = new Set<string>();
+    for (let i = 0; i < unitIds.length; i++) {
+      const unit = cadState.dispatchUnits[unitIds[i]];
+      if (!unit) continue;
+      const channelId = getDispatchChannelForUnit(unit);
+      if (sentChannels.has(channelId)) continue;
+      sentChannels.add(channelId);
+      radioActions.injectSystemMessage(channelId, msg, 'TEXT', 'DISPATCH', 'DSP');
+    }
+
+    terminalActions.addLine(`Radio notice sent: ${msg}`, 'system');
+  };
+
   const closePanel = () => {
     terminalActions.setActiveModal(null);
   };
@@ -553,6 +581,7 @@ export function DispatchTable() {
         currentCall: callId,
       });
       terminalActions.addLine(`Unit ${unitId} assigned to ${callId}`, 'output');
+      notifyCallToChannels(result, [unitId], 'Assignment');
     } catch (error) {
       terminalActions.addLine(`Failed assigning unit: ${String(error)}`, 'error');
     }
@@ -625,7 +654,7 @@ export function DispatchTable() {
   };
 
   const autoAssignBestUnit = async () => {
-    // Boton de pereza: agarra la mejor sugerencia y asigna en un click.
+    // Single-click assignment using the current best suggestion.
     const call = selectedCall();
     const suggestion = recommendedUnit();
 
@@ -700,6 +729,7 @@ export function DispatchTable() {
         description: '',
       });
       terminalActions.addLine(`Dispatch call ${result.callId} created`, 'output');
+      radioActions.injectSystemMessage('CH-1', `New call ${result.callId}: ${result.title}`, 'TEXT', 'DISPATCH', 'DSP');
     } catch (error) {
       terminalActions.addLine(`Failed creating call: ${String(error)}`, 'error');
     } finally {
@@ -757,7 +787,7 @@ export function DispatchTable() {
         <div class="modal-header dispatch-v2-header">
           <h2>=== DISPATCH OPERATIONS CENTER ===</h2>
           <div class="dispatch-v2-header-actions">
-            <button class="btn" onClick={() => terminalActions.setActiveModal('MAP')}>[MAP]</button>
+            <button class="btn" onClick={() => terminalActions.setActiveModal('MAP', { returnModal: 'DISPATCH_PANEL' })}>[MAP]</button>
             <button class="btn" onClick={() => void refreshData()} disabled={loading()}>
               [{loading() ? 'SYNCING...' : 'REFRESH'}]
             </button>
@@ -888,6 +918,14 @@ export function DispatchTable() {
                         <button class="btn" onClick={() => createCaseFromCall(call.callId)}>
                           [{getCaseActionLabel(call.callId)}]
                         </button>
+                        <Show when={Object.keys(call.assignedUnits).length > 0}>
+                          <button
+                            class="btn"
+                            onClick={() => notifyCallToChannels(call, Object.keys(call.assignedUnits), 'Case update')}
+                          >
+                            [NOTIFY UNITS]
+                          </button>
+                        </Show>
                         <Show when={call.status !== 'CLOSED'}>
                           <button class="btn btn-danger" onClick={() => void closeCall(call.callId)}>
                             [CLOSE CALL]

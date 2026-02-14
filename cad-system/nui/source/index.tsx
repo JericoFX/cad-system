@@ -18,11 +18,16 @@ void (async () => {
   registerAllCommands();
 
   if (CONFIG.USE_MOCK_DATA) {
-    const { initializeMockNUI, setMockUser } = await import('./mocks/mockNUI');
-    initializeMockNUI();
-    setMockUser(CONFIG.MOCK_USER.id, CONFIG.MOCK_USER.badge);
+    // Initialize new event-based mock system
+    const { initMockSystem, setMockEnabled, loadScenario, emptyScenario } = await import('./mocks');
+    initMockSystem();
+    setMockEnabled(true);
+    
+    // Load empty scenario by default
+    await loadScenario(emptyScenario);
+    
     await userActions.init();
-    console.log('[DEV] Mock mode enabled');
+    console.log('[DEV] Mock system enabled - event-based mode');
     return;
   }
 

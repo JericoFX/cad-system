@@ -1,3 +1,10 @@
+--[[
+C.A.D. System
+Created by JericoFX
+GitHub: https://github.com/JericoFX
+License: GNU GPL v3
+]]
+
 CAD = CAD or {}
 
 CAD.Config = {
@@ -311,6 +318,13 @@ CAD.Config = {
         DefaultEvidenceItem = 'cad_evidence_item',
         WorldTraceTTLSeconds = 1800,
         WorldTraceMinIntervalMs = 750,
+        WorldTraceDetectRadius = 18.0,
+        WorldTraceInteractRadius = 1.8,
+        WorldTraceVisibleJobs = {
+            police = true,
+            sheriff = true,
+            csi = true,
+        },
         AllowAllIngestResources = true,
         AllowedIngestResources = {},
         BloodAnalysisDurationMs = 45000,
@@ -354,6 +368,9 @@ CAD.State = CAD.State or {
         Alerts = {},
         Units = {},
         BloodRequests = {},
+    },
+    Police = {
+        JailTransfers = {},
     },
     OfficerStatus = {},
     Forensics = {

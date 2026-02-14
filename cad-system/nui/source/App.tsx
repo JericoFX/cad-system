@@ -1,9 +1,12 @@
 import { Switch, Match, Show, createMemo } from 'solid-js';
 import { Terminal } from './components/Terminal';
-import { HelpDrawer } from './components/HelpDrawer';
+import { CenterBadge } from './components/CenterBadge';
 import { SessionContextBar } from './components/SessionContextBar';
 import { DockLauncher } from './components/DockLauncher';
-import { FlowProgressOverlay, FlowMinimizedIndicator } from './components/FlowMacros';
+import {
+  FlowProgressOverlay,
+  FlowMinimizedIndicator,
+} from './components/FlowMacros';
 import { AuditViewer, AuditQuickButton } from './components/AuditViewer';
 import { HomeScreen } from './components/HomeScreen';
 import { DispatchTable } from './components/modals/DispatchTable';
@@ -37,6 +40,7 @@ import { viewerState, viewerActions } from './stores/viewerStore';
 import { uiPrefsState, uiPrefsActions } from './stores/uiPreferencesStore';
 import { featureState } from './stores/featureStore';
 import { CONFIG } from './config';
+import { MockController } from './mocks';
 
 export function App() {
   const appClasses = createMemo(() => {
@@ -63,8 +67,16 @@ export function App() {
           <Terminal />
         </div>
       </Show>
+
+      <CenterBadge />
+
       <Switch>
-        <Match when={terminalState.activeModal === 'DISPATCH_PANEL' && featureState.dispatch.visible}>
+        <Match
+          when={
+            terminalState.activeModal === 'DISPATCH_PANEL' &&
+            featureState.dispatch.visible
+          }
+        >
           <DispatchTable />
         </Match>
         <Match when={terminalState.activeModal === 'CASE_CREATOR'}>
@@ -106,7 +118,12 @@ export function App() {
         <Match when={terminalState.activeModal === 'EMS_DASHBOARD'}>
           <EMSDashboard />
         </Match>
-        <Match when={terminalState.activeModal === 'NEWS_MANAGER' && featureState.news.visible}>
+        <Match
+          when={
+            terminalState.activeModal === 'NEWS_MANAGER' &&
+            featureState.news.visible
+          }
+        >
           <NewsManager />
         </Match>
         <Match when={terminalState.activeModal === 'RADIO_PANEL'}>
@@ -136,33 +153,38 @@ export function App() {
         <Match when={terminalState.activeModal === 'BOLO_MANAGER'}>
           <BoloManager />
         </Match>
-        <Match when={terminalState.activeModal === 'FORENSIC_COLLECTION' && featureState.forensics.visible}>
+        <Match
+          when={
+            terminalState.activeModal === 'FORENSIC_COLLECTION' &&
+            featureState.forensics.visible
+          }
+        >
           <ForensicCollection />
         </Match>
       </Switch>
-      
+
       {viewerState.isOpen && (
-        <ImageViewer 
+        <ImageViewer
           images={viewerState.images}
           title={viewerState.title}
           onClose={viewerActions.close}
         />
       )}
-      
-      <HelpDrawer />
-      
+
       <SessionContextBar />
-      
+
       <DockLauncher />
-      
+
       <HomeScreen />
-      
+
       <FlowProgressOverlay />
       <FlowMinimizedIndicator />
-      
+
       <AuditViewer />
-      
+
       <AuditQuickButton />
+
+      <MockController />
     </div>
   );
 }

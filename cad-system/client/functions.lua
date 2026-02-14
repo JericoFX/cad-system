@@ -1,3 +1,10 @@
+--[[
+C.A.D. System
+Created by JericoFX
+GitHub: https://github.com/JericoFX
+License: GNU GPL v3
+]]
+
 -- CAD Client Functions
 
 -- Get street name at coords
@@ -17,7 +24,7 @@ function CAD.Client.FormatCoords(coords)
     return string.format('%.2f, %.2f, %.2f', coords.x, coords.y, coords.z)
 end
 
--- Get direction from heading
+-- Get direction from heading ((dont remember where i take this sorry!!))
 function CAD.Client.GetDirection(heading)
     local directions = { 'N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW' }
     local index = math.floor((heading + 22.5) / 45) % 8
@@ -32,12 +39,12 @@ end
 -- Get vehicle info
 function CAD.Client.GetVehicleInfo()
     if not cache.vehicle then return nil end
-    
+
     local vehicle = cache.vehicle
     local model = GetEntityModel(vehicle)
     local name = GetDisplayNameFromVehicleModel(model)
     local plate = GetVehicleNumberPlateText(vehicle)
-    
+
     return {
         model = model,
         name = name,
@@ -94,7 +101,7 @@ function CAD.Client.Draw3DText(coords, text)
         SetTextCentre(1)
         AddTextComponentString(text)
         DrawText(x, y)
-        
+
         local factor = (string.len(text)) / 370
         DrawRect(x, y + 0.0125, 0.015 + factor, 0.03, 41, 11, 41, 68)
     end
@@ -110,10 +117,11 @@ function CAD.Client.RayCastGamePlayCamera(distance)
         y = cameraCoord.y + direction.y * distance,
         z = cameraCoord.z + direction.z * distance
     }
-    
-    local rayHandle = StartShapeTestRay(cameraCoord.x, cameraCoord.y, cameraCoord.z, destination.x, destination.y, destination.z, -1, cache.ped, 0)
+
+    local rayHandle = StartShapeTestRay(cameraCoord.x, cameraCoord.y, cameraCoord.z, destination.x, destination.y,
+        destination.z, -1, cache.ped, 0)
     local _, hit, hitCoords, _, entityHit = GetShapeTestResult(rayHandle)
-    
+
     return hit, hitCoords, entityHit
 end
 
@@ -135,5 +143,5 @@ end
 -- Check if coords are valid
 function CAD.Client.IsValidCoords(coords)
     return coords and coords.x and coords.y and coords.z and
-           coords.x ~= 0 and coords.y ~= 0
+        coords.x ~= 0 and coords.y ~= 0
 end
