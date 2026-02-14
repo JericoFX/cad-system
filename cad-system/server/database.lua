@@ -1,3 +1,10 @@
+--[[
+C.A.D. System
+Created by JericoFX
+GitHub: https://github.com/JericoFX
+License: GNU GPL v3
+]]
+
 CAD = CAD or {}
 CAD.Database = CAD.Database or {}
 
@@ -168,64 +175,64 @@ function CAD.Database.EnsureSchema()
     execute([[ALTER TABLE cad_ems_blood_requests ADD COLUMN IF NOT EXISTS last_reminder_ms BIGINT NULL]])
     execute([[ALTER TABLE cad_ems_blood_requests ADD COLUMN IF NOT EXISTS evidence_id VARCHAR(64) NULL]])
 
-    -- Enable event scheduler
+
     execute([[SET GLOBAL event_scheduler = ON]])
 
-    -- Event 1: Cleanup stale evidence (staging > 24h)
+    -- 1
     execute([[
         CREATE EVENT IF NOT EXISTS ev_cleanup_stale_evidence
         ON SCHEDULE EVERY 6 HOUR
         DO
-            DELETE FROM cad_evidence 
-            WHERE case_id = '' 
+            DELETE FROM cad_evidence
+            WHERE case_id = ''
             AND STR_TO_DATE(attached_at, '%Y-%m-%dT%H:%i:%s') < DATE_SUB(NOW(), INTERVAL 24 HOUR)
     ]])
 
-    -- Event 2: Cleanup closed calls (> 30 days)
+    -- Event 2: Purge old closed dispatch calls
     execute([[
         CREATE EVENT IF NOT EXISTS ev_cleanup_closed_calls
         ON SCHEDULE EVERY 24 HOUR
         DO
-            DELETE FROM cad_dispatch_calls 
-            WHERE status = 'CLOSED' 
-            AND STR_TO_DATE(created_at, '%Y-%m-%dT%H:%i:%s') < DATE_SUB(NOW(), INTERVAL 30 DAY)
+            DELETE FROM cad_dispatch_calls
+            WHERE status = 'CLOSED'
+            AND STR_TO_DATE(created_at, '%Y-%m-%dT%H:%i:%s') < DATE_SUB(NOW(), INTERVAL 10 DAY)
     ]])
 
-    -- Event 3: Cleanup closed cases with related data (> 90 days)
+    -- Event 3: Purge old closed cases and related records
     execute([[
         CREATE EVENT IF NOT EXISTS ev_cleanup_closed_cases
         ON SCHEDULE EVERY 24 HOUR
         DO
-            DELETE c, n, t, e 
+            DELETE c, n, t, e
             FROM cad_cases c
             LEFT JOIN cad_case_notes n ON c.case_id = n.case_id
             LEFT JOIN cad_case_tasks t ON c.case_id = t.case_id
             LEFT JOIN cad_evidence e ON c.case_id = e.case_id
-            WHERE c.status = 'CLOSED' 
-            AND STR_TO_DATE(c.created_at, '%Y-%m-%dT%H:%i:%s') < DATE_SUB(NOW(), INTERVAL 90 DAY)
+            WHERE c.status = 'CLOSED'
+            AND STR_TO_DATE(c.created_at, '%Y-%m-%dT%H:%i:%s') < DATE_SUB(NOW(), INTERVAL 10 DAY)
     ]])
 
-    -- Event 4: Cleanup paid fines (> 180 days)
+    -- Event 4: Purge old paid fines
     execute([[
         CREATE EVENT IF NOT EXISTS ev_cleanup_paid_fines
         ON SCHEDULE EVERY 24 HOUR
         DO
-            DELETE FROM cad_fines 
-            WHERE status = 'PAID' 
-            AND STR_TO_DATE(paid_at, '%Y-%m-%dT%H:%i:%s') < DATE_SUB(NOW(), INTERVAL 180 DAY)
+            DELETE FROM cad_fines
+            WHERE status = 'PAID'
+            AND STR_TO_DATE(paid_at, '%Y-%m-%dT%H:%i:%s') < DATE_SUB(NOW(), INTERVAL 10 DAY)
     ]])
 
-    -- Event 5: Cleanup expired/resolved EMS alerts
+    -- Event 5: Purge expired EMS alerts
     execute([[
         CREATE EVENT IF NOT EXISTS ev_cleanup_expired_alerts
         ON SCHEDULE EVERY 1 HOUR
         DO
-            DELETE FROM cad_ems_alerts 
-            WHERE status IN ('EXPIRED','RESOLVED') 
+            DELETE FROM cad_ems_alerts
+            WHERE status IN ('EXPIRED','RESOLVED')
             AND STR_TO_DATE(created_at, '%Y-%m-%dT%H:%i:%s') < DATE_SUB(NOW(), INTERVAL 1 HOUR)
     ]])
 
-    -- Event 6: Cleanup completed/declined blood requests (> 14 days)
+    -- Event 6: Purge old completed blood requests
     execute([[
         CREATE EVENT IF NOT EXISTS ev_cleanup_completed_blood_requests
         ON SCHEDULE EVERY 24 HOUR

@@ -1,3 +1,10 @@
+--[[
+C.A.D. System
+Created by JericoFX
+GitHub: https://github.com/JericoFX
+License: GNU GPL v3
+]]
+
 fx_version 'cerulean'
 game 'gta5'
 
@@ -5,8 +12,8 @@ lua54 'yes'
 use_experimental_fxv2_oal 'yes'
 
 description 'C.A.D. Terminal System - Computer Aided Dispatch'
-author 'CAD Team'
-version '3.0.0'
+author 'JericoFX'
+version '1.0.0'
 
 shared_scripts {
     '@ox_lib/init.lua',
@@ -43,6 +50,7 @@ server_scripts {
     'server/cases.lua',
     'server/evidence.lua',
     'server/dispatch.lua',
+    'server/police.lua',
     'server/fines.lua',
     'server/ems.lua',
     'server/forensic.lua',
@@ -53,11 +61,11 @@ server_scripts {
 
 files {
     'locales/*.json',
-    'nui/build/index.html',
-    'nui/build/assets/**/*'
+    'build/index.html',
+    'build/*'
 }
 
-ui_page 'nui/build/index.html'
+ui_page 'build/index.html'
 
 dependencies {
     'ox_lib',
@@ -70,24 +78,26 @@ exports {
     'UpdateCase',
     'CloseCase',
     'SearchCases',
-    
+
     'CreateEvidenceBag',
     'GetEvidenceById',
     'AttachEvidenceToCase',
-    
+
     'GetForensicData',
     'AnalyzeEvidence',
     'IsPlayerInLab',
     'GetLabLocations',
-    
+
     'CreateDispatchCall',
     'GetActiveCalls',
     'AssignUnit',
     'GetUnitStatus',
     'SetUnitStatus',
-    
+
     'CheckPermission',
-    'GetOfficerData'
+    'GetOfficerData',
+    'LogJailTransfer',
+    'GetJailTransfers'
 }
 
 server_exports {
@@ -96,22 +106,24 @@ server_exports {
     'UpdateCase',
     'CloseCase',
     'SearchCases',
-    
+
     'CreateEvidenceBag',
     'GetEvidenceById',
     'AttachEvidenceToCase',
-    
+
     'GetForensicData',
     'AnalyzeEvidence',
     'IsPlayerInLab',
     'GetLabLocations',
-    
+
     'CreateDispatchCall',
     'GetActiveCalls',
     'AssignUnit',
     'GetUnitStatus',
     'SetUnitStatus',
-    
+
     'CheckPermission',
-    'GetOfficerData'
+    'GetOfficerData',
+    'LogJailTransfer',
+    'GetJailTransfers'
 }

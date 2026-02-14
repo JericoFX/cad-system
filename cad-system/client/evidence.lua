@@ -1,3 +1,10 @@
+--[[
+C.A.D. System
+Created by JericoFX
+GitHub: https://github.com/JericoFX
+License: GNU GPL v3
+]]
+
 CAD = CAD or {}
 CAD.Client = CAD.Client or {}
 
@@ -24,15 +31,17 @@ function CAD.Client.CollectEvidence(evidenceType, description)
     return result
 end
 
-RegisterCommand('collectevidence', function()
-    local input = lib.inputDialog('Collect Evidence', {
-        { type = 'input', label = 'Evidence Type', placeholder = 'PHOTO / DOCUMENT / DNA', required = true },
-        { type = 'textarea', label = 'Description', required = false },
-    })
+if CAD.Config.Debug == true then
+    RegisterCommand('collectevidence', function()
+        local input = lib.inputDialog('Collect Evidence (Debug)', {
+            { type = 'input', label = 'Evidence Type', placeholder = 'PHOTO / DOCUMENT / DNA', required = true },
+            { type = 'textarea', label = 'Description', required = false },
+        })
 
-    if not input then
-        return
-    end
+        if not input then
+            return
+        end
 
-    CAD.Client.CollectEvidence(input[1], input[2])
-end, false)
+        CAD.Client.CollectEvidence(input[1], input[2])
+    end, false)
+end

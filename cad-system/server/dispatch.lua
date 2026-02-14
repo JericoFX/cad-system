@@ -1,3 +1,13 @@
+--[[
+C.A.D. System
+Created by JericoFX
+GitHub: https://github.com/JericoFX
+License: GNU GPL v3
+]]
+
+
+
+
 CAD = CAD or {}
 CAD.Dispatch = CAD.Dispatch or {}
 
@@ -51,32 +61,41 @@ local function withDispatchGuard(bucket, handler)
 end
 
 local function saveCallDb(call)
-    MySQL.insert.await([[
-        INSERT INTO cad_dispatch_calls (
-            call_id, call_type, priority, title, description,
-            location, coordinates, status, assigned_units, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-            call_type = VALUES(call_type),
-            priority = VALUES(priority),
-            title = VALUES(title),
-            description = VALUES(description),
-            location = VALUES(location),
-            coordinates = VALUES(coordinates),
-            status = VALUES(status),
-            assigned_units = VALUES(assigned_units)
-    ]], {
-        call.callId,
-        call.type,
-        call.priority,
-        call.title,
-        call.description,
-        call.location,
-        call.coordinates and json.encode(call.coordinates) or nil,
-        call.status,
-        json.encode(call.assignedUnits or {}),
-        call.createdAt,
-    })
+    local ok, err = pcall(function()
+        MySQL.insert.await([[
+            INSERT INTO cad_dispatch_calls (
+                call_id, call_type, priority, title, description,
+                location, coordinates, status, assigned_units, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                call_type = VALUES(call_type),
+                priority = VALUES(priority),
+                title = VALUES(title),
+                description = VALUES(description),
+                location = VALUES(location),
+                coordinates = VALUES(coordinates),
+                status = VALUES(status),
+                assigned_units = VALUES(assigned_units)
+        ]], {
+            call.callId,
+            call.type,
+            call.priority,
+            call.title,
+            call.description,
+            call.location,
+            call.coordinates and json.encode(call.coordinates) or nil,
+            call.status,
+            json.encode(call.assignedUnits or {}),
+            call.createdAt,
+        })
+    end)
+
+    if not ok then
+        CAD.Log('error', 'Failed saving dispatch call %s: %s', tostring(call and call.callId), tostring(err))
+        return false, 'db_write_failed'
+    end
+
+    return true
 end
 
 local function normalizeUnitStatus(status)
@@ -149,19 +168,23 @@ end))
 lib.callback.register('cad:updateUnitStatus', withDispatchGuard('default', function(source, payload)
     local unitId = sourceToUnit[source]
     if not unitId or not units[unitId] then
-        return nil
+        return { ok = false, error = 'unit_not_found' }
     end
 
     local officer = CAD.Auth.GetOfficerData(source)
     if not officer then
-        return nil
+        return { ok = false, error = 'officer_not_found' }
     end
 
     if payload.unitId and payload.unitId ~= unitId then
         if not (officer.isAdmin or officer.job == 'dispatch') then
-            return nil
+            return { ok = false, error = 'forbidden' }
         end
         unitId = payload.unitId
+    end
+
+    if not units[unitId] then
+        return { ok = false, error = 'unit_not_found' }
     end
 
     local unit = units[unitId]
@@ -188,7 +211,7 @@ end))
 lib.callback.register('cad:createDispatchCall', withDispatchGuard('heavy', function(_, payload)
     local title = CAD.Server.SanitizeString(payload.title, 255)
     if title == '' then
-        return nil
+        return { ok = false, error = 'title_required' }
     end
 
     local callId = CAD.Server.GenerateId('CALL')
@@ -209,8 +232,12 @@ lib.callback.register('cad:createDispatchCall', withDispatchGuard('heavy', funct
         createdAt = CAD.Server.ToIso(),
     }
 
+    local saved, saveErr = saveCallDb(call)
+    if not saved then
+        return { ok = false, error = saveErr or 'db_write_failed' }
+    end
+
     calls[callId] = call
-    saveCallDb(call)
     return call
 end))
 
@@ -233,7 +260,17 @@ lib.callback.register('cad:assignUnitToCall', withDispatchGuard('heavy', functio
     local call = calls[payload.callId]
     local unit = units[payload.unitId]
     if not call or not unit then
-        return nil
+        return { ok = false, error = 'call_or_unit_not_found' }
+    end
+
+    local previousCallStatus = call.status
+    local previousUnitStatus = unit.status
+    local previousCurrentCall = unit.currentCall
+    local previousEmsStatus = nil
+    local previousEmsCurrentCall = nil
+    if CAD.State.EMS.Units[payload.unitId] then
+        previousEmsStatus = CAD.State.EMS.Units[payload.unitId].status
+        previousEmsCurrentCall = CAD.State.EMS.Units[payload.unitId].currentCall
     end
 
     call.assignedUnits[payload.unitId] = {
@@ -249,7 +286,20 @@ lib.callback.register('cad:assignUnitToCall', withDispatchGuard('heavy', functio
         CAD.State.EMS.Units[payload.unitId].updatedAt = CAD.Server.ToIso()
     end
 
-    saveCallDb(call)
+    local saved, saveErr = saveCallDb(call)
+    if not saved then
+        call.assignedUnits[payload.unitId] = nil
+        call.status = previousCallStatus
+        unit.status = previousUnitStatus
+        unit.currentCall = previousCurrentCall
+        if CAD.State.EMS.Units[payload.unitId] then
+            CAD.State.EMS.Units[payload.unitId].status = previousEmsStatus or previousUnitStatus
+            CAD.State.EMS.Units[payload.unitId].currentCall = previousEmsCurrentCall or previousCurrentCall
+            CAD.State.EMS.Units[payload.unitId].updatedAt = CAD.Server.ToIso()
+        end
+        return { ok = false, error = saveErr or 'db_write_failed' }
+    end
+
     return call
 end))
 
@@ -257,7 +307,18 @@ lib.callback.register('cad:unassignUnitFromCall', withDispatchGuard('heavy', fun
     local call = calls[payload.callId]
     local unit = units[payload.unitId]
     if not call or not unit then
-        return nil
+        return { ok = false, error = 'call_or_unit_not_found' }
+    end
+
+    local previousAssigned = call.assignedUnits[payload.unitId]
+    local previousCallStatus = call.status
+    local previousUnitStatus = unit.status
+    local previousCurrentCall = unit.currentCall
+    local previousEmsStatus = nil
+    local previousEmsCurrentCall = nil
+    if CAD.State.EMS.Units[payload.unitId] then
+        previousEmsStatus = CAD.State.EMS.Units[payload.unitId].status
+        previousEmsCurrentCall = CAD.State.EMS.Units[payload.unitId].currentCall
     end
 
     call.assignedUnits[payload.unitId] = nil
@@ -281,13 +342,27 @@ lib.callback.register('cad:unassignUnitFromCall', withDispatchGuard('heavy', fun
         CAD.State.EMS.Units[payload.unitId].updatedAt = CAD.Server.ToIso()
     end
 
-    saveCallDb(call)
+    local saved, saveErr = saveCallDb(call)
+    if not saved then
+        call.assignedUnits[payload.unitId] = previousAssigned
+        call.status = previousCallStatus
+        unit.status = previousUnitStatus
+        unit.currentCall = previousCurrentCall
+        if CAD.State.EMS.Units[payload.unitId] then
+            CAD.State.EMS.Units[payload.unitId].status = previousEmsStatus or previousUnitStatus
+            CAD.State.EMS.Units[payload.unitId].currentCall = previousEmsCurrentCall or previousCurrentCall
+            CAD.State.EMS.Units[payload.unitId].updatedAt = CAD.Server.ToIso()
+        end
+        return { ok = false, error = saveErr or 'db_write_failed' }
+    end
+
     return call
 end))
 
-lib.callback.register('cad:closeDispatchCall', withDispatchGuard('heavy', function(_, payload)
-    local call = calls[payload.callId]
-    if not call then return nil end
+local function closeCallInternal(call, payload)
+    local previousCallStatus = call.status
+    local previousResolution = call.resolution
+    local previousUnits = {}
 
     call.status = 'CLOSED'
     call.resolution = payload.resolution or nil
@@ -295,42 +370,72 @@ lib.callback.register('cad:closeDispatchCall', withDispatchGuard('heavy', functi
     for unitId in pairs(call.assignedUnits) do
         local unit = units[unitId]
         if unit then
+            previousUnits[unitId] = {
+                status = unit.status,
+                currentCall = unit.currentCall,
+            }
             unit.currentCall = nil
             unit.status = 'AVAILABLE'
         end
         if CAD.State.EMS.Units[unitId] then
+            local existing = previousUnits[unitId] or {}
+            existing.emsStatus = CAD.State.EMS.Units[unitId].status
+            existing.emsCurrentCall = CAD.State.EMS.Units[unitId].currentCall
+            previousUnits[unitId] = existing
             CAD.State.EMS.Units[unitId].status = 'AVAILABLE'
             CAD.State.EMS.Units[unitId].currentCall = nil
             CAD.State.EMS.Units[unitId].updatedAt = CAD.Server.ToIso()
         end
     end
 
-    saveCallDb(call)
+    local saved, saveErr = saveCallDb(call)
+    if not saved then
+        call.status = previousCallStatus
+        call.resolution = previousResolution
+        for unitId, snapshot in pairs(previousUnits) do
+            local unit = units[unitId]
+            if unit then
+                unit.status = snapshot.status
+                unit.currentCall = snapshot.currentCall
+            end
+            if CAD.State.EMS.Units[unitId] then
+                CAD.State.EMS.Units[unitId].status = snapshot.emsStatus or snapshot.status
+                CAD.State.EMS.Units[unitId].currentCall = snapshot.emsCurrentCall or snapshot.currentCall
+                CAD.State.EMS.Units[unitId].updatedAt = CAD.Server.ToIso()
+            end
+        end
+        return nil, saveErr or 'db_write_failed'
+    end
+
     return call
+end
+
+lib.callback.register('cad:closeDispatchCall', withDispatchGuard('heavy', function(_, payload)
+    local call = calls[payload.callId]
+    if not call then
+        return { ok = false, error = 'call_not_found' }
+    end
+
+    local closed, closeErr = closeCallInternal(call, payload)
+    if not closed then
+        return { ok = false, error = closeErr or 'db_write_failed' }
+    end
+
+    return closed
 end))
 
 lib.callback.register('cad:closeCall', withDispatchGuard('heavy', function(source, payload)
     local call = calls[payload.callId]
-    if not call then return nil end
-
-    call.status = 'CLOSED'
-    call.resolution = payload.resolution or nil
-
-    for unitId in pairs(call.assignedUnits) do
-        local unit = units[unitId]
-        if unit then
-            unit.currentCall = nil
-            unit.status = 'AVAILABLE'
-        end
-        if CAD.State.EMS.Units[unitId] then
-            CAD.State.EMS.Units[unitId].status = 'AVAILABLE'
-            CAD.State.EMS.Units[unitId].currentCall = nil
-            CAD.State.EMS.Units[unitId].updatedAt = CAD.Server.ToIso()
-        end
+    if not call then
+        return { ok = false, error = 'call_not_found' }
     end
 
-    saveCallDb(call)
-    return call
+    local closed, closeErr = closeCallInternal(call, payload)
+    if not closed then
+        return { ok = false, error = closeErr or 'db_write_failed' }
+    end
+
+    return closed
 end))
 
 lib.callback.register('cad:setOfficerStatus', withDispatchGuard('default', function(source, payload)
@@ -348,7 +453,7 @@ end))
 lib.callback.register('cad:getOfficerStatus', withDispatchGuard('default', function(source)
     local unitId = sourceToUnit[source]
     if not unitId or not units[unitId] then
-        return nil
+        return { ok = false, error = 'unit_not_found' }
     end
 
     local unit = units[unitId]
@@ -362,14 +467,14 @@ end))
 lib.callback.register('cad:getNearestUnit', withDispatchGuard('default', function(_, payload)
     local coords = payload
     if type(coords) ~= 'table' then
-        return nil
+        return { ok = false, error = 'invalid_coords' }
     end
 
     local tx = tonumber(coords.x)
     local ty = tonumber(coords.y)
     local tz = tonumber(coords.z)
     if not tx or not ty or not tz then
-        return nil
+        return { ok = false, error = 'invalid_coords' }
     end
 
     local nearest = nil
@@ -385,6 +490,10 @@ lib.callback.register('cad:getNearestUnit', withDispatchGuard('default', functio
                 nearest = unit
             end
         end
+    end
+
+    if not nearest then
+        return { ok = false, error = 'no_unit_available' }
     end
 
     return nearest

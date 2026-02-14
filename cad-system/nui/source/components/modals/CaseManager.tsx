@@ -4,6 +4,7 @@ import { terminalActions, terminalState } from '~/stores/terminalStore';
 import { cadState, cadActions, type Case, type Note, type Evidence } from '~/stores/cadStore';
 import { userActions } from '~/stores/userStore';
 import { viewerActions } from '~/stores/viewerStore';
+import { fetchNui } from '~/utils/fetchNui';
 
 export function CaseManager() {
   const [activeTab, setActiveTab] = createSignal<'list' | 'detail' | 'notes' | 'evidence' | 'tasks'>('list');
@@ -112,6 +113,41 @@ export function CaseManager() {
       setSelectedCase(null);
     } catch (error) {
       terminalActions.addLine(`Failed to close case: ${error}`, 'error');
+    }
+  };
+
+  const printCaseReport = async () => {
+    const caseItem = selectedCase();
+    if (!caseItem) return;
+
+    try {
+      const response = await fetchNui<{
+        ok: boolean;
+        itemId?: string;
+        error?: string;
+      }>('cad:case:printReport', {
+        caseId: caseItem.caseId,
+        caseType: caseItem.caseType,
+        title: caseItem.title,
+        priority: caseItem.priority,
+        status: caseItem.status,
+        createdAt: caseItem.createdAt,
+        description: caseItem.description,
+        notesCount: caseItem.notes?.length || 0,
+        evidenceCount: caseItem.evidence?.length || 0,
+      });
+
+      if (!response?.ok) {
+        terminalActions.addLine(`Failed to print report: ${response?.error || 'unknown_error'}`, 'error');
+        return;
+      }
+
+      terminalActions.addLine(
+        `✓ Case report printed: ${caseItem.caseId} (Item: ${response.itemId || 'PAPER'})`,
+        'output'
+      );
+    } catch (error) {
+      terminalActions.addLine(`Failed to print case report: ${error}`, 'error');
     }
   };
 
@@ -358,6 +394,13 @@ export function CaseManager() {
             <div class="detail-header">
               <h3>{selectedCase()!.caseId}</h3>
               <div class="detail-actions">
+                <button 
+                  class="btn btn-primary"
+                  onClick={() => void printCaseReport()}
+                  title="Print case report"
+                >
+                  [PRINT REPORT]
+                </button>
                 <Show when={selectedCase()!.status === 'OPEN'}>
                   <button 
                     class="btn btn-danger"

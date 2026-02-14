@@ -1,9 +1,24 @@
 import { createSignal, createMemo, For, Show, onMount } from 'solid-js';
 import { terminalActions, terminalState } from '~/stores/terminalStore';
 import { cadState, cadActions, type CriminalRecord, type Warrant, type Vehicle, type Evidence } from '~/stores/cadStore';
+import { fetchNui } from '~/utils/fetchNui';
+
+type JailTransfer = {
+  transferId: string;
+  citizenId: string;
+  personName: string;
+  caseId?: string;
+  jailMonths: number;
+  reason: string;
+  facility: string;
+  notes?: string;
+  createdBy: string;
+  createdByName: string;
+  createdAt: string;
+};
 
 export function PoliceDashboard() {
-  const [activeTab, setActiveTab] = createSignal<'arrests' | 'warrants' | 'impounds' | 'evidence' | 'create'>('arrests');
+  const [activeTab, setActiveTab] = createSignal<'arrests' | 'warrants' | 'impounds' | 'evidence' | 'create' | 'jail'>('arrests');
    
   const [arrestForm, setArrestForm] = createSignal({
     citizenId: '',
@@ -35,7 +50,23 @@ export function PoliceDashboard() {
     description: ''
   });
 
+  const [lookupMode, setLookupMode] = createSignal<'PERSON' | 'VEHICLE'>('PERSON');
+  const [lookupQuery, setLookupQuery] = createSignal('');
+
+  const [jailForm, setJailForm] = createSignal({
+    citizenId: '',
+    personName: '',
+    caseId: '',
+    jailMonths: '6',
+    reason: '',
+    facility: 'Bolingbroke Penitentiary',
+    notes: ''
+  });
+  const [jailTransfers, setJailTransfers] = createSignal<JailTransfer[]>([]);
+
   onMount(() => {
+    void loadJailTransfers();
+
     const modalData = (terminalState.modalData as {
       create?: string;
       citizenId?: string;
@@ -86,12 +117,110 @@ export function PoliceDashboard() {
     return (cadState.cases[caseId].evidence || []) as Evidence[];
   });
 
+  const personLookupResults = createMemo(() => {
+    const query = lookupQuery().trim().toLowerCase();
+    if (!query || lookupMode() !== 'PERSON') return [];
+
+    return Object.values(cadState.persons)
+      .filter((person) => {
+        const fullName = `${person.firstName} ${person.lastName}`.toLowerCase();
+        return person.citizenid.toLowerCase().includes(query) || fullName.includes(query);
+      })
+      .slice(0, 6);
+  });
+
+  const vehicleLookupResults = createMemo(() => {
+    const query = lookupQuery().trim().toLowerCase();
+    if (!query || lookupMode() !== 'VEHICLE') return [];
+
+    return Object.values(cadState.vehicles)
+      .filter((vehicle) => {
+        const owner = (vehicle.ownerName || '').toLowerCase();
+        const model = `${vehicle.make} ${vehicle.model}`.toLowerCase();
+        return vehicle.plate.toLowerCase().includes(query) || model.includes(query) || owner.includes(query);
+      })
+      .slice(0, 6);
+  });
+
+  const lookupResults = createMemo(() => {
+    if (lookupMode() === 'PERSON') {
+      return personLookupResults();
+    }
+    return vehicleLookupResults();
+  });
+
   const closeModal = () => {
     terminalActions.setActiveModal(null);
   };
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString();
+  };
+
+  const loadJailTransfers = async () => {
+    try {
+      const response = await fetchNui<{ ok: boolean; transfers?: JailTransfer[]; error?: string }>('cad:police:getJailTransfers', {});
+      if (!response?.ok) {
+        terminalActions.addLine(`Failed loading jail transfers: ${response?.error || 'unknown_error'}`, 'error');
+        return;
+      }
+
+      setJailTransfers(Array.isArray(response.transfers) ? response.transfers : []);
+    } catch (error) {
+      terminalActions.addLine(`Failed loading jail transfers: ${String(error)}`, 'error');
+    }
+  };
+
+  const applyPersonToForms = (citizenId: string, personName: string) => {
+    setArrestForm({ ...arrestForm(), citizenId, personName });
+    setWarrantForm({ ...warrantForm(), citizenId, personName });
+    setJailForm({ ...jailForm(), citizenId, personName });
+  };
+
+  const applyPersonLookup = (citizenId: string) => {
+    const person = cadState.persons[citizenId];
+    if (!person) return;
+
+    const personName = `${person.firstName} ${person.lastName}`;
+    applyPersonToForms(person.citizenid, personName);
+    terminalActions.addLine(`✓ Loaded person ${personName} (${person.citizenid})`, 'output');
+  };
+
+  const applyVehicleLookup = (plate: string) => {
+    const vehicle = cadState.vehicles[plate];
+    if (!vehicle) return;
+
+    setImpoundForm({ ...impoundForm(), plate: vehicle.plate });
+    terminalActions.addLine(`✓ Loaded vehicle ${vehicle.plate}`, 'output');
+  };
+
+  const openPersonSearch = () => {
+    const query = lookupQuery().trim();
+    terminalActions.setActiveModal('PERSON_SEARCH', query ? { query } : undefined);
+  };
+
+  const openVehicleSearch = () => {
+    const query = lookupQuery().trim();
+    terminalActions.setActiveModal('VEHICLE_SEARCH', query ? { plate: query } : undefined);
+  };
+
+  const applyLookupResult = (entry: any) => {
+    if (lookupMode() === 'PERSON') {
+      applyPersonLookup(String(entry.citizenid || ''));
+      return;
+    }
+
+    applyVehicleLookup(String(entry.plate || ''));
+  };
+
+  const handleLookupApplyFirst = () => {
+    const first = lookupResults()[0];
+    if (!first) {
+      terminalActions.addLine('No lookup result found', 'error');
+      return;
+    }
+
+    applyLookupResult(first);
   };
 
   const getEvidenceUrl = (evidence: Evidence): string | undefined => {
@@ -242,6 +371,52 @@ export function PoliceDashboard() {
     setEvidenceForm({ caseId: form.caseId, evidenceType: 'PHOTO_URL', url: '', description: '' });
   };
 
+  const handleLogJailTransfer = async () => {
+    const form = jailForm();
+    if (!form.citizenId || !form.personName || !form.jailMonths || !form.reason) {
+      terminalActions.addLine('Error: fill citizen, name, jail months and reason', 'error');
+      return;
+    }
+
+    const jailMonths = parseInt(form.jailMonths, 10);
+    if (!Number.isFinite(jailMonths) || jailMonths <= 0) {
+      terminalActions.addLine('Error: jail months must be greater than 0', 'error');
+      return;
+    }
+
+    try {
+      const response = await fetchNui<{ ok: boolean; transfer?: JailTransfer; error?: string }>('cad:police:logJailTransfer', {
+        citizenId: form.citizenId,
+        personName: form.personName,
+        caseId: form.caseId,
+        jailMonths,
+        reason: form.reason,
+        facility: form.facility,
+        notes: form.notes,
+      });
+
+      if (!response?.ok || !response.transfer) {
+        terminalActions.addLine(`Error logging jail transfer: ${response?.error || 'unknown_error'}`, 'error');
+        return;
+      }
+
+      setJailTransfers((prev) => [response.transfer!, ...prev]);
+      setJailForm({
+        citizenId: form.citizenId,
+        personName: form.personName,
+        caseId: form.caseId,
+        jailMonths: '6',
+        reason: '',
+        facility: form.facility,
+        notes: '',
+      });
+      setActiveTab('jail');
+      terminalActions.addLine(`✓ Jail transfer logged: ${response.transfer.transferId}`, 'output');
+    } catch (error) {
+      terminalActions.addLine(`Error logging jail transfer: ${String(error)}`, 'error');
+    }
+  };
+
   return (
     <div class="modal-overlay" onClick={closeModal}>
       <div class="modal-content police-dashboard" onClick={(e) => e.stopPropagation()}>
@@ -274,6 +449,12 @@ export function PoliceDashboard() {
             onClick={() => setActiveTab('evidence')}
           >
             [EVIDENCE]
+          </button>
+          <button
+            class={`tab ${activeTab() === 'jail' ? 'active' : ''}`}
+            onClick={() => setActiveTab('jail')}
+          >
+            [JAIL ({jailTransfers().length})]
           </button>
           <button 
             class={`tab ${activeTab() === 'create' ? 'active' : ''}`}
@@ -457,8 +638,137 @@ export function PoliceDashboard() {
             </Show>
           </Show>
 
+          <Show when={activeTab() === 'jail'}>
+            <div class="section-header">[JAIL TRANSFER LOG]</div>
+
+            <div class="create-form">
+              <h3>[LOG JAIL TRANSFER]</h3>
+              <input
+                type="text"
+                class="dos-input"
+                placeholder="Citizen ID"
+                value={jailForm().citizenId}
+                onInput={(e) => setJailForm({ ...jailForm(), citizenId: e.currentTarget.value })}
+              />
+              <input
+                type="text"
+                class="dos-input"
+                placeholder="Person Name"
+                value={jailForm().personName}
+                onInput={(e) => setJailForm({ ...jailForm(), personName: e.currentTarget.value })}
+              />
+              <select
+                class="dos-input"
+                value={jailForm().caseId}
+                onChange={(e: any) => setJailForm({ ...jailForm(), caseId: e.currentTarget.value })}
+              >
+                <option value="">No linked case</option>
+                <For each={availableCases()}>
+                  {(caseItem) => (
+                    <option value={caseItem.caseId}>{caseItem.caseId} - {caseItem.title}</option>
+                  )}
+                </For>
+              </select>
+              <input
+                type="number"
+                class="dos-input"
+                placeholder="Jail Months"
+                value={jailForm().jailMonths}
+                onInput={(e) => setJailForm({ ...jailForm(), jailMonths: e.currentTarget.value })}
+              />
+              <input
+                type="text"
+                class="dos-input"
+                placeholder="Facility"
+                value={jailForm().facility}
+                onInput={(e) => setJailForm({ ...jailForm(), facility: e.currentTarget.value })}
+              />
+              <input
+                type="text"
+                class="dos-input"
+                placeholder="Reason"
+                value={jailForm().reason}
+                onInput={(e) => setJailForm({ ...jailForm(), reason: e.currentTarget.value })}
+              />
+              <textarea
+                class="dos-textarea"
+                rows={2}
+                placeholder="Notes (optional)"
+                value={jailForm().notes}
+                onInput={(e) => setJailForm({ ...jailForm(), notes: e.currentTarget.value })}
+              />
+              <div class="form-actions">
+                <button class="btn btn-primary" onClick={() => void handleLogJailTransfer()}>[LOG TRANSFER]</button>
+                <button class="btn" onClick={() => void loadJailTransfers()}>[REFRESH]</button>
+              </div>
+            </div>
+
+            <Show when={jailTransfers().length === 0}>
+              <div class="empty-state">No jail transfers logged yet</div>
+            </Show>
+            <For each={jailTransfers()}>
+              {(transfer) => (
+                <div class="record-item">
+                  <div class="record-header">
+                    <span class="record-id">{transfer.transferId}</span>
+                    <span class="record-date">{formatDate(transfer.createdAt)}</span>
+                  </div>
+                  <div class="record-person">{transfer.personName} ({transfer.citizenId})</div>
+                  <div class="record-sentence">{transfer.jailMonths} months | {transfer.facility}</div>
+                  <div class="record-charges">{transfer.reason}</div>
+                  <Show when={transfer.caseId}><div class="record-officer">Case: {transfer.caseId}</div></Show>
+                  <div class="record-officer">By: {transfer.createdByName}</div>
+                </div>
+              )}
+            </For>
+          </Show>
+
           <Show when={activeTab() === 'create'}>
             <div class="create-sections">
+              <div class="create-form">
+                <h3>[QUICK LOOKUP]</h3>
+                <div class="form-row">
+                  <select
+                    class="dos-input"
+                    value={lookupMode()}
+                    onChange={(e) => setLookupMode(e.currentTarget.value as 'PERSON' | 'VEHICLE')}
+                  >
+                    <option value="PERSON">PERSON</option>
+                    <option value="VEHICLE">VEHICLE</option>
+                  </select>
+                  <input
+                    type="text"
+                    class="dos-input"
+                    placeholder={lookupMode() === 'PERSON' ? 'Citizen ID or Name' : 'Plate or Owner'}
+                    value={lookupQuery()}
+                    onInput={(e) => setLookupQuery(e.currentTarget.value)}
+                  />
+                </div>
+                <div class="form-actions">
+                  <button class="btn btn-primary" onClick={handleLookupApplyFirst}>[AUTOFILL]</button>
+                  <button class="btn" onClick={() => lookupMode() === 'PERSON' ? openPersonSearch() : openVehicleSearch()}>
+                    [OPEN SEARCH]
+                  </button>
+                </div>
+
+                <Show when={lookupResults().length > 0}>
+                  <div class="records-list">
+                    <For each={lookupResults()}>
+                      {(entry: any) => (
+                        <button class="result-item" onClick={() => applyLookupResult(entry)}>
+                          <Show
+                            when={lookupMode() === 'PERSON'}
+                            fallback={<span>{entry.plate} - {entry.ownerName}</span>}
+                          >
+                            <span>{entry.citizenid} - {entry.firstName} {entry.lastName}</span>
+                          </Show>
+                        </button>
+                      )}
+                    </For>
+                  </div>
+                </Show>
+              </div>
+
               <div class="create-form">
                 <h3>[REGISTER ARREST]</h3>
                 <input

@@ -97,6 +97,13 @@ export interface Note {
   type: 'general' | 'observation' | 'interview' | 'evidence';
 }
 
+export interface EntityNote {
+  id: string;
+  content: string;
+  author: string;
+  timestamp: string;
+}
+
 export interface Person {
   citizenid: string;
   firstName: string;
@@ -118,6 +125,7 @@ export interface Person {
   lastUpdated: string;
   isDead: boolean;
   ckDate?: string;
+  notes?: EntityNote[];
 }
 
 export interface Vehicle {
@@ -135,6 +143,7 @@ export interface Vehicle {
   stolenReportedAt?: string;
   flags: string[];
   createdAt: string;
+  notes?: EntityNote[];
 }
 
 export interface Fine {
@@ -433,15 +442,28 @@ export const cadActions = {
   },
   
   setPersons: (persons: Record<string, Person>) => setCADState('persons', persons),
-  addPerson: (person: Person) => setCADState('persons', person.citizenid, person),
+  addPerson: (person: Person) => setCADState('persons', person.citizenid, { ...person, notes: person.notes || [] }),
   updatePerson: (citizenid: string, data: Partial<Person>) => {
     setCADState('persons', citizenid, (prev) => ({ ...prev, ...data, lastUpdated: new Date().toISOString() }));
   },
+  addPersonNote: (citizenid: string, note: EntityNote) => {
+    setCADState('persons', citizenid, (prev) => ({
+      ...prev,
+      notes: [...(prev?.notes || []), note],
+      lastUpdated: new Date().toISOString(),
+    }));
+  },
   
   setVehicles: (vehicles: Record<string, Vehicle>) => setCADState('vehicles', vehicles),
-  addVehicle: (vehicle: Vehicle) => setCADState('vehicles', vehicle.plate, vehicle),
+  addVehicle: (vehicle: Vehicle) => setCADState('vehicles', vehicle.plate, { ...vehicle, notes: vehicle.notes || [] }),
   updateVehicle: (plate: string, data: Partial<Vehicle>) => {
     setCADState('vehicles', plate, (prev) => ({ ...prev, ...data }));
+  },
+  addVehicleNote: (plate: string, note: EntityNote) => {
+    setCADState('vehicles', plate, (prev) => ({
+      ...prev,
+      notes: [...(prev?.notes || []), note],
+    }));
   },
   
   setFines: (fines: Record<string, Fine>) => setCADState('fines', fines),

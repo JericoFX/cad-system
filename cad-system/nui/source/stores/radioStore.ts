@@ -50,6 +50,17 @@ export interface RadioState {
   isConnected: boolean;
   volume: number;
   isMuted: boolean;
+  chatterEnabled: boolean;
+  chatterVolume: number;
+  recentChatter: RadioChatter[];
+}
+
+export interface RadioChatter {
+  id: string;
+  message: string;
+  unit: string;
+  timestamp: number;
+  type: 'dispatch' | 'unit' | 'emergency';
 }
 
 const FIXED_CHANNELS: RadioChannel[] = [
@@ -105,7 +116,10 @@ const initialState: RadioState = {
   currentChannel: null,
   isConnected: false,
   volume: 80,
-  isMuted: false
+  isMuted: false,
+  chatterEnabled: true,
+  chatterVolume: 30,
+  recentChatter: []
 };
 
 export const [radioState, setRadioState] = createStore<RadioState>(initialState);
@@ -284,6 +298,32 @@ export const radioActions = {
     
     this.emitRadioEvent('message', message);
   },
+
+  injectSystemMessage(
+    channelId: string,
+    content: string,
+    type: RadioMessage['type'] = 'TEXT',
+    senderName: string = 'DISPATCH',
+    senderBadge: string = 'DSP'
+  ) {
+    if (!channelId || !radioState.channels[channelId]) {
+      return;
+    }
+
+    const message: RadioMessage = {
+      messageId: `SYS_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      channelId,
+      senderId: 'SYSTEM',
+      senderName,
+      senderBadge,
+      content: content.substring(0, 500),
+      timestamp: new Date().toISOString(),
+      type,
+    };
+
+    setRadioState('messages', messages => [...messages.slice(-100), message]);
+    this.emitRadioEvent('message', message);
+  },
   
   setTalking(isTalking: boolean) {
     const userId = radioState.currentUser?.userId;
@@ -353,5 +393,113 @@ export const radioActions = {
     setRadioState('currentUser', null);
     setRadioState('currentChannel', null);
     setRadioState('isConnected', false);
+  },
+
+  // Radio Chatter Simulation
+  toggleChatter() {
+    setRadioState('chatterEnabled', !radioState.chatterEnabled);
+    if (radioState.chatterEnabled) {
+      this.startChatter();
+    } else {
+      this.stopChatter();
+    }
+  },
+
+  setChatterVolume(volume: number) {
+    setRadioState('chatterVolume', Math.max(0, Math.min(100, volume)));
+  },
+
+  addChatter(message: string, unit: string, type: RadioChatter['type'] = 'dispatch') {
+    const chatter: RadioChatter = {
+      id: `chatter-${Date.now()}`,
+      message,
+      unit,
+      timestamp: Date.now(),
+      type
+    };
+    setRadioState('recentChatter', prev => [chatter, ...prev].slice(0, 50));
+  },
+
+  clearChatter() {
+    setRadioState('recentChatter', []);
+  },
+
+  startChatter() {
+    if (!radioState.chatterEnabled) return;
+
+    const phrases = {
+      dispatch: [
+        'Dispatch to all units, 10-4 on that last call.',
+        'Be advised, we have multiple units en route.',
+        'Dispatch copies, continue on your current assignment.',
+        'All units, signal 100, maintain radio silence.',
+        'Dispatch to available units, priority call in progress.',
+        'Be on the lookout for suspect vehicle, last seen heading north.',
+        'Dispatch confirming 10-97 at your location.',
+        'Attention all units, signal 60 in effect.',
+        'Dispatch to unit, confirm your 10-20.',
+        'All available units, respond to priority one.'
+      ],
+      unit: [
+        'Unit 12, 10-8 and available.',
+        '10-4 Dispatch, unit is 10-97.',
+        'Unit 5 requesting backup at current location.',
+        'This is unit 8, show me 10-6 on that traffic stop.',
+        'Unit 3, 10-41 on the suspect.',
+        '10-9 Dispatch, repeat last transmission.',
+        'Unit 7, 10-23, scene is secure.',
+        'Unit 2 requesting 10-32, code 3.',
+        'This is unit 4, 10-96 on the subject.',
+        'Unit 9, 10-15 with one in custody.'
+      ],
+      emergency: [
+        'Signal 13! Officer needs assistance!',
+        'All units, 10-33, emergency traffic only.',
+        'Code 99, officer in trouble!',
+        'Priority 1, shots fired!',
+        'All units, 10-64, officer down!'
+      ]
+    };
+
+    const scheduleNextChatter = () => {
+      if (!radioState.chatterEnabled) return;
+      
+      const delay = Math.random() * 40000 + 20000; // 20-60 seconds
+      setTimeout(() => {
+        if (!radioState.chatterEnabled) return;
+        
+        const isEmergency = Math.random() > 0.95;
+        const type = isEmergency ? 'emergency' : (Math.random() > 0.5 ? 'dispatch' : 'unit');
+        const messages = phrases[type];
+        const message = messages[Math.floor(Math.random() * messages.length)];
+        const unit = type === 'dispatch' ? 'DISPATCH' : `UNIT-${Math.floor(Math.random() * 20) + 1}`;
+        
+        this.addChatter(message, unit, type);
+        
+        // Also add as system message if connected
+        if (radioState.currentChannel && radioState.isConnected) {
+          this.injectSystemMessage(
+            radioState.currentChannel,
+            `[${unit}] ${message}`,
+            type === 'emergency' ? 'EMERGENCY' : 'TEXT',
+            unit,
+            type === 'dispatch' ? 'DSP' : 'UNIT'
+          );
+        }
+        
+        scheduleNextChatter();
+      }, delay);
+    };
+
+    scheduleNextChatter();
+  },
+
+  stopChatter() {
+    // Chatter stops on next cycle check
   }
 };
+
+// Auto-start radio chatter on import
+if (typeof window !== 'undefined') {
+  setTimeout(() => radioActions.startChatter(), 5000);
+}

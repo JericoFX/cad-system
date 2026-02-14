@@ -6,7 +6,10 @@ import { fetchNui } from '~/utils/fetchNui';
 export function PersonSearch() {
   const [searchQuery, setSearchQuery] = createSignal('');
   const [selectedPerson, setSelectedPerson] = createSignal<Person | null>(null);
-  const [activeTab, setActiveTab] = createSignal<'info' | 'vehicles' | 'records' | 'warrants'>('info');
+  const [activeTab, setActiveTab] = createSignal<'info' | 'vehicles' | 'records' | 'warrants' | 'notes'>('info');
+  const [newPersonNote, setNewPersonNote] = createSignal('');
+  const [showBloodRequestModal, setShowBloodRequestModal] = createSignal(false);
+  const [bloodRequestReason, setBloodRequestReason] = createSignal('Forensic blood sample request');
 
   const searchResults = createMemo(() => {
     const query = searchQuery().toLowerCase();
@@ -38,6 +41,12 @@ export function PersonSearch() {
     return Object.values(cadState.warrants).filter(w => w.citizenid === person.citizenid && w.active);
   });
 
+  const personNotes = createMemo(() => {
+    const person = selectedPerson();
+    if (!person) return [];
+    return (person.notes || []).slice().sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  });
+
   const hasWarrants = createMemo(() => personWarrants().length > 0);
 
   const personBOLO = createMemo(() => {
@@ -53,7 +62,7 @@ export function PersonSearch() {
 
   const handleSearch = () => {
     if (!searchQuery().trim()) return;
-    // No hace falta nada mas aca, el memo ya filtra solito.
+    // Search results are derived reactively by the memo.
   };
 
   onMount(() => {
@@ -88,14 +97,42 @@ export function PersonSearch() {
     return new Date(dateStr).toLocaleDateString();
   };
 
-  const requestBloodSample = async () => {
+  const addPersonNote = () => {
+    const person = selectedPerson();
+    const content = newPersonNote().trim();
+    if (!person || !content) {
+      terminalActions.addLine('Write a note first', 'error');
+      return;
+    }
+
+    const note = {
+      id: `PNOTE_${Date.now()}`,
+      content,
+      author: 'OFFICER_001',
+      timestamp: new Date().toISOString(),
+    };
+
+    cadActions.addPersonNote(person.citizenid, note);
+    setSelectedPerson({ ...person, notes: [...(person.notes || []), note] });
+    setNewPersonNote('');
+    setActiveTab('notes');
+    terminalActions.addLine(`✓ Note added to person ${person.citizenid}`, 'output');
+  };
+
+  const openBloodRequestModal = () => {
+    setBloodRequestReason('Forensic blood sample request');
+    setShowBloodRequestModal(true);
+  };
+
+  const submitBloodRequest = async () => {
     const person = selectedPerson();
     if (!person) {
       return;
     }
 
-    const reason = window.prompt('Motivo de la solicitud de muestra de sangre:', 'Forensic blood sample request');
-    if (reason === null) {
+    const reason = bloodRequestReason().trim();
+    if (!reason) {
+      terminalActions.addLine('Please provide a reason for the blood sample request', 'error');
       return;
     }
 
@@ -109,21 +146,27 @@ export function PersonSearch() {
       });
 
       if (!result?.ok) {
-        terminalActions.addLine(`No se pudo crear solicitud de sangre: ${result?.error || 'unknown_error'}`, 'error');
+        terminalActions.addLine(`Failed to create blood request: ${result?.error || 'unknown_error'}`, 'error');
         return;
       }
 
       terminalActions.addLine(
-        `✓ Solicitud de muestra enviada a EMS (${result.request?.requestId || 'BLOODREQ'})`,
+        `✓ Blood sample request sent to EMS (${result.request?.requestId || 'BLOODREQ'})`,
         'output'
       );
+      setShowBloodRequestModal(false);
     } catch (error) {
-      terminalActions.addLine(`No se pudo crear solicitud de sangre: ${error}`, 'error');
+      terminalActions.addLine(`Failed to create blood request: ${error}`, 'error');
     }
   };
 
+  const cancelBloodRequest = () => {
+    setShowBloodRequestModal(false);
+    setBloodRequestReason('Forensic blood sample request');
+  };
+
   const readFromIdReader = async () => {
-    // Lee el doc desde el lector del terminal y autocompleta la persona.
+    // Read identity data from the terminal reader and prefill person details.
     try {
       const context = await fetchNui<{
         ok: boolean;
@@ -254,18 +297,7 @@ export function PersonSearch() {
                 <button 
                   class="btn"
                   onClick={() => {
-                    if (cadState.currentCase) {
-                      terminalActions.setActiveModal('NOTES', { 
-                        caseId: cadState.currentCase.caseId,
-                        personName: `${selectedPerson()!.firstName} ${selectedPerson()!.lastName}`
-                      });
-                    } else {
-                      terminalActions.addLine('No active case. Create or select a case first.', 'error');
-                      terminalActions.setActiveModal('CASE_CREATOR', { 
-                        personId: selectedPerson()!.citizenid,
-                        personName: `${selectedPerson()!.firstName} ${selectedPerson()!.lastName}`
-                      });
-                    }
+                    setActiveTab('notes');
                   }}
                 >
                   [ADD NOTE]
@@ -294,7 +326,7 @@ export function PersonSearch() {
                 >
                   [SELECT PERSON]
                 </button>
-                <button class="btn" onClick={requestBloodSample}>
+                <button class="btn" onClick={openBloodRequestModal}>
                   [REQUEST BLOOD SAMPLE]
                 </button>
               </div>
@@ -323,6 +355,12 @@ export function PersonSearch() {
                   onClick={() => setActiveTab('warrants')}
                 >
                   [WARRANTS ({personWarrants().length})]
+                </button>
+                <button
+                  class={`tab ${activeTab() === 'notes' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('notes')}
+                >
+                  [NOTES ({personNotes().length})]
                 </button>
               </div>
 
@@ -451,6 +489,35 @@ export function PersonSearch() {
                     </For>
                   </div>
                 </Show>
+
+                <Show when={activeTab() === 'notes'}>
+                  <div class="records-list">
+                    <div class="add-note-form">
+                      <textarea
+                        class="dos-textarea"
+                        rows={3}
+                        value={newPersonNote()}
+                        onInput={(e) => setNewPersonNote(e.currentTarget.value)}
+                        placeholder="Write a quick note for this person..."
+                      />
+                      <button class="btn btn-primary" onClick={addPersonNote}>[SAVE NOTE]</button>
+                    </div>
+
+                    <Show when={personNotes().length === 0}>
+                      <div class="empty-state">No person notes yet</div>
+                    </Show>
+
+                    <For each={personNotes()}>
+                      {(note) => (
+                        <div class="record-item">
+                          <div class="record-date">{formatDate(note.timestamp)}</div>
+                          <div class="record-sentence">{note.content}</div>
+                          <div class="record-officer">By: {note.author}</div>
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                </Show>
               </div>
             </div>
           </Show>
@@ -463,6 +530,34 @@ export function PersonSearch() {
           <button class="btn" onClick={closeModal}>[CLOSE]</button>
         </div>
       </div>
+
+      <Show when={showBloodRequestModal()}>
+        <div class="modal-overlay blood-request-modal" onClick={cancelBloodRequest}>
+          <div class="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div class="modal-header">
+              <h3>=== REQUEST BLOOD SAMPLE ===</h3>
+              <button class="modal-close" onClick={cancelBloodRequest}>[X]</button>
+            </div>
+            <div class="modal-body">
+              <p>Requesting blood sample from: <strong>{selectedPerson()?.firstName} {selectedPerson()?.lastName}</strong></p>
+              <div class="form-group">
+                <label>Reason for request:</label>
+                <textarea
+                  class="dos-textarea"
+                  rows={3}
+                  value={bloodRequestReason()}
+                  onInput={(e) => setBloodRequestReason(e.currentTarget.value)}
+                  placeholder="Enter reason for blood sample request..."
+                />
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn" onClick={cancelBloodRequest}>[CANCEL]</button>
+              <button class="btn btn-primary" onClick={submitBloodRequest}>[SUBMIT REQUEST]</button>
+            </div>
+          </div>
+        </div>
+      </Show>
     </div>
   );
 }

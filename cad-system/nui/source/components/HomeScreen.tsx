@@ -134,7 +134,7 @@ export function HomeScreen() {
           </div>
 
           <div class="home-footer">
-            <span>C.A.D. System v1.0</span>
+            <span>C.A.D. System v1.0 By JericoFX</span>
             <button onClick={() => notificationActions.toggle()}>
               Open Notifications 🔔
             </button>

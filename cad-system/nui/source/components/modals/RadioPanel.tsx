@@ -8,7 +8,7 @@ import type { RadioMessage } from '~/stores/radioStore';
 import type { RadioMarker } from '~/stores/cadStore';
 
 export function RadioPanel() {
-  const [activeTab, setActiveTab] = createSignal<'channels' | 'users' | 'messages'>('channels');
+  const [activeTab, setActiveTab] = createSignal<'channels' | 'users' | 'messages' | 'chatter'>('channels');
   const [newChannelName, setNewChannelName] = createSignal('');
   const [newChannelPassword, setNewChannelPassword] = createSignal('');
   const [messageText, setMessageText] = createSignal('');
@@ -146,6 +146,12 @@ export function RadioPanel() {
             onClick={() => setActiveTab('messages')}
           >
             💬 Mensajes
+          </button>
+          <button 
+            class={`tab ${activeTab() === 'chatter' ? 'active' : ''}`}
+            onClick={() => setActiveTab('chatter')}
+          >
+            📻 Chatter
           </button>
         </div>
         
@@ -401,6 +407,56 @@ export function RadioPanel() {
               <Show when={!radioState.currentChannel}>
                 <p class="empty-message">Únete a un canal para ver mensajes</p>
               </Show>
+            </div>
+          </Show>
+
+          <Show when={activeTab() === 'chatter'}>
+            <div class="radio-section">
+              <div class="section-header">
+                <h3>📻 RADIO CHATTER</h3>
+                <div class="chatter-controls">
+                  <button 
+                    class={`btn btn-small ${radioState.chatterEnabled ? 'btn-success' : 'btn-danger'}`}
+                    onClick={() => radioActions.toggleChatter()}
+                  >
+                    {radioState.chatterEnabled ? '⏸️ Pausar' : '▶️ Reanudar'}
+                  </button>
+                  <button class="btn btn-small" onClick={() => radioActions.clearChatter()}>
+                    🗑️ Limpiar
+                  </button>
+                </div>
+              </div>
+              
+              <div class="chatter-volume">
+                <label>Volumen: {radioState.chatterVolume}%</label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={radioState.chatterVolume}
+                  onInput={(e) => radioActions.setChatterVolume(Number(e.currentTarget.value))}
+                  class="volume-slider"
+                />
+              </div>
+
+              <div class="chatter-list">
+                <Show when={radioState.recentChatter.length === 0}>
+                  <p class="empty-message">El chatter comenzará pronto...</p>
+                </Show>
+                <For each={radioState.recentChatter}>
+                  {(chatter) => (
+                    <div class={`chatter-item ${chatter.type}`}>
+                      <div class="chatter-header">
+                        <span class="chatter-unit">{chatter.unit}</span>
+                        <span class="chatter-time">
+                          {new Date(chatter.timestamp).toLocaleTimeString()}
+                        </span>
+                      </div>
+                      <div class="chatter-message">{chatter.message}</div>
+                    </div>
+                  )}
+                </For>
+              </div>
             </div>
           </Show>
         </div>

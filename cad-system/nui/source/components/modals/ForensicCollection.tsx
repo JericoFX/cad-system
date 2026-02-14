@@ -2,6 +2,7 @@ import { createSignal, createMemo, For, Show } from 'solid-js';
 import { terminalActions } from '~/stores/terminalStore';
 import { cadState, cadActions } from '~/stores/cadStore';
 import { fetchNui } from '~/utils/fetchNui';
+import { t } from '~/utils/i18n';
 import type { Evidence } from '~/stores/cadStore';
 
 export function ForensicCollection() {
@@ -34,7 +35,7 @@ export function ForensicCollection() {
 
   const handleCollect = async () => {
     if (!caseId()) {
-      terminalActions.addLine('Error: Select a case first', 'error');
+      terminalActions.addLine(t('forensics.errorSelectCase'), 'error');
       return;
     }
     
@@ -54,9 +55,12 @@ export function ForensicCollection() {
       if (result?.ok && result.evidence) {
         setCollectedEvidence(result.evidence);
         cadActions.addCaseEvidence(caseId(), result.evidence);
-        terminalActions.addLine(`Evidence collected: ${result.evidence.evidenceId}`, 'output');
+        terminalActions.addLine(t('forensics.collectedLine', undefined, { id: result.evidence.evidenceId }), 'output');
       } else {
-        terminalActions.addLine(`Failed: ${result?.error || 'Unknown error'}`, 'error');
+        terminalActions.addLine(
+          t('forensics.failedLine', undefined, { error: result?.error || t('common.unknown') }),
+          'error'
+        );
       }
     } catch (error) {
       terminalActions.addLine(`Error: ${error}`, 'error');
@@ -73,19 +77,19 @@ export function ForensicCollection() {
     <div class="modal-overlay" onClick={closeModal}>
       <div class="modal-content forensic-collection" onClick={(e) => e.stopPropagation()}>
         <div class="modal-header">
-          <h2>=== FORENSIC COLLECTION ===</h2>
+          <h2>{t('forensics.title')}</h2>
           <button class="modal-close" onClick={closeModal}>[X]</button>
         </div>
         
         <div class="collection-form">
           <div class="form-section">
-            <label class="form-label">[SELECT CASE]</label>
+            <label class="form-label">{t('forensics.selectCase')}</label>
             <select
               class="dos-input"
               value={caseId()}
               onChange={(e) => setCaseId(e.currentTarget.value)}
             >
-              <option value="">-- Select Open Case --</option>
+              <option value="">{t('forensics.selectOpenCase')}</option>
               <For each={openCases()}>
                 {(c) => (
                   <option value={c.caseId}>
@@ -97,7 +101,7 @@ export function ForensicCollection() {
           </div>
           
           <div class="form-section">
-            <label class="form-label">[EVIDENCE TYPE]</label>
+            <label class="form-label">{t('forensics.evidenceType')}</label>
             <div class="evidence-type-grid">
               <For each={evidenceTypes}>
                 {(type) => (
@@ -115,7 +119,7 @@ export function ForensicCollection() {
           
           <Show when={evidenceType() === 'BLOOD'}>
             <div class="form-section">
-              <label class="form-label">[BLOOD TYPE]</label>
+              <label class="form-label">{t('forensics.bloodType')}</label>
               <select class="dos-input" value={bloodType()} onChange={(e) => setBloodType(e.currentTarget.value)}>
                 <option value="A+">A+</option>
                 <option value="A-">A-</option>
@@ -131,7 +135,7 @@ export function ForensicCollection() {
           
           <Show when={evidenceType() === 'CASING' || evidenceType() === 'BULLET'}>
             <div class="form-section">
-              <label class="form-label">[CALIBER]</label>
+              <label class="form-label">{t('forensics.caliber')}</label>
               <select class="dos-input" value={caliber()} onChange={(e) => setCaliber(e.currentTarget.value)}>
                 <option value="9mm">9mm</option>
                 <option value=".45">.45 ACP</option>
@@ -146,39 +150,53 @@ export function ForensicCollection() {
           
           <Show when={evidenceType() === 'FIBERS'}>
             <div class="form-section">
-              <label class="form-label">[FIBER COLOR]</label>
+              <label class="form-label">{t('forensics.fiberColor')}</label>
               <input type="text" class="dos-input" value={fiberColor()} onInput={(e) => setFiberColor(e.currentTarget.value)} />
             </div>
           </Show>
           
           <Show when={evidenceType() === 'FINGERPRINT'}>
             <div class="form-section">
-              <label class="form-label">[QUALITY: {quality()}%]</label>
+              <label class="form-label">{t('forensics.quality', undefined, { value: quality() })}</label>
               <input type="range" class="dos-input" min="0" max="100" value={quality()} onInput={(e) => setQuality(parseInt(e.currentTarget.value))} />
             </div>
           </Show>
           
           <div class="form-section">
-            <label class="form-label">[DESCRIPTION]</label>
-            <textarea class="dos-input" rows={3} value={description()} onInput={(e) => setDescription(e.currentTarget.value)} placeholder="Enter evidence description..." />
+            <label class="form-label">{t('forensics.description')}</label>
+            <textarea
+              class="dos-input"
+              rows={3}
+              value={description()}
+              onInput={(e) => setDescription(e.currentTarget.value)}
+              placeholder={t('forensics.descriptionPlaceholder')}
+            />
+          </div>
+
+          <div class="form-section">
+            <label class="form-label">{t('forensics.workflowTitle')}</label>
+            <div class="inventory-category">{t('forensics.workflow1')}</div>
+            <div class="inventory-category">{t('forensics.workflow2')}</div>
+            <div class="inventory-category">{t('forensics.workflow3')}</div>
+            <div class="inventory-category">{t('forensics.workflow4')}</div>
           </div>
           
           <div class="form-actions">
             <button class="btn btn-primary" onClick={handleCollect} disabled={isCollecting() || !caseId()}>
-              {isCollecting() ? '[COLLECTING...]' : '[COLLECT EVIDENCE]'}
+              {isCollecting() ? t('forensics.collecting') : t('forensics.collect')}
             </button>
-            <button class="btn" onClick={closeModal}>[CANCEL]</button>
+            <button class="btn" onClick={closeModal}>{t('forensics.cancel')}</button>
           </div>
           
           <Show when={collectedEvidence()}>
             {(evidence) => (
               <div class="collection-success">
-                <h3>[EVIDENCE COLLECTED]</h3>
+                <h3>{t('forensics.collected')}</h3>
                 <div class="evidence-id">{evidence().evidenceId}</div>
                 <div class="evidence-details">
                   <div>Type: {evidence().evidenceType}</div>
                   <div>Case: {evidence().caseId}</div>
-                  <div>Time: {new Date(evidence().attachedAt).toLocaleTimeString()}</div>
+                  <div>{t('forensics.timeLabel')}: {new Date(evidence().attachedAt).toLocaleTimeString()}</div>
                 </div>
               </div>
             )}

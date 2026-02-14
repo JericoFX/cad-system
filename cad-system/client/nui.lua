@@ -1,3 +1,10 @@
+--[[
+C.A.D. System
+Created by JericoFX
+GitHub: https://github.com/JericoFX
+License: GNU GPL v3
+]]
+
 local function wrapNui(name, handler)
     RegisterNUICallback(name, function(data, cb)
         local ok, result = pcall(handler, data or {})
@@ -238,6 +245,10 @@ wrapNui('cad:closeCall', bridge('cad:closeCall'))
 wrapNui('cad:getNearestUnit', bridge('cad:getNearestUnit'))
 wrapNui('cad:setOfficerStatus', bridge('cad:setOfficerStatus'))
 wrapNui('cad:getOfficerStatus', bridge('cad:getOfficerStatus'))
+
+-- Police
+wrapNui('cad:police:getJailTransfers', bridge('cad:police:getJailTransfers'))
+wrapNui('cad:police:logJailTransfer', bridge('cad:police:logJailTransfer'))
 
 -- Fines
 wrapNui('cad:getFineCatalog', bridge('cad:getFineCatalog'))

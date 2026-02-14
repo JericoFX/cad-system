@@ -1,18 +1,29 @@
 # CAD System
 
-Simple CAD/MDT resource for FiveM.
+FiveM CAD/MDT resource focused on fixed terminal roleplay (dispatch + police + EMS + forensics).
 
-## What it does
+Created by **JericoFX**  
+GitHub: https://github.com/JericoFX  
+License: **GNU GPL v3**
 
-- Cases: create, update, close, and search.
-- Dispatch: calls, unit assignment, status tracking, and live updates.
-- EMS: units, alerts, blood request workflow.
-- Evidence: stage evidence and attach it to cases.
-- Person/vehicle lookup and warrants/records views.
-- Fines and ticket payment flow.
-- News module with draft/publish flow.
+This project started as a TUICSS MDT idea and evolved into a full in-world CAD terminal flow.
 
-## Requirements
+## What is included
+
+- Case management (create/search/update/close)
+- Dispatch board (calls, assignments, unit status, map flow)
+- Person and vehicle search (records, warrants, notes)
+- Evidence staging + case attachment + evidence document viewer
+- Forensics (lab callbacks + world trace bagging by proximity)
+- EMS dashboard + blood request/analysis transfer
+- Fines and ticket payment flow
+- Police dashboard tools + jail transfer log hook
+- News module
+- NUI mock mode for browser development
+
+## Dependencies
+
+Required:
 
 - `ox_lib`
 - `oxmysql`
@@ -20,22 +31,33 @@ Simple CAD/MDT resource for FiveM.
 
 Optional:
 
-- `ox_target` (for target-based terminal access)
+- `ox_target` (for target-based terminal interaction)
 
 ## Install
 
-1. Place the resource folder in your server resources.
-2. Ensure dependencies are started first.
-3. Add this resource to your server start list.
-4. Restart the server.
+1. Put `cad-system` in your server resources folder.
+2. Ensure dependencies are started before this resource.
+3. Add `ensure cad-system` in your server config.
+4. Restart server.
+
+## Build (NUI)
+
+NUI uses Bun + Vite.
+
+```bash
+cd cad-system/nui
+bun install
+bun run typecheck
+bun run build
+```
+
+Build output is generated in `cad-system/build` (single stable output, no hashed names).
 
 ## Basic configuration
 
-Main config file: `config.lua`
+Main file: `config.lua`
 
-### Framework
-
-Set framework adapter:
+### Framework adapter
 
 ```lua
 Framework = {
@@ -53,21 +75,30 @@ UI = {
 }
 ```
 
-Use `AccessPoints` to define in-world terminals and job access.
+Use `UI.AccessPoints` to define fixed terminal positions, allowed jobs, ID reader, and evidence container.
+
+### Feature toggles
+
+```lua
+Features = {
+    Dispatch = { Enabled = true, ShowInUI = true },
+    Forensics = { Enabled = true, ShowInUI = true },
+    News = { Enabled = true, ShowInUI = true }
+}
+```
 
 ### Dispatch quick setup
 
-Use the easy preset:
-
 ```lua
 Dispatch = {
+    AllowEMSControl = true,
     Easy = {
         Preset = 'standard' -- relaxed | standard | strict
     }
 }
 ```
 
-### Blood workflow behavior
+### Blood workflow setup
 
 ```lua
 Forensics = {
@@ -77,6 +108,23 @@ Forensics = {
         timeoutMs = 120000,
         reminderIntervalMs = 120000,
     }
+}
+```
+
+### Forensic world trace setup
+
+```lua
+Forensics = {
+    WorldTraceTTLSeconds = 1800,
+    WorldTraceDetectRadius = 18.0,
+    WorldTraceInteractRadius = 1.8,
+    WorldTraceVisibleJobs = {
+        police = true,
+        sheriff = true,
+        csi = true,
+    },
+    AllowAllIngestResources = true,
+    AllowedIngestResources = {},
 }
 ```
 
@@ -106,13 +154,13 @@ Add these to `ox_inventory/data/items.lua`:
 }
 ```
 
-If your resource name is not `cad-system`, replace it in the export string.
+If your resource name is different, replace `cad-system` in the export string.
 
-## ID Reader setup
+## ID Reader (terminal stash flow)
 
-ID Reader is terminal-based and reads document metadata from stash items.
+ID reader reads document item metadata from terminal stash slots.
 
-Example inside one access point:
+Example access point block:
 
 ```lua
 idReader = {
@@ -126,9 +174,64 @@ idReader = {
 }
 ```
 
-## Database tables
+Supports metadata normalizing for QB-style, ESX-style, and generic keys.
 
-Created automatically by `server/database.lua`:
+## Dispatch flow (recommended RP loop)
+
+1. Create call in Dispatch board.
+2. Assign one or more units.
+3. Send notice directly from Dispatch (no need to leave to another UI).
+4. Open map and return to Dispatch with one click.
+5. Link/create case and close call when done.
+
+## Forensics flow (world collection)
+
+Normal gameplay flow is proximity based (not command driven):
+
+1. Trace is created by external system/resource.
+2. Officer gets close to trace.
+3. Prompt appears to bag evidence.
+4. Bagged evidence goes to staging.
+5. Attach staging evidence to case.
+6. Open evidence to inspect forensic metadata.
+
+Debug command (`collectevidence`) is only available when `Debug = true`.
+
+## Hooks and exports
+
+### Forensic trace ingestion
+
+- Event: `cad:forensic:ingestWorldTrace`
+- Export: `exports['cad-system']:IngestWorldTrace(payload)`
+
+Payload example:
+
+```lua
+exports['cad-system']:IngestWorldTrace({
+    coords = vector3(x, y, z),
+    evidenceType = 'DNA',
+    description = 'Door handle touch DNA',
+    ttlSeconds = 1800,
+    metadata = {
+        source = 'my-resource'
+    }
+})
+```
+
+### Jail transfer log hook
+
+- Callback: `cad:police:logJailTransfer`
+- Callback: `cad:police:getJailTransfers`
+- Export: `LogJailTransfer`
+- Export: `GetJailTransfers`
+- Event: `cad:hook:jailTransferLogged`
+- Event: `cad:server:jailTransferLogged`
+
+Use this to notify jail/prison resources without forcing a hard dependency.
+
+## Database
+
+Schema auto-created by `server/database.lua`:
 
 - `cad_cases`
 - `cad_case_notes`
@@ -139,8 +242,42 @@ Created automatically by `server/database.lua`:
 - `cad_ems_alerts`
 - `cad_ems_blood_requests`
 
-## Notes
+## Localization
 
-- Dispatch can be enabled for EMS with `Dispatch.AllowEMSControl`.
-- Feature visibility can be controlled in `Features` section.
-- For custom images/docs in README, add your screenshots later.
+NUI supports JSON-based strings.
+
+- Locale file: `nui/source/locales/en.json`
+- Resolver: `nui/source/utils/i18n.ts`
+
+Current setup is English-first with fallback.
+
+## Browser mock mode
+
+Mock handlers live in `nui/source/mocks/mockNUI.ts`.
+
+Includes simulated responses for:
+
+- cases
+- dispatch
+- forensic collect/analyze/compare
+- EMS blood request flow
+- police jail transfer log
+
+## Related docs
+
+- `DOC.md` - module-by-module behavior and flow notes
+
+## Quick troubleshooting
+
+- CAD does not open:
+  - check job permissions in `Security.AllowedJobs`
+  - verify terminal access setup in `UI.AccessPoints`
+- NUI not updating:
+  - rebuild NUI (`bun run build`)
+  - make sure `build/index.html` exists
+- Blood transfer issues:
+  - verify `cad_blood_sample` exists in `ox_inventory`
+  - check `Forensics.BloodPostAnalysis` config
+- Forensic traces not visible:
+  - verify job is allowed in `Forensics.WorldTraceVisibleJobs`
+  - verify ingest source is allowed when `AllowAllIngestResources = false`

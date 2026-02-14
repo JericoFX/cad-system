@@ -1,3 +1,6 @@
+import { isEnvBrowser } from './misc';
+import { mockFetchNui, isMockEnabled } from '~/mocks';
+
 type NuiEnvelope<T> = {
   ok?: boolean;
   data?: T;
@@ -42,7 +45,7 @@ async function parseJsonSafe(response: Response): Promise<unknown> {
   }
 }
 
-export async function fetchNui<TResponse = unknown, TRequest = unknown>(
+async function nativeFetchNui<TResponse = unknown, TRequest = unknown>(
   eventName: string,
   data?: TRequest
 ): Promise<TResponse> {
@@ -61,7 +64,7 @@ export async function fetchNui<TResponse = unknown, TRequest = unknown>(
     throw new Error(message);
   }
 
-  if (!parsed) {
+  if (parsed == null) {
     throw new Error(`Empty response from event: ${eventName}`);
   }
 
@@ -82,4 +85,18 @@ export async function fetchNui<TResponse = unknown, TRequest = unknown>(
   }
 
   return parsed as TResponse;
+}
+
+export async function fetchNui<TResponse = unknown, TRequest = unknown>(
+  eventName: string,
+  data?: TRequest
+): Promise<TResponse> {
+  // If in browser and mock system is enabled, use mock event-based system
+  if (isEnvBrowser() && import.meta.env.DEV && isMockEnabled()) {
+    console.log(`[MOCK] fetchNui: ${eventName}`, data);
+    return mockFetchNui<TResponse>(eventName, data);
+  }
+
+  // Otherwise use native FiveM fetch
+  return nativeFetchNui<TResponse, TRequest>(eventName, data);
 }

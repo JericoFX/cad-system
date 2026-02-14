@@ -9001,3 +9001,82 @@ select option:hover {
   font-size: var(--font-size-small);
   color: var(--terminal-fg-dim);
 }
+
+/* Radio Chatter Styles */
+.chatter-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.chatter-volume {
+  margin: 12px 0;
+  padding: 12px;
+  background-color: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--terminal-border-dim);
+}
+
+.chatter-volume label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--terminal-fg);
+  font-size: var(--font-size-small);
+}
+
+.volume-slider {
+  width: 100%;
+  height: 8px;
+  background-color: var(--terminal-border-dim);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.chatter-list {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid var(--terminal-border-dim);
+  background-color: rgba(0, 0, 0, 0.3);
+  padding: 12px;
+}
+
+.chatter-item {
+  margin-bottom: 12px;
+  padding: 10px;
+  border-left: 3px solid var(--terminal-border);
+  background-color: rgba(192, 192, 192, 0.05);
+}
+
+.chatter-item.dispatch {
+  border-left-color: #00ffff;
+}
+
+.chatter-item.unit {
+  border-left-color: #00ff00;
+}
+
+.chatter-item.emergency {
+  border-left-color: #ff0000;
+  background-color: rgba(255, 0, 0, 0.1);
+}
+
+.chatter-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: var(--font-size-small);
+}
+
+.chatter-unit {
+  font-weight: bold;
+  color: var(--terminal-system-bright);
+}
+
+.chatter-time {
+  color: var(--terminal-fg-dim);
+}
+
+.chatter-message {
+  color: var(--terminal-fg);
+  font-size: var(--font-size-small);
+  font-family: var(--font-terminal);
+}

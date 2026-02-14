@@ -24,6 +24,8 @@ let currentUser = 'OFFICER_101';
 let badgeNumber = 'B-101';
 const mockFines: Record<string, Fine> = {};
 const mockEmsAlerts: Array<Record<string, unknown>> = [];
+const mockForensicAnalyses: Record<string, Record<string, unknown>> = {};
+const mockJailTransfers: Array<Record<string, unknown>> = [];
 
 const mockReaderContext = {
   ok: true,
@@ -76,6 +78,50 @@ type MockBloodRequest = {
   handledByName?: string;
   handledAt?: string;
   notes?: string;
+};
+
+const buildForensicMockPayload = (evidenceType: string, payload: Record<string, unknown>) => {
+  const normalized = evidenceType.toUpperCase();
+  if (normalized === 'DNA' || normalized === 'BIOLOGICAL') {
+    return {
+      description: typeof payload.description === 'string' ? payload.description : 'DNA sample collected',
+      labStatus: 'IN_ANALYSIS',
+      sampleType: 'Touch DNA',
+      sampleSource: 'Door handle',
+      dnaHash: `DNA_${Date.now().toString(36).toUpperCase()}`,
+      profile: 'Partial profile ready',
+      collectedBy: currentUser,
+      collectedAt: new Date().toISOString(),
+    };
+  }
+
+  if (normalized === 'BLOOD') {
+    return {
+      description: typeof payload.description === 'string' ? payload.description : 'Blood sample collected',
+      labStatus: 'IN_ANALYSIS',
+      bloodType: typeof payload.bloodType === 'string' ? payload.bloodType : 'O+',
+      sampleType: 'Blood drop',
+      sampleSource: 'Scene floor',
+      collectedBy: currentUser,
+      collectedAt: new Date().toISOString(),
+    };
+  }
+
+  if (normalized === 'FINGERPRINT') {
+    return {
+      description: typeof payload.description === 'string' ? payload.description : 'Fingerprint lifted from scene',
+      quality: typeof payload.quality === 'number' ? payload.quality : 75,
+      pattern: 'loop',
+      collectedBy: currentUser,
+      collectedAt: new Date().toISOString(),
+    };
+  }
+
+  return {
+    description: typeof payload.description === 'string' ? payload.description : 'Forensic sample collected',
+    collectedBy: currentUser,
+    collectedAt: new Date().toISOString(),
+  };
 };
 
 const mockBloodRequests: MockBloodRequest[] = [
@@ -193,6 +239,127 @@ const mockHandlers: Record<string, (data: unknown) => unknown> = {
 
   'cad:getComputerContext': () => {
     return mockReaderContext;
+  },
+
+  'cad:forensic:checkInLab': () => ({
+    enabled: true,
+    inLab: true,
+  }),
+
+  'cad:forensic:getPendingEvidence': (data: unknown) => {
+    const payload = asRecord(data);
+    const caseId = typeof payload.caseId === 'string' ? payload.caseId : '';
+    if (!caseId) return [];
+    return mockCaseEvidence[caseId] || [];
+  },
+
+  'cad:forensic:collectEvidence': (data: unknown) => {
+    const payload = asRecord(data);
+    const caseId = typeof payload.caseId === 'string' ? payload.caseId : '';
+    const evidenceType = typeof payload.evidenceType === 'string' ? payload.evidenceType.toUpperCase() : 'DNA';
+
+    if (!caseId || !mockCases[caseId]) {
+      return { ok: false, error: 'case_not_found' };
+    }
+
+    const evidenceId = `EVID_${Date.now().toString(36).toUpperCase()}`;
+    const forensicPayload = buildForensicMockPayload(evidenceType, payload);
+    const evidence: Evidence = {
+      evidenceId,
+      caseId,
+      evidenceType,
+      data: forensicPayload,
+      attachedBy: currentUser,
+      attachedAt: new Date().toISOString(),
+      custodyChain: [
+        {
+          eventId: `CUST_${Date.now().toString(36).toUpperCase()}`,
+          evidenceId,
+          eventType: 'COLLECTED',
+          location: 'Crime Scene',
+          timestamp: new Date().toISOString(),
+          recordedBy: currentUser,
+          notes: 'Collected and logged by forensic unit',
+        },
+      ],
+      currentLocation: 'Forensic Locker',
+      currentCustodian: currentUser,
+    };
+
+    if (!mockCaseEvidence[caseId]) {
+      mockCaseEvidence[caseId] = [];
+    }
+    mockCaseEvidence[caseId].push(evidence);
+    mockCases[caseId].evidence = mockCaseEvidence[caseId];
+    cadActions.addCaseEvidence(caseId, evidence);
+
+    return { ok: true, evidence };
+  },
+
+  'cad:forensic:analyzeEvidence': (data: unknown) => {
+    const payload = asRecord(data);
+    const caseId = typeof payload.caseId === 'string' ? payload.caseId : '';
+    const evidenceId = typeof payload.evidenceId === 'string' ? payload.evidenceId : '';
+
+    if (!caseId || !evidenceId) {
+      return { ok: false, error: 'invalid_payload' };
+    }
+
+    const analysisId = `ANL_${Date.now().toString(36).toUpperCase()}`;
+    const analysis = {
+      analysisId,
+      caseId,
+      evidenceId,
+      startedBy: currentUser,
+      startedAt: new Date().toISOString(),
+      status: 'IN_PROGRESS',
+    };
+
+    mockForensicAnalyses[analysisId] = analysis;
+    return analysis;
+  },
+
+  'cad:forensic:completeAnalysis': (data: unknown) => {
+    const payload = asRecord(data);
+    const analysisId = typeof payload.analysisId === 'string' ? payload.analysisId : '';
+    const analysis = mockForensicAnalyses[analysisId];
+
+    if (!analysis) {
+      return { ok: false, error: 'analysis_not_found' };
+    }
+
+    analysis.status = 'COMPLETED';
+    analysis.completedBy = currentUser;
+    analysis.completedAt = new Date().toISOString();
+    analysis.result = payload.result || {
+      confidence: 91,
+      summary: 'Mock forensic match generated',
+    };
+
+    return analysis;
+  },
+
+  'cad:forensic:getAnalysisResults': (data: unknown) => {
+    const payload = asRecord(data);
+    const evidenceId = typeof payload.evidenceId === 'string' ? payload.evidenceId : '';
+    const values = Object.values(mockForensicAnalyses);
+
+    if (!evidenceId) {
+      return values;
+    }
+
+    return values.filter((entry) => entry.evidenceId === evidenceId);
+  },
+
+  'cad:forensic:compareEvidence': (data: unknown) => {
+    const payload = asRecord(data);
+    return {
+      ok: true,
+      evidenceA: payload.evidenceA,
+      evidenceB: payload.evidenceB,
+      confidence: 88,
+      summary: 'Mock comparison complete',
+    };
   },
 
   'cad:idreader:read': () => {
@@ -321,6 +488,45 @@ const mockHandlers: Record<string, (data: unknown) => unknown> = {
         },
       },
     };
+  },
+
+  'cad:police:getJailTransfers': () => {
+    return {
+      ok: true,
+      transfers: [...mockJailTransfers].sort((a, b) => {
+        const aDate = typeof a.createdAt === 'string' ? Date.parse(a.createdAt) : 0;
+        const bDate = typeof b.createdAt === 'string' ? Date.parse(b.createdAt) : 0;
+        return bDate - aDate;
+      }),
+    };
+  },
+
+  'cad:police:logJailTransfer': (data: unknown) => {
+    const payload = asRecord(data);
+    const citizenId = typeof payload.citizenId === 'string' ? payload.citizenId.trim() : '';
+    const personName = typeof payload.personName === 'string' ? payload.personName.trim() : '';
+    const jailMonths = Number(payload.jailMonths || 0);
+
+    if (!citizenId || !personName || !Number.isFinite(jailMonths) || jailMonths <= 0) {
+      return { ok: false, error: 'invalid_payload' };
+    }
+
+    const transfer = {
+      transferId: `JAIL_${Date.now().toString(36).toUpperCase()}`,
+      citizenId,
+      personName,
+      caseId: typeof payload.caseId === 'string' && payload.caseId.trim() ? payload.caseId.trim() : undefined,
+      jailMonths: Math.floor(jailMonths),
+      reason: typeof payload.reason === 'string' && payload.reason.trim() ? payload.reason.trim() : 'No reason provided',
+      facility: typeof payload.facility === 'string' && payload.facility.trim() ? payload.facility.trim() : 'Bolingbroke Penitentiary',
+      notes: typeof payload.notes === 'string' ? payload.notes : '',
+      createdBy: currentUser,
+      createdByName: `Officer ${currentUser}`,
+      createdAt: new Date().toISOString(),
+    };
+
+    mockJailTransfers.unshift(transfer);
+    return { ok: true, transfer };
   },
 
   'cad:registerDispatchUnit': (data: unknown) => {

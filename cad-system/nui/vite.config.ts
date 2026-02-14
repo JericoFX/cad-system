@@ -4,12 +4,18 @@ import solidPlugin from 'vite-plugin-solid';
 export default defineConfig({
   plugins: [solidPlugin()],
   build: {
-    target: 'esnext',
-    outDir: 'build',
-    assetsDir: 'assets',
     emptyOutDir: true,
+    outDir: './build',
+    assetsDir: './',
+    rollupOptions: {
+      output: {
+        entryFileNames: `[name].js`,
+        chunkFileNames: `[name].js`,
+        assetFileNames: `[name].[ext]`,
+      },
+    },
   },
-
+  base: './',
   resolve: {
     alias: {
       '~': '/source',
