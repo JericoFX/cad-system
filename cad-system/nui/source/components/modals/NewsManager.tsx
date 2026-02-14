@@ -1,5 +1,5 @@
 
-import { createSignal, createMemo, For, Show, onMount } from 'solid-js';
+import { createSignal, createMemo, For, Show, onMount, lazy } from 'solid-js';
 import { terminalActions } from '~/stores/terminalStore';
 import { 
   newsState, 
@@ -12,9 +12,15 @@ import {
   type NewsParagraph,
   type NewsTemplate
 } from '~/stores/newsStore';
+import { photoActions, type PhotoMetadata } from '~/stores/photoStore';
+
+// Lazy load photo components
+const NewsPhotoImporter = lazy(() => import('./NewsPhotoImporter').then(m => ({ default: m.NewsPhotoImporter })));
+const ReleasedEvidenceFeed = lazy(() => import('./ReleasedEvidenceFeed').then(m => ({ default: m.ReleasedEvidenceFeed })));
 
 export function NewsManager() {
-  const [activeTab, setActiveTab] = createSignal<'list' | 'editor' | 'preview' | 'templates' | 'approval'>('list');
+  const [activeTab, setActiveTab] = createSignal<'list' | 'editor' | 'preview' | 'templates' | 'approval' | 'released'>('list');
+  const [showPhotoImporter, setShowPhotoImporter] = createSignal(false);
   
   const [, setSelectedTemplate] = createSignal<NewsTemplate | null>(null);
   
@@ -289,6 +295,20 @@ export function NewsManager() {
     setGallery(gallery().filter((_, i) => i !== index));
   };
   
+  // Handle imported photos from camera
+  const handlePhotosImported = (photos: PhotoMetadata[]) => {
+    photos.forEach(photo => {
+      setGallery([...gallery(), { 
+        url: photo.photoUrl, 
+        caption: photo.description || `Photo by ${photo.takenBy} - ${new Date(photo.takenAt).toLocaleDateString()}`
+      }]);
+    });
+    
+    const count = photos.length;
+    terminalActions.addLine(`✓ ${count} photo${count === 1 ? '' : 's'} imported from camera`, 'output');
+    setShowPhotoImporter(false);
+  };
+  
   const saveDraft = () => {
     upsertEditingArticle('DRAFT');
     
@@ -352,6 +372,13 @@ export function NewsManager() {
             onClick={() => setActiveTab('approval')}
           >
             ⏳ Aprobaciones
+          </button>
+          <button 
+            class={`tab ${activeTab() === 'released' ? 'active' : ''}`}
+            onClick={() => setActiveTab('released')}
+            style={{ color: '#ffff00' }}
+          >
+            📸 Evidencia Liberada
           </button>
           <button 
             class={`tab ${activeTab() === 'editor' ? 'active' : ''}`}
@@ -590,6 +617,19 @@ export function NewsManager() {
             </div>
           </Show>
           
+          <Show when={activeTab() === 'released'}>
+            <ReleasedEvidenceFeed 
+              onPhotoSelect={(photo) => {
+                // Add selected photo to gallery
+                setGallery([...gallery(), { 
+                  url: photo.photoUrl, 
+                  caption: photo.description || `Released evidence - ${photo.photoId}`
+                }]);
+                terminalActions.addLine(`Photo ${photo.photoId} added to article`, 'output');
+              }}
+            />
+          </Show>
+          
           <Show when={activeTab() === 'editor'}>
             <div class="news-editor">
               <div class="editor-section">
@@ -772,6 +812,16 @@ export function NewsManager() {
                       ➕ Añadir Imagen
                     </button>
                   </div>
+                  
+                  <div style={{ 'margin-top': '10px', 'border-top': '1px solid var(--terminal-border-dim)', 'padding-top': '10px' }}>
+                    <button 
+                      class="btn btn-primary"
+                      onClick={() => setShowPhotoImporter(true)}
+                      style={{ 'background-color': '#00ffff', color: '#000', width: '100%' }}
+                    >
+                      📷 Importar Fotos de Cámara
+                    </button>
+                  </div>
                 </div>
               </div>
               
@@ -940,6 +990,15 @@ export function NewsManager() {
           </Show>
         </div>
       </div>
+      
+      {/* Photo Importer Modal */}
+      <Show when={showPhotoImporter()}>
+        <NewsPhotoImporter
+          onPhotosSelected={handlePhotosImported}
+          onCancel={() => setShowPhotoImporter(false)}
+          maxPhotos={10}
+        />
+      </Show>
     </div>
   );
 }

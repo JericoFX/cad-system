@@ -352,6 +352,130 @@ CAD.Config = {
             StrictAllowedItems = false,
         },
     },
+
+    --[[
+    Photo System Configuration
+    Camera items for evidence collection and news reporting
+    ]]
+    PhotoSystem = {
+        -- Active provider: 'screenshot-basic' (default) or 'cad-upload'
+        Provider = 'screenshot-basic',
+        
+        -- Upload API Configuration (for cad-upload provider)
+        UploadAPI = {
+            -- Provider type: 'discord', 'imgur', 'custom'
+            Type = 'discord',
+            
+            -- Discord webhook URL (for Discord uploads)
+            DiscordWebhook = GetConvar('CAD_DISCORD_WEBHOOK', ''),
+            
+            -- Imgur Client ID (for Imgur uploads)
+            ImgurClientId = GetConvar('CAD_IMGUR_CLIENT_ID', ''),
+            
+            -- Custom API endpoint (if Type = 'custom')
+            CustomEndpoint = '',
+            CustomHeaders = {},
+        },
+        
+        -- Minimum rank required to release photos to press
+        -- Uses job grade number (3 = Sargento+)
+        ReleaseRanks = {
+            police = 3,
+            sheriff = 3,
+        },
+        
+        -- FOV (Field of View) Settings
+        FOV = {
+            -- Maximum raycast distance in meters
+            MaxDistance = 50.0,
+            
+            -- Show visual marker where camera is aiming
+            ShowMarker = true,
+            
+            -- Size of the aim marker
+            MarkerSize = 0.1,
+            
+            -- Record detailed entity info on capture
+            RecordEntityInfo = true,
+        },
+        
+        -- Animation settings
+        Animations = {
+            -- Scenario to play during capture
+            Scenario = 'WORLD_HUMAN_PAPARAZZI',
+            
+            -- Duration in milliseconds (focus time)
+            Duration = 2000,
+        },
+        
+        -- Maximum photos allowed per player
+        MaxPhotosPerPlayer = 100,
+        
+        -- Auto-delete local photos after successful upload
+        AutoDeleteLocal = true,
+        
+        -- Days to keep photos before auto-cleanup (0 = never)
+        RetentionDays = 30,
+    },
+
+    --[[
+    Photo Items Configuration
+    These are physical items for inventory systems (ox_inventory, qb-inventory, etc.)
+    ]]
+    PhotoItems = {
+        -- Police evidence camera
+        ['police_camera'] = {
+            label = 'Evidence Camera',
+            weight = 500,
+            stack = false,
+            close = true,
+            description = 'Official evidence camera with GPS and FOV tracking',
+            -- client side export when item is used
+            client = {
+                export = 'cad-system.usePoliceCamera'
+            },
+            -- Allowed jobs
+            jobs = { 'police', 'sheriff', 'admin' },
+        },
+        
+        -- News/press camera
+        ['news_camera'] = {
+            label = 'Press Camera',
+            weight = 300,
+            stack = false,
+            close = true,
+            description = 'Professional camera for news coverage',
+            client = {
+                export = 'cad-system.useNewsCamera'
+            },
+            jobs = { 'reporter', 'weazelnews', 'admin' },
+        },
+        
+        -- Developed evidence photo (police)
+        ['police_camera_photo'] = {
+            label = 'Evidence Photo',
+            weight = 0,
+            stack = false,
+            close = true,
+            description = 'Developed evidence photograph with metadata',
+            -- Can be viewed
+            client = {
+                export = 'cad-system.viewPhotoItem'
+            },
+        },
+        
+        -- Press photo (news)
+        ['news_camera_photo'] = {
+            label = 'Press Photo',
+            weight = 0,
+            stack = false,
+            close = true,
+            description = 'News photograph ready for publication',
+            client = {
+                export = 'cad-system.viewPhotoItem'
+            },
+        },
+    },
 }
 
 CAD.State = CAD.State or {
@@ -377,6 +501,13 @@ CAD.State = CAD.State or {
         LockerItems = {},
         WorldTraces = {},
         IdReaders = {},
+    },
+    Photos = {
+        Photos = {},              -- All photos by ID
+        Staging = {},            -- Per-officer staging
+        ReviewQueue = {},        -- News → Police submissions
+        ReleasedPhotos = {},     -- Police → News released
+        LastId = 0,
     },
 }
 
