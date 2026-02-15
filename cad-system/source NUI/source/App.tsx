@@ -1,6 +1,6 @@
 import { Switch, Match, Show, createMemo } from 'solid-js';
 import { Terminal } from './components/Terminal';
-import { BackgroundTerminal } from './components/BackgroundTerminal';
+import HackerTerminalBg from './components/HackerTerminalBg';
 import { CenterBadge } from './components/CenterBadge';
 import { SessionContextBar } from './components/SessionContextBar';
 import { DockLauncher } from './components/DockLauncher';
@@ -68,7 +68,12 @@ export function App() {
     <>
       <Show when={appState.isVisible}>
         <div class={appClasses()}>
-          <BackgroundTerminal />
+          {/* Hacker background terminal - optimized, no memory leak */}
+          <HackerTerminalBg 
+            maxLines={250}
+            intervalMs={35}
+            seed={20260215}
+          />
 
           <Show when={!CONFIG.DOCK_ONLY && uiPrefsActions.shouldShowTerminal()}>
             <div class={terminalClasses()}>
