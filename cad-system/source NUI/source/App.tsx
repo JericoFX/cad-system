@@ -36,6 +36,7 @@ import { RadioMarkers } from './components/modals/RadioMarkers';
 import { BoloManager } from './components/modals/BoloManager';
 import { ForensicCollection } from './components/modals/ForensicCollection';
 import { ImageViewer } from './components/modals/ImageViewer';
+import { CallsignPrompt } from './components/modals/CallsignPrompt';
 import { terminalState } from './stores/terminalStore';
 import { viewerState, viewerActions } from './stores/viewerStore';
 import { uiPrefsState, uiPrefsActions } from './stores/uiPreferencesStore';
@@ -78,6 +79,12 @@ export function App() {
         <CenterBadge />
 
         <Switch>
+          <Match when={terminalState.activeModal === 'CALLSIGN_PROMPT'}>
+            <CallsignPrompt mode="setup" />
+          </Match>
+          <Match when={terminalState.activeModal === 'CALLSIGN_CHANGE'}>
+            <CallsignPrompt mode="change" />
+          </Match>
           <Match
             when={
               terminalState.activeModal === 'DISPATCH_PANEL' &&

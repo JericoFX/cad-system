@@ -46,6 +46,7 @@ server_scripts {
     'server/core/init.lua',
     'server/functions.lua',
     'server/database.lua',
+    'server/officers.lua',
     'server/auth.lua',
     'server/cases.lua',
     'server/evidence.lua',
@@ -61,11 +62,12 @@ server_scripts {
 
 files {
     'locales/*.json',
-    'build/index.html',
-    'build/*'
+    'nui/build/index.html',
+    'nui/build/*.js',
+    'nui/build/*.css'
 }
 
-ui_page 'build/index.html'
+ui_page 'nui/build/index.html'
 
 dependencies {
     'ox_lib',

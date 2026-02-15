@@ -318,3 +318,7 @@ wrapNui('getCurrentPosition', function()
         street = GetStreetNameFromHashKey(streetHash),
     }
 end)
+
+-- Callsign
+wrapNui('cad:getCallsign', bridge('cad:getCallsign'))
+wrapNui('cad:setCallsign', bridge('cad:setCallsign'))

@@ -175,6 +175,17 @@ function CAD.Database.EnsureSchema()
     execute([[ALTER TABLE cad_ems_blood_requests ADD COLUMN IF NOT EXISTS last_reminder_ms BIGINT NULL]])
     execute([[ALTER TABLE cad_ems_blood_requests ADD COLUMN IF NOT EXISTS evidence_id VARCHAR(64) NULL]])
 
+    -- Officers table for callsign storage
+    execute([[
+        CREATE TABLE IF NOT EXISTS cad_officers (
+            identifier VARCHAR(128) PRIMARY KEY,
+            callsign VARCHAR(32) NULL,
+            unit_type VARCHAR(32) NULL,
+            updated_at VARCHAR(32) NOT NULL,
+            INDEX idx_officers_callsign (callsign)
+        )
+    ]])
+
 
     execute([[SET GLOBAL event_scheduler = ON]])
 
