@@ -6,6 +6,7 @@
 import { onNuiMessage } from '~/utils/nuiRouter';
 import { appActions } from '~/stores/appStore';
 import { userActions, userState } from '~/stores/userStore';
+import { sessionState } from '~/stores/sessionStore';
 import type { 
   CadOpenedData, 
   CadClosedData,
@@ -21,24 +22,11 @@ export function initCadHandlers(): void {
     appActions.show();
     
     // Import stores dynamically to avoid circular dependencies
-    const { homeActions } = await import('~/stores/homeStore');
     const { sessionActions } = await import('~/stores/sessionStore');
     const { terminalActions } = await import('~/stores/terminalStore');
     
-    // Initialize user first (this loads callsign)
-    await userActions.init();
-    
-    // Check if user needs callsign
-    if (userState.needsCallsign) {
-      console.log('[NUI] User needs callsign, showing prompt');
-      terminalActions.setActiveModal('CALLSIGN_PROMPT');
-      return; // Don't initialize rest until callsign is set
-    }
-    
-    // Initialize home screen with user role
-    homeActions.init();
-    
-    // Set terminal context
+    // Save terminal context FIRST (before callsign check)
+    // This ensures we have the context even if user needs to set callsign
     if (data.terminalId) {
       sessionActions.setTerminalContext({
         terminalId: data.terminalId,
@@ -46,7 +34,29 @@ export function initCadHandlers(): void {
         hasContainer: data.hasContainer,
         hasReader: data.hasReader,
       });
+      console.log('[NUI] Terminal context saved:', data.terminalId);
     }
+    
+    // Initialize user first (this loads callsign)
+    await userActions.init();
+    
+    // Check if user needs callsign - must check after init completes
+    const needsCallsign = !userState.callsign || (userState.callsign && userState.callsign.startsWith('B-'));
+    
+    console.log('[NUI] Callsign check:', { 
+      callsign: userState.callsign, 
+      needsCallsign,
+      isAuthenticated: userState.isAuthenticated 
+    });
+    
+    if (needsCallsign || userState.needsCallsign) {
+      console.log('[NUI] User needs callsign, showing prompt');
+      terminalActions.setActiveModal('CALLSIGN_PROMPT');
+      return; // Don't initialize rest until callsign is set
+    }
+    
+    // Continue with normal initialization
+    await continueCadInit(data);
   });
   
   // CAD Closed
@@ -102,8 +112,9 @@ export async function continueCadInit(data: CadOpenedData): Promise<void> {
   // Initialize home screen
   homeActions.init();
   
-  // Set terminal context
-  if (data.terminalId) {
+  // Terminal context is already set in initCadHandlers before callsign check
+  // Only update if we have new data and context wasn't set
+  if (data.terminalId && !sessionState.terminalId) {
     sessionActions.setTerminalContext({
       terminalId: data.terminalId,
       location: data.location,
