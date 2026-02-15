@@ -11,6 +11,7 @@ const sanitizeUrl = (url: string): { valid: boolean; sanitized: string; error?: 
     return { valid: false, sanitized: '', error: 'URL cannot be empty' };
   }
   
+  // 1. Check for dangerous protocols
   const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:'];
   const lowerUrl = sanitized.toLowerCase();
   
@@ -20,20 +21,42 @@ const sanitizeUrl = (url: string): { valid: boolean; sanitized: string; error?: 
     }
   }
   
+  // 2. Add https if missing
   if (!sanitized.match(/^https?:\/\//i)) {
     sanitized = 'https://' + sanitized;
   }
   
+  // 3. Validate URL format
+  let urlObj: URL;
   try {
-    new URL(sanitized);
+    urlObj = new URL(sanitized);
   } catch {
     return { valid: false, sanitized: '', error: 'Invalid URL format' };
   }
   
+  // 4. Check URL length
   if (sanitized.length > 2048) {
     return { valid: false, sanitized: '', error: 'URL too long (max 2048 characters)' };
   }
   
+  // 5. Validate image extension
+  const validImageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'];
+  const pathname = urlObj.pathname.toLowerCase();
+  const hasValidExtension = validImageExtensions.some(ext => pathname.endsWith(ext));
+  
+  if (!hasValidExtension) {
+    // Check if URL contains image indicators in query params or path
+    const imageIndicators = ['image', 'img', 'photo', 'pic', 'jpg', 'png', 'gif'];
+    const hasImageIndicator = imageIndicators.some(indicator => 
+      pathname.includes(indicator) || urlObj.search.toLowerCase().includes(indicator)
+    );
+    
+    if (!hasImageIndicator) {
+      return { valid: false, sanitized: '', error: 'URL must point to an image file (.jpg, .png, .gif, etc.)' };
+    }
+  }
+  
+  // 6. Check allowed domains
   const allowedDomains = [
     'imgur.com',
     'i.imgur.com',
@@ -43,18 +66,50 @@ const sanitizeUrl = (url: string): { valid: boolean; sanitized: string; error?: 
     'cfx.re',
     'github.com',
     'raw.githubusercontent.com',
+    'postimg.cc',
+    'i.postimg.cc',
+    'gyazo.com',
+    'i.gyazo.com',
   ];
   
-  const urlObj = new URL(sanitized);
   const domain = urlObj.hostname.toLowerCase();
-  
   const isWhitelisted = allowedDomains.some(allowed => domain.includes(allowed));
   
   if (!isWhitelisted) {
-    terminalActions.addLine(`Warning: Domain ${domain} not in whitelist`, 'system');
+    return { valid: false, sanitized: '', error: `Domain ${domain} not in whitelist. Allowed: imgur, discord, gyazo, etc.` };
   }
   
   return { valid: true, sanitized };
+};
+
+// Validate image content by attempting to load it
+const validateImageContent = async (url: string): Promise<{ valid: boolean; error?: string }> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const timeout = setTimeout(() => {
+      resolve({ valid: false, error: 'Image load timeout' });
+    }, 10000);
+    
+    img.onload = () => {
+      clearTimeout(timeout);
+      // Check image dimensions
+      if (img.width < 10 || img.height < 10) {
+        resolve({ valid: false, error: 'Image too small' });
+      } else if (img.width > 10000 || img.height > 10000) {
+        resolve({ valid: false, error: 'Image too large' });
+      } else {
+        resolve({ valid: true });
+      }
+    };
+    
+    img.onerror = () => {
+      clearTimeout(timeout);
+      resolve({ valid: false, error: 'Failed to load image' });
+    };
+    
+    img.crossOrigin = 'anonymous';
+    img.src = url;
+  });
 };
 
 export function EvidenceUploader() {
@@ -67,6 +122,7 @@ export function EvidenceUploader() {
   const [selectedFile, setSelectedFile] = createSignal<File | null>(null);
   const [uploadMode, setUploadMode] = createSignal<'url' | 'file'>('url');
   const [targetCaseId, setTargetCaseId] = createSignal<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = createSignal(false);
 
   onMount(() => {
     const modalData = (terminalState.modalData as { caseId?: string } | null) || null;
@@ -146,6 +202,13 @@ export function EvidenceUploader() {
         return;
       }
       finalUrl = sanitization.sanitized;
+      
+      // Validate image content
+      const contentValidation = await validateImageContent(finalUrl);
+      if (!contentValidation.valid) {
+        setValidationError(contentValidation.error || 'Invalid image content');
+        return;
+      }
     }
 
     setIsUploading(true);
@@ -198,6 +261,13 @@ export function EvidenceUploader() {
         
         cadActions.addCaseEvidence(caseId, evidence);
         
+        // Show success notification
+        setUploadSuccess(true);
+        setTimeout(() => {
+          setUploadSuccess(false);
+          closeModal();
+        }, 2000);
+        
         terminalActions.addLine(`✓ Evidence added to case ${caseId}`, 'output');
         terminalActions.addLine(`  Evidence ID: ${evidence.evidenceId}`, 'output');
         terminalActions.addLine(`  Type: ${evidenceType()}`, 'output');
@@ -242,7 +312,27 @@ export function EvidenceUploader() {
 
   return (
     <div class="modal-overlay" onClick={closeModal}>
-      <div class="modal-content evidence-uploader" onClick={(e) => e.stopPropagation()}>
+      <div 
+        class="modal-content evidence-uploader" 
+        onClick={(e) => e.stopPropagation()}
+        style={uploadSuccess() ? { 'border-color': '#00ff00', 'border-width': '3px', 'border-style': 'solid' } : {}}
+      >
+        <Show when={uploadSuccess()}>
+          <div style={{ 
+            position: 'absolute', 
+            top: '10px', 
+            left: '50%', 
+            transform: 'translateX(-50%)',
+            'background-color': '#00ff00',
+            color: '#000',
+            padding: '8px 16px',
+            'border-radius': '4px',
+            'font-weight': 'bold',
+            'z-index': '100'
+          }}>
+            ✓ EVIDENCE ADDED SUCCESSFULLY
+          </div>
+        </Show>
         <div class="modal-header">
           <h2>=== UPLOAD EVIDENCE ===</h2>
           <Show when={targetCaseId()}>

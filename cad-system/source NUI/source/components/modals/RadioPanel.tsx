@@ -253,15 +253,16 @@ export function RadioPanel() {
                       <div class="channel-users-count">
                         👤 {radioActions.getUsersInChannel(channel.channelId).length}
                       </div>
-                      <Show when={radioState.currentChannel !== channel.channelId}>
+                      <Show when={radioState?.currentChannel !== channel?.channelId}>
                         <button 
                           class="btn btn-small"
-                          onClick={() => radioActions.joinChannel(channel.channelId)}
+                          onClick={() => channel?.channelId && radioActions?.joinChannel?.(channel.channelId)}
+                          disabled={!radioState?.currentUser}
                         >
                           Unirse
                         </button>
                       </Show>
-                      <Show when={radioState.currentChannel === channel.channelId}>
+                      <Show when={radioState?.currentChannel === channel?.channelId}>
                         <span class="badge">ACTUAL</span>
                       </Show>
                     </div>
