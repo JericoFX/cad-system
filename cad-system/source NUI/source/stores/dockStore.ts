@@ -166,17 +166,6 @@ const DEFAULT_DOCK_ITEMS: DockItem[] = [
     shortcut: 'F4',
     roles: ['police', 'ems', 'dispatch', 'admin'],
   },
-  {
-    id: 'help',
-    name: 'Help',
-    icon: '❓',
-    command: 'help',
-    modal: undefined,
-    tooltip: 'Command Guide (F1)',
-    category: 'system',
-    shortcut: 'F1',
-    roles: ['police', 'ems', 'dispatch', 'admin'],
-  },
 ];
 
 const initialState: DockState = {
