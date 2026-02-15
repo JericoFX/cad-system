@@ -1,4 +1,5 @@
 import { createEffect, createSignal, onCleanup } from 'solid-js';
+import { hackerState, type HackerLine } from '~/stores/hackerStore';
 
 type HackerTerminalBgProps = {
   maxLines?: number;
@@ -104,12 +105,21 @@ function createRingBuffer(capacity: number) {
   return { push, toArray };
 }
 
+// Format HackerLine from store to string
+function formatHackerLine(line: HackerLine): string {
+  const prefix = line.type === 'command' ? '$ ' : 
+                 line.type === 'error' ? '✗ ' : 
+                 line.type === 'system' ? '⚡ ' : '  ';
+  return `[${new Date(line.timestamp).toLocaleTimeString()}] ${prefix}${line.content}`;
+}
+
 export default function HackerTerminalBg(props: HackerTerminalBgProps) {
   const maxLines = () => Math.max(20, props.maxLines ?? 250);
   const intervalMs = () => Math.max(10, props.intervalMs ?? 35);
   const seed = () => props.seed ?? 20260215;
 
   const [lines, setLines] = createSignal<string[]>([]);
+  const [storeLines, setStoreLines] = createSignal<string[]>([]);
   let containerRef: HTMLDivElement | undefined;
 
   let timer: number | undefined;
@@ -118,7 +128,14 @@ export default function HackerTerminalBg(props: HackerTerminalBgProps) {
 
   function tick() {
     ring.push(nextLine());
-    setLines(ring.toArray());
+    updateLines();
+  }
+
+  function updateLines() {
+    const autoLines = ring.toArray();
+    const userLines = storeLines();
+    // Combine: user actions first (more important), then auto-generated
+    setLines([...userLines, ...autoLines].slice(-maxLines()));
   }
 
   function start() {
@@ -127,19 +144,26 @@ export default function HackerTerminalBg(props: HackerTerminalBgProps) {
   }
 
   function stop() {
- if (timer !== undefined) {
+    if (timer !== undefined) {
       window.clearInterval(timer);
       timer = undefined;
     }
   }
 
-  // Re-init si cambian props clave
+  // Watch hackerStore for user actions
+  createEffect(() => {
+    const userLines = hackerState.lines.map(formatHackerLine);
+    setStoreLines(userLines);
+    updateLines();
+  });
+
+  // Re-init if props change
   createEffect(() => {
     const capacity = maxLines();
     const s = seed();
     ring = createRingBuffer(capacity);
     nextLine = makeLineFactory(s);
-    setLines([]);
+    updateLines();
     if (!props.paused) start();
   });
 
@@ -149,7 +173,7 @@ export default function HackerTerminalBg(props: HackerTerminalBgProps) {
     else start();
   });
 
-  // Auto-scroll sin cálculos pesados
+  // Auto-scroll without heavy calculations
   createEffect(() => {
     lines();
     queueMicrotask(() => {
