@@ -194,8 +194,6 @@ export function App() {
 
         <DockLauncher />
 
-        <HomeScreen />
-
         <FlowProgressOverlay />
         <FlowMinimizedIndicator />
 
