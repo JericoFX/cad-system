@@ -214,3 +214,57 @@ AddEventHandler('playerDropped', function()
     CAD.State.OfficerStatus[source] = nil
     CAD.State.Evidence.Staging[source] = nil
 end)
+
+-- Callsign callbacks
+lib.callback.register('cad:getCallsign', function(source)
+    local identifier = CAD.Core.Server.GetIdentifier(source)
+    if not identifier then
+        return { success = false, error = 'no_identifier' }
+    end
+
+    local callsign = CAD.Officers.GetCallsign(identifier)
+
+    return {
+        success = true,
+        callsign = callsign
+    }
+end)
+
+lib.callback.register('cad:setCallsign', function(source, data)
+    local identifier = CAD.Core.Server.GetIdentifier(source)
+    if not identifier then
+        return { success = false, error = 'no_identifier' }
+    end
+
+    if not data or type(data.callsign) ~= 'string' then
+        return { success = false, error = 'invalid_data' }
+    end
+
+    -- Validate format
+    local valid, normalizedOrError = CAD.Officers.ValidateCallsign(data.callsign)
+    if not valid then
+        return { success = false, error = 'invalid_format', detail = normalizedOrError }
+    end
+
+    local callsign = normalizedOrError
+
+    -- Check for duplicate (warning, not blocking)
+    local isDuplicate = CAD.Officers.CheckDuplicate(callsign, identifier)
+
+    -- Save to database
+    local saved = CAD.Officers.SetCallsignDB(identifier, callsign)
+    if not saved then
+        return { success = false, error = 'db_error' }
+    end
+
+    -- Sync to framework
+    CAD.Officers.SyncToFramework(source, callsign)
+
+    CAD.Log('info', 'Officer %s set callsign to %s', identifier, callsign)
+
+    return {
+        success = true,
+        callsign = callsign,
+        warning = isDuplicate and 'callsign_duplicate' or nil
+    }
+end)

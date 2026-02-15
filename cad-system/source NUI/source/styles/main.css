@@ -9211,3 +9211,230 @@ select option:hover {
 .hacker-background.active {
   animation: hackerPulse 2s ease-in-out;
 }
+
+/* ============================================
+   CALLSIGN PROMPT MODAL
+   ============================================ */
+
+.callsign-prompt-modal {
+  background-color: var(--terminal-bg);
+  border: 3px solid var(--terminal-border);
+  width: min(420px, 90vw);
+  max-width: 420px;
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+}
+
+.callsign-header {
+  padding: 24px 24px 16px;
+  text-align: center;
+  border-bottom: 2px solid var(--terminal-border);
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+.callsign-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.callsign-header h2 {
+  color: var(--terminal-fg-bright);
+  font-size: 20px;
+  letter-spacing: 2px;
+  margin: 0 0 8px 0;
+  text-transform: uppercase;
+}
+
+.callsign-subtitle {
+  color: var(--terminal-fg-dim);
+  font-size: 13px;
+  margin: 0;
+}
+
+.callsign-form {
+  padding: 24px;
+}
+
+.callsign-input-group {
+  margin-bottom: 20px;
+}
+
+.callsign-input-group label {
+  display: block;
+  color: var(--terminal-fg);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+.callsign-input {
+  width: 100%;
+  padding: 14px 16px;
+  font-family: var(--font-terminal);
+  font-size: 24px;
+  text-align: center;
+  letter-spacing: 2px;
+  background-color: rgba(0, 0, 0, 0.5);
+  border: 2px solid var(--terminal-border);
+  color: var(--terminal-fg-bright);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.callsign-input::placeholder {
+  color: var(--terminal-fg-dim);
+  opacity: 0.5;
+}
+
+.callsign-input:focus {
+  border-color: var(--terminal-border-bright);
+  box-shadow: 0 0 10px rgba(192, 192, 192, 0.1);
+}
+
+.callsign-input--valid {
+  border-color: var(--priority-low);
+  box-shadow: 0 0 10px rgba(0, 255, 0, 0.1);
+}
+
+.callsign-input--error {
+  border-color: var(--terminal-error);
+  box-shadow: 0 0 10px rgba(255, 0, 0, 0.1);
+}
+
+.callsign-error {
+  display: block;
+  color: var(--terminal-error);
+  font-size: 12px;
+  margin-top: 8px;
+  text-align: center;
+}
+
+.callsign-warning {
+  display: block;
+  color: var(--terminal-system);
+  font-size: 12px;
+  margin-top: 8px;
+  text-align: center;
+}
+
+.callsign-examples {
+  margin-bottom: 20px;
+  padding: 12px;
+  background-color: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--terminal-border-dim);
+}
+
+.examples-label {
+  display: block;
+  color: var(--terminal-fg-dim);
+  font-size: 11px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.examples-list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.example-btn {
+  padding: 6px 12px;
+  font-family: var(--font-terminal);
+  font-size: 12px;
+  background-color: transparent;
+  border: 1px solid var(--terminal-border);
+  color: var(--terminal-fg);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.example-btn:hover {
+  background-color: var(--terminal-border);
+  color: var(--terminal-bg);
+}
+
+.example-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.callsign-format-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background-color: rgba(255, 255, 0, 0.05);
+  border: 1px solid var(--terminal-system);
+  margin-bottom: 24px;
+  font-size: 12px;
+}
+
+.format-label {
+  color: var(--terminal-system);
+  text-transform: uppercase;
+}
+
+.format-code {
+  color: var(--terminal-system-bright);
+  font-family: var(--font-terminal);
+}
+
+.format-example {
+  color: var(--terminal-fg-dim);
+}
+
+.callsign-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.callsign-actions .btn {
+  min-width: 120px;
+  padding: 12px 24px;
+  font-family: var(--font-terminal);
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border: 2px solid var(--terminal-border);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.callsign-actions .btn-primary {
+  background-color: var(--terminal-border);
+  color: var(--terminal-bg);
+}
+
+.callsign-actions .btn-primary:hover:not(:disabled) {
+  background-color: var(--terminal-border-bright);
+}
+
+.callsign-actions .btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.callsign-actions .btn-secondary {
+  background-color: transparent;
+  color: var(--terminal-fg);
+}
+
+.callsign-actions .btn-secondary:hover:not(:disabled) {
+  background-color: rgba(192, 192, 192, 0.1);
+}
+
+.callsign-footer {
+  padding: 16px 24px;
+  border-top: 2px solid var(--terminal-border);
+  background-color: rgba(0, 0, 0, 0.3);
+  text-align: center;
+}
+
+.callsign-footer p {
+  color: var(--terminal-fg-dim);
+  font-size: 11px;
+  margin: 0;
+  line-height: 1.6;
+}

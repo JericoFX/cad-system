@@ -49,7 +49,12 @@ function CAD.Core.Server.QBox.ResolveIdentity(source, fallbackIdentifier)
     local lastName = pd.charinfo and pd.charinfo.lastname or tostring(source)
     local fullName = ('%s %s'):format(firstName, lastName)
     local job = pd.job and pd.job.name or 'police'
-    local callsign = pd.metadata and pd.metadata.callsign or ('B-%s'):format(source)
+    
+    -- Check DB first for callsign, then metadata, then fallback
+    local callsign = CAD.Officers.GetCallsign(pd.citizenid or fallbackIdentifier)
+    if not callsign then
+        callsign = pd.metadata and pd.metadata.callsign or ('B-%s'):format(source)
+    end
 
     return {
         source = source,
@@ -61,4 +66,11 @@ function CAD.Core.Server.QBox.ResolveIdentity(source, fallbackIdentifier)
         grade = getGradeLevel(pd.job),
         isAdmin = CAD.Config.Security.AdminJobs[job] or false,
     }
+end
+
+function CAD.Core.Server.QBox.SaveCallsign(source, callsign)
+    local ok, _ = pcall(function()
+        exports['qbx_core']:SetPlayerMetadata(source, 'callsign', callsign)
+    end)
+    return ok
 end

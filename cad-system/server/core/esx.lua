@@ -55,14 +55,26 @@ function CAD.Core.Server.ESX.ResolveIdentity(source, fallbackIdentifier)
         identifier = xPlayer.identifier or xPlayer.license or fallbackIdentifier
     end
 
+    -- ESX doesn't have metadata, check DB for callsign
+    local callsign = CAD.Officers.GetCallsign(identifier)
+
     return {
         source = source,
         identifier = identifier,
-        callsign = ('B-%s'):format(source),
+        callsign = callsign or ('B-%s'):format(source),
         name = name,
         job = job,
         jobLabel = xPlayer.job and xPlayer.job.label or job,
         grade = grade,
         isAdmin = CAD.Config.Security.AdminJobs[job] or false,
     }
+end
+
+-- ESX doesn't have native metadata, we use cad_officers table
+function CAD.Core.Server.ESX.SaveCallsign(source, callsign)
+    local identifier = CAD.Core.Server.GetIdentifier(source)
+    if not identifier then
+        return false
+    end
+    return CAD.Officers.SetCallsignDB(identifier, callsign)
 end
