@@ -34,7 +34,8 @@ client_scripts {
     'client/nui.lua',
     'client/ticket.lua',
     'client/evidence.lua',
-    'client/forensic.lua'
+    'client/forensic.lua',
+    'client/sounds.lua'
 }
 
 server_scripts {
@@ -99,7 +100,15 @@ exports {
     'CheckPermission',
     'GetOfficerData',
     'LogJailTransfer',
-    'GetJailTransfers'
+    'GetJailTransfers',
+    
+    -- Sounds
+    'PlayPTTStart',
+    'PlayPTTEnd',
+    'PlayDispatchIncoming',
+    'PlayEmergencyAlert',
+    'PlaySuccess',
+    'PlayError'
 }
 
 server_exports {
