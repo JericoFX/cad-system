@@ -4,6 +4,7 @@ import { terminalActions } from '~/stores/terminalStore';
 import { radioState, radioActions } from '~/stores/radioStore';
 import { cadState, cadActions } from '~/stores/cadStore';
 import { userActions } from '~/stores/userStore';
+import { playPTTStart, playPTTEnd, playRadioChatter } from '~/utils/sounds';
 import type { RadioMessage } from '~/stores/radioStore';
 import type { RadioMarker } from '~/stores/cadStore';
 
@@ -84,6 +85,13 @@ export function RadioPanel() {
     const newState = !isTalking();
     setIsTalking(newState);
     radioActions.setTalking(newState);
+    
+    // Play PTT sounds
+    if (newState) {
+      playPTTStart();
+    } else {
+      playPTTEnd();
+    }
   };
   
   const formatTimeLeft = (expiresAt?: string) => {
