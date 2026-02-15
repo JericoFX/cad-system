@@ -64,11 +64,11 @@ export function App() {
 
   return (
     <div class={appClasses()}>
-      {/* Hacker background terminal - visible behind everything */}
-      <BackgroundTerminal />
-
       {/* Main CAD Application - Only visible when appState.isVisible is true */}
       <Show when={appState.isVisible}>
+        {/* Hacker background terminal - visible behind everything */}
+        <BackgroundTerminal />
+
         <Show when={!CONFIG.DOCK_ONLY && uiPrefsActions.shouldShowTerminal()}>
           <div class={terminalClasses()}>
             <Terminal />
