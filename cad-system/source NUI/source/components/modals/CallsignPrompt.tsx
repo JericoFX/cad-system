@@ -2,7 +2,8 @@ import { createSignal, Show, createEffect, For, onMount } from 'solid-js';
 import { userActions, userState } from '~/stores/userStore';
 import { appActions } from '~/stores/appStore';
 import { terminalActions } from '~/stores/terminalStore';
-import { homeActions } from '~/stores/homeStore';
+import { continueCadInit } from '~/handlers/cadHandlers';
+import { sessionState } from '~/stores/sessionStore';
 
 interface CallsignPromptProps {
   mode?: 'setup' | 'change';
@@ -61,9 +62,16 @@ export function CallsignPrompt(props: CallsignPromptProps) {
       // Close modal
       terminalActions.setActiveModal(null);
       
-      // If in setup mode, initialize home screen
+      // Continue CAD initialization with terminal context
       if (props.mode !== 'change') {
-        homeActions.init();
+        // Build CadOpenedData from session store
+        const data = {
+          terminalId: sessionState.terminalId || 'unknown',
+          location: sessionState.terminalLocation || undefined,
+          hasContainer: sessionState.hasContainer || false,
+          hasReader: sessionState.hasReader || false,
+        };
+        await continueCadInit(data);
       }
     } else {
       setError(result.error || 'Error al guardar el callsign');
