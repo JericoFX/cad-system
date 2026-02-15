@@ -117,3 +117,56 @@ function CAD.Server.NotifyJobs(jobs, message, notificationType)
         end
     end
 end
+
+-- ============================================================
+-- NUI Event Broadcasting System
+-- Broadcast events from server to client NUI
+-- ============================================================
+
+-- Broadcast to specific jobs
+function CAD.Server.BroadcastToJobs(jobs, eventName, data)
+    local players = GetPlayers()
+    for i = 1, #players do
+        local source = tonumber(players[i])
+        if CAD.Server.HasRole(source, jobs) then
+            TriggerClientEvent('cad:client:' .. eventName, source, data)
+        end
+    end
+end
+
+-- Broadcast to all players
+function CAD.Server.BroadcastToAll(eventName, data)
+    TriggerClientEvent('cad:client:' .. eventName, -1, data)
+end
+
+-- Broadcast to specific player
+function CAD.Server.BroadcastToPlayer(source, eventName, data)
+    TriggerClientEvent('cad:client:' .. eventName, source, data)
+end
+
+-- Offline event queue for disconnected players
+CAD.Server.OfflineQueue = {}
+
+-- Queue event for offline player
+function CAD.Server.QueueOfflineEvent(playerId, eventName, data)
+    if not CAD.Server.OfflineQueue[playerId] then
+        CAD.Server.OfflineQueue[playerId] = {}
+    end
+    table.insert(CAD.Server.OfflineQueue[playerId], {
+        eventName = eventName,
+        data = data,
+        timestamp = os.time()
+    })
+end
+
+-- Send queued events to reconnected player
+function CAD.Server.SendOfflineQueue(playerId, source)
+    if CAD.Server.OfflineQueue[playerId] then
+        local events = CAD.Server.OfflineQueue[playerId]
+        CAD.Server.OfflineQueue[playerId] = nil
+        
+        TriggerClientEvent('cad:client:syncOffline', source, {
+            events = events
+        })
+    end
+end

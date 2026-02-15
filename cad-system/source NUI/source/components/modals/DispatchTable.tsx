@@ -3,6 +3,7 @@ import { terminalActions } from '~/stores/terminalStore';
 import { cadActions, cadState, type DispatchCall, type DispatchUnit } from '~/stores/cadStore';
 import { radioActions } from '~/stores/radioStore';
 import { fetchNui } from '~/utils/fetchNui';
+import { useDispatchEvents } from '~/hooks/useNui';
 
 type DispatchGuardError = {
   ok: false;
@@ -238,6 +239,29 @@ export function DispatchTable() {
   });
 
   const callTypeOptions = createMemo(() => dispatchSettings().callTypeOptions);
+
+  // Real-time event listeners - replaces polling
+  useDispatchEvents({
+    onCallCreated: (data) => {
+      // Data already added to store by handler, just log
+      console.log('[DispatchTable] Call created:', data.call.callId);
+    },
+    onCallUpdated: (data) => {
+      console.log('[DispatchTable] Call updated:', data.callId);
+    },
+    onCallClosed: (data) => {
+      console.log('[DispatchTable] Call closed:', data.callId);
+      if (selectedCallId() === data.callId) {
+        setSelectedCallId(null);
+      }
+    },
+    onCallAssigned: (data) => {
+      console.log('[DispatchTable] Unit assigned:', data.unitId, 'to', data.callId);
+    },
+    onUnitStatusChanged: (data) => {
+      console.log('[DispatchTable] Unit status:', data.unitId, '->', data.newStatus);
+    },
+  });
 
   const allCalls = createMemo(() =>
     Object.values(cadState.dispatchCalls).sort((a, b) => {
@@ -767,16 +791,13 @@ export function DispatchTable() {
 
   createEffect(() => {
     const settings = dispatchSettings();
-    // Esto se auto-refresca solo, asi no hay que spamear refresh manual.
-    const refreshInterval = window.setInterval(() => {
-      void refreshData(true);
-    }, settings.refreshIntervalMs);
+    // Solo mantener el clock para timestamps, no hacer polling
+    // Los datos llegan en tiempo real via useDispatchEvents
     const clockInterval = window.setInterval(() => {
       setNowMs(Date.now());
     }, settings.clockTickMs);
 
     onCleanup(() => {
-      window.clearInterval(refreshInterval);
       window.clearInterval(clockInterval);
     });
   });

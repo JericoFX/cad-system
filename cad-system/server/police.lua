@@ -147,6 +147,13 @@ lib.callback.register('cad:police:logJailTransfer', CAD.Auth.WithGuard('heavy', 
         'inform'
     )
 
+    -- Broadcast jail transfer
+    CAD.Server.BroadcastToJobs(
+        {'police', 'sheriff', 'dispatch'},
+        'policeJailTransferLogged',
+        { transfer = transfer }
+    )
+
     return {
         ok = true,
         transfer = transfer,
