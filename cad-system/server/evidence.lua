@@ -72,6 +72,15 @@ lib.callback.register('cad:addEvidenceToStaging', CAD.Auth.WithGuard('default', 
     }
 
     bucket[#bucket + 1] = record
+
+    -- Broadcast evidence staged (notify the officer's UI only)
+    CAD.Server.BroadcastToPlayer(source, 'evidenceStaged', {
+        stagingId = stagingId,
+        evidenceType = record.evidenceType,
+        data = record.data,
+        createdAt = record.createdAt
+    })
+
     return record
 end))
 
@@ -150,6 +159,19 @@ lib.callback.register('cad:attachEvidence', CAD.Auth.WithGuard('heavy', function
     end
 
     table.remove(bucket, selectedIndex)
+
+    -- Broadcast evidence attached to case
+    CAD.Server.BroadcastToJobs(
+        {'police', 'sheriff', 'dispatch'},
+        'caseEvidenceAttached',
+        {
+            caseId = caseId,
+            evidenceId = evidence.evidenceId,
+            attachedBy = officer.identifier,
+            attachedAt = evidence.attachedAt
+        }
+    )
+
     return evidence
 end))
 

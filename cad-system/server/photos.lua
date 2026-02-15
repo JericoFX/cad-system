@@ -256,6 +256,11 @@ lib.callback.register('cad:photos:capturePolicePhoto', function(source, payload)
     -- Log
     print(string.format('[CAD:Photos] Police photo captured: %s by %s', 
         metadata.photoId, officer.name))
+
+    -- Broadcast to officer
+    CAD.Server.BroadcastToPlayer(source, 'photoCaptured', {
+        photo = metadata
+    })
     
     return {
         ok = true,

@@ -121,6 +121,13 @@ local function issueFine(payload, officer)
         CAD.Server.Notify(targetSource, ('New fine: $%s (%s)'):format(fine.amount, fine.fineCode), 'warning')
     end
 
+    -- Broadcast fine creation to police
+    CAD.Server.BroadcastToJobs(
+        {'police', 'sheriff'},
+        'fineCreated',
+        { fine = fine }
+    )
+
     if GetResourceState('ox_inventory') == 'started' then
         local ticketMetadata = {
             fineId = fine.fineId,
@@ -178,6 +185,18 @@ local function payFine(source, fineId, method)
     fine.paidMethod = tostring(method or 'BANK')
     fine.status = 'PAID'
     saveFineDb(fine)
+
+    -- Broadcast fine paid
+    CAD.Server.BroadcastToJobs(
+        {'police', 'sheriff'},
+        'finePaid',
+        {
+            fineId = fineId,
+            paidAt = fine.paidAt,
+            paidMethod = fine.paidMethod,
+            paidBy = source
+        }
+    )
 
     return fine
 end

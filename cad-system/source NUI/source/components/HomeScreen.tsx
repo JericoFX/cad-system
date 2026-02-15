@@ -1,19 +1,16 @@
 
-import { For, Show, createMemo, onMount } from 'solid-js';
-import { homeState, homeActions } from '~/stores/homeStore';
+import { For, Show, createMemo } from 'solid-js';
+import { homeState } from '~/stores/homeStore';
+import { appActions } from '~/stores/appStore';
 import { terminalActions } from '~/stores/terminalStore';
 import { registry } from '~/commands/registry';
 import { notificationActions } from '~/stores/notificationStore';
 import { featureState, featureActions } from '~/stores/featureStore';
 
 export function HomeScreen() {
-  onMount(() => {
-    if (!homeState.isVisible) {
-    }
-  });
-
   const handleAction = (action: { command?: string; modal?: string }) => {
-    homeActions.hide();
+    // Close the entire CAD application
+    appActions.hide();
     
     if (action.modal) {
       terminalActions.setActiveModal(action.modal);
@@ -53,18 +50,17 @@ export function HomeScreen() {
   };
 
   return (
-    <Show when={homeState.isVisible}>
-      <div class="home-screen-overlay" onClick={() => homeActions.hide()}>
-        <div class="home-screen" onClick={(e) => e.stopPropagation()}>
-          <div class="home-header">
-            <div class="home-title">
-              <span class="home-icon">{roleIcon()}</span>
-              <h1>{roleTitle()}</h1>
-            </div>
-            <button class="home-close" onClick={() => homeActions.hide()}>
-              ×
-            </button>
+    <div class="home-screen-overlay" onClick={() => appActions.hide()}>
+      <div class="home-screen" onClick={(e) => e.stopPropagation()}>
+        <div class="home-header">
+          <div class="home-title">
+            <span class="home-icon">{roleIcon()}</span>
+            <h1>{roleTitle()}</h1>
           </div>
+          <button class="home-close" onClick={() => appActions.hide()}>
+            ×
+          </button>
+        </div>
 
           <div class="home-content">
             <div class="home-section">
@@ -141,6 +137,5 @@ export function HomeScreen() {
           </div>
         </div>
       </div>
-    </Show>
   );
 }

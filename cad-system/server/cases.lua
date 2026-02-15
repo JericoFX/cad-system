@@ -144,6 +144,13 @@ lib.callback.register('cad:createCase', CAD.Auth.WithGuard('heavy', function(sou
 
     cases[caseId] = caseObj
 
+    -- Broadcast case creation to police and dispatch
+    CAD.Server.BroadcastToJobs(
+        {'police', 'sheriff', 'dispatch'},
+        'caseCreated',
+        { case = caseToClient(caseObj) }
+    )
+
     return caseToClient(caseObj)
 end))
 
@@ -226,6 +233,18 @@ lib.callback.register('cad:updateCase', CAD.Auth.WithGuard('heavy', function(_, 
         return { ok = false, error = saveErr or 'db_write_failed' }
     end
 
+    -- Broadcast case update
+    CAD.Server.BroadcastToJobs(
+        {'police', 'sheriff', 'dispatch'},
+        'caseUpdated',
+        {
+            caseId = caseId,
+            changes = payload,
+            updatedBy = 'system',
+            updatedAt = caseObj.updatedAt
+        }
+    )
+
     return caseToClient(caseObj)
 end))
 
@@ -250,6 +269,17 @@ lib.callback.register('cad:closeCase', CAD.Auth.WithGuard('heavy', function(_, p
         caseObj.updatedAt = previousUpdatedAt
         return { ok = false, error = saveErr or 'db_write_failed' }
     end
+
+    -- Broadcast case closure
+    CAD.Server.BroadcastToJobs(
+        {'police', 'sheriff', 'dispatch'},
+        'caseClosed',
+        {
+            caseId = caseId,
+            closedBy = 'system',
+            closedAt = caseObj.updatedAt
+        }
+    )
 
     return { ok = true, success = true, caseId = caseId }
 end))

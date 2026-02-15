@@ -219,6 +219,19 @@ lib.callback.register('cad:forensic:completeAnalysis', CAD.Auth.WithGuard('heavy
     analysis.completedAt = CAD.Server.ToIso()
     analysis.completedBy = officer.identifier
 
+    -- Broadcast analysis completion
+    CAD.Server.BroadcastToJobs(
+        {'police', 'sheriff'},
+        'forensicsAnalysisCompleted',
+        {
+            analysisId = analysis.analysisId,
+            evidenceId = analysis.evidenceId,
+            results = analysis.result,
+            completedBy = officer.identifier,
+            completedAt = analysis.completedAt
+        }
+    )
+
     return analysis
 end))
 
@@ -340,6 +353,20 @@ lib.callback.register('cad:forensic:collectEvidence', CAD.Auth.WithGuard('heavy'
         CAD.Log('error', 'Failed saving forensic evidence %s: %s', tostring(evidence.evidenceId), tostring(saveErr))
         return { ok = false, error = 'db_write_failed' }
     end
+
+    -- Broadcast evidence collected
+    CAD.Server.BroadcastToJobs(
+        {'police', 'sheriff', 'forensics'},
+        'evidenceCollected',
+        {
+            evidenceId = evidence.evidenceId,
+            caseId = caseId,
+            evidenceType = evidenceType,
+            data = data,
+            collectedBy = officer.identifier,
+            collectedAt = evidence.collectedAt
+        }
+    )
     
     return { ok = true, evidence = evidence }
 end))

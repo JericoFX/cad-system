@@ -1,7 +1,6 @@
 
 import { createStore } from 'solid-js/store';
 import { userState } from './userStore';
-import { CONFIG } from '~/config';
 
 export type UserRole = 'police' | 'ems' | 'dispatch' | 'admin';
 
@@ -21,7 +20,6 @@ export interface HomeActivity {
 }
 
 interface HomeState {
-  isVisible: boolean;
   activeRole: UserRole | null;
   actions: QuickAction[];
   recentActivity: HomeActivity[];
@@ -61,25 +59,7 @@ const getDefaultActions = (role: UserRole): QuickAction[] => {
   }
 };
 
-const getAllMockActions = (): QuickAction[] => {
-  const byId = new Map<string, QuickAction>();
-  const roles: UserRole[] = ['police', 'ems', 'dispatch'];
-
-  for (let i = 0; i < roles.length; i++) {
-    const roleActions = getDefaultActions(roles[i]);
-    for (let j = 0; j < roleActions.length; j++) {
-      const action = roleActions[j];
-      if (!byId.has(action.id)) {
-        byId.set(action.id, action);
-      }
-    }
-  }
-
-  return Array.from(byId.values());
-};
-
 const initialState: HomeState = {
-  isVisible: false,
   activeRole: null,
   actions: [],
   recentActivity: [],
@@ -88,34 +68,27 @@ const initialState: HomeState = {
 export const [homeState, setHomeState] = createStore<HomeState>(initialState);
 
 export const homeActions = {
-  show: () => {
-    if (CONFIG.USE_MOCK_DATA && CONFIG.MOCK_BYPASS_ROLE_GUARDS) {
-      setHomeState({
-        isVisible: true,
-        activeRole: 'admin',
-        actions: getAllMockActions(),
-      });
-      return;
-    }
-
+  /**
+   * Initialize home screen with user role
+   * Called when CAD is opened (appStore.show)
+   */
+  init: () => {
     const role = (userState.currentUser?.role as UserRole) || 'police';
     setHomeState({
-      isVisible: true,
       activeRole: role,
       actions: getDefaultActions(role),
     });
   },
-  
-  hide: () => {
-    setHomeState('isVisible', false);
-  },
-  
-  toggle: () => {
-    if (homeState.isVisible) {
-      homeActions.hide();
-    } else {
-      homeActions.show();
-    }
+
+  /**
+   * Reset home screen when CAD is closed
+   * Called when CAD is hidden (appStore.hide)
+   */
+  reset: () => {
+    setHomeState({
+      activeRole: null,
+      actions: [],
+    });
   },
   
   setRole: (role: UserRole) => {

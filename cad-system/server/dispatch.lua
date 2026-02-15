@@ -235,6 +235,14 @@ lib.callback.register('cad:createDispatchCall', withDispatchGuard('heavy', funct
     end
 
     calls[callId] = call
+    
+    -- Broadcast to all dispatch and police units
+    CAD.Server.BroadcastToJobs(
+        {'police', 'sheriff', 'dispatch'},
+        'dispatchCreated',
+        { call = call }
+    )
+    
     return call
 end))
 

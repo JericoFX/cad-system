@@ -579,6 +579,13 @@ local function createBloodRequest(payload, officer)
     end
     CAD.Server.NotifyJobs({ 'ambulance', 'ems' }, ('New blood sample request %s'):format(request.requestId), 'warning')
 
+    -- Broadcast blood request creation
+    CAD.Server.BroadcastToJobs(
+        {'ambulance', 'ems'},
+        'emsBloodRequestCreated',
+        { request = request }
+    )
+
     return request
 end
 
@@ -828,6 +835,14 @@ createAlert = function(title, description, severity, coords, createdBy)
     end
 
     alerts[alert.alertId] = alert
+
+    -- Broadcast EMS alert
+    CAD.Server.BroadcastToJobs(
+        {'ambulance', 'ems', 'dispatch'},
+        'emsAlertCreated',
+        { alert = alert }
+    )
+
     return alert
 end
 
