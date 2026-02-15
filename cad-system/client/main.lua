@@ -139,9 +139,37 @@ function CAD.Client.SetUIState(open)
     end
 
     uiOpen = open == true
-    SetNuiFocus(uiOpen, uiOpen)
-    SetNuiFocusKeepInput(uiOpen)
-    SendNUIMessage({ action = uiOpen and 'openCad' or 'closeCad' })
+    
+    -- Always disable NUI focus first to ensure clean state
+    SetNuiFocus(false, false)
+    SetNuiFocusKeepInput(false)
+    
+    -- Small delay to ensure focus is released before re-enabling if opening
+    if uiOpen then
+        Wait(50)
+        SetNuiFocus(true, true)
+        SetNuiFocusKeepInput(true)
+    end
+    
+    -- Send NUI message with detailed context
+    if uiOpen then
+        SendNUIMessage({
+            action = 'cad:opened',
+            data = {
+                terminalId = activeTerminalContext and activeTerminalContext.terminalId or 'unknown',
+                location = activeTerminalContext and activeTerminalContext.coords or nil,
+                hasContainer = activeTerminalContext and activeTerminalContext.hasContainer or false,
+                hasReader = activeTerminalContext and activeTerminalContext.hasReader or false,
+            }
+        })
+    else
+        SendNUIMessage({
+            action = 'cad:closed',
+            data = {
+                timestamp = GetGameTimer()
+            }
+        })
+    end
 end
 
 function CAD.Client.GetComputerContext()
@@ -237,4 +265,126 @@ AddEventHandler('onResourceStop', function(resourceName)
 
     lib.hideTextUI()
     CAD.Client.SetUIState(false)
+end)
+
+-- ============================================================
+-- NUI Event Forwarding - Server to Client to NUI
+-- ============================================================
+
+-- Dispatch events
+RegisterNetEvent('cad:client:dispatchCreated')
+AddEventHandler('cad:client:dispatchCreated', function(data)
+    SendNUIMessage({ action = 'dispatch:callCreated', data = data })
+end)
+
+RegisterNetEvent('cad:client:dispatchUpdated')
+AddEventHandler('cad:client:dispatchUpdated', function(data)
+    SendNUIMessage({ action = 'dispatch:callUpdated', data = data })
+end)
+
+RegisterNetEvent('cad:client:dispatchClosed')
+AddEventHandler('cad:client:dispatchClosed', function(data)
+    SendNUIMessage({ action = 'dispatch:callClosed', data = data })
+end)
+
+RegisterNetEvent('cad:client:dispatchAssigned')
+AddEventHandler('cad:client:dispatchAssigned', function(data)
+    SendNUIMessage({ action = 'dispatch:callAssigned', data = data })
+end)
+
+RegisterNetEvent('cad:client:unitStatusChanged')
+AddEventHandler('cad:client:unitStatusChanged', function(data)
+    SendNUIMessage({ action = 'dispatch:unitStatusChanged', data = data })
+end)
+
+-- Case events
+RegisterNetEvent('cad:client:caseCreated')
+AddEventHandler('cad:client:caseCreated', function(data)
+    SendNUIMessage({ action = 'case:created', data = data })
+end)
+
+RegisterNetEvent('cad:client:caseUpdated')
+AddEventHandler('cad:client:caseUpdated', function(data)
+    SendNUIMessage({ action = 'case:updated', data = data })
+end)
+
+RegisterNetEvent('cad:client:caseClosed')
+AddEventHandler('cad:client:caseClosed', function(data)
+    SendNUIMessage({ action = 'case:closed', data = data })
+end)
+
+RegisterNetEvent('cad:client:caseNoteAdded')
+AddEventHandler('cad:client:caseNoteAdded', function(data)
+    SendNUIMessage({ action = 'case:noteAdded', data = data })
+end)
+
+-- Evidence events
+RegisterNetEvent('cad:client:evidenceStaged')
+AddEventHandler('cad:client:evidenceStaged', function(data)
+    SendNUIMessage({ action = 'evidence:staged', data = data })
+end)
+
+RegisterNetEvent('cad:client:evidenceAnalyzed')
+AddEventHandler('cad:client:evidenceAnalyzed', function(data)
+    SendNUIMessage({ action = 'evidence:analyzed', data = data })
+end)
+
+-- EMS events
+RegisterNetEvent('cad:client:emsAlertCreated')
+AddEventHandler('cad:client:emsAlertCreated', function(data)
+    SendNUIMessage({ action = 'ems:alertCreated', data = data })
+end)
+
+RegisterNetEvent('cad:client:emsAlertUpdated')
+AddEventHandler('cad:client:emsAlertUpdated', function(data)
+    SendNUIMessage({ action = 'ems:alertUpdated', data = data })
+end)
+
+RegisterNetEvent('cad:client:emsCriticalPatient')
+AddEventHandler('cad:client:emsCriticalPatient', function(data)
+    SendNUIMessage({ action = 'ems:criticalPatient', data = data })
+end)
+
+RegisterNetEvent('cad:client:emsLowStock')
+AddEventHandler('cad:client:emsLowStock', function(data)
+    SendNUIMessage({ action = 'ems:lowStock', data = data })
+end)
+
+RegisterNetEvent('cad:client:emsBloodRequest')
+AddEventHandler('cad:client:emsBloodRequest', function(data)
+    SendNUIMessage({ action = 'ems:bloodRequestCreated', data = data })
+end)
+
+-- Forensics events
+RegisterNetEvent('cad:client:forensicsAnalysisStarted')
+AddEventHandler('cad:client:forensicsAnalysisStarted', function(data)
+    SendNUIMessage({ action = 'forensics:analysisStarted', data = data })
+end)
+
+RegisterNetEvent('cad:client:forensicsAnalysisCompleted')
+AddEventHandler('cad:client:forensicsAnalysisCompleted', function(data)
+    SendNUIMessage({ action = 'forensics:analysisCompleted', data = data })
+end)
+
+-- Photo events
+RegisterNetEvent('cad:client:photoCaptured')
+AddEventHandler('cad:client:photoCaptured', function(data)
+    SendNUIMessage({ action = 'photo:captured', data = data })
+end)
+
+-- Fine events
+RegisterNetEvent('cad:client:fineCreated')
+AddEventHandler('cad:client:fineCreated', function(data)
+    SendNUIMessage({ action = 'fine:created', data = data })
+end)
+
+RegisterNetEvent('cad:client:finePaid')
+AddEventHandler('cad:client:finePaid', function(data)
+    SendNUIMessage({ action = 'fine:paid', data = data })
+end)
+
+-- Offline sync
+RegisterNetEvent('cad:client:syncOffline')
+AddEventHandler('cad:client:syncOffline', function(data)
+    SendNUIMessage({ action = 'cad:syncOffline', data = data })
 end)
