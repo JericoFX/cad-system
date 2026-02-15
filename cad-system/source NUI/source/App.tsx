@@ -37,6 +37,7 @@ import { BoloManager } from './components/modals/BoloManager';
 import { ForensicCollection } from './components/modals/ForensicCollection';
 import { ImageViewer } from './components/modals/ImageViewer';
 import { CallsignPrompt } from './components/modals/CallsignPrompt';
+import { BrowserHelper } from './components/BrowserHelper';
 import { terminalState } from './stores/terminalStore';
 import { viewerState, viewerActions } from './stores/viewerStore';
 import { uiPrefsState, uiPrefsActions } from './stores/uiPreferencesStore';
@@ -64,25 +65,25 @@ export function App() {
   });
 
   return (
-    <Show when={appState.isVisible}>
-      <div class={appClasses()}>
-        {/* Hacker background terminal - visible behind everything */}
-        <BackgroundTerminal />
+    <>
+      <Show when={appState.isVisible}>
+        <div class={appClasses()}>
+          <BackgroundTerminal />
 
-        <Show when={!CONFIG.DOCK_ONLY && uiPrefsActions.shouldShowTerminal()}>
-          <div class={terminalClasses()}>
-            <Terminal />
-          </div>
-        </Show>
+          <Show when={!CONFIG.DOCK_ONLY && uiPrefsActions.shouldShowTerminal()}>
+            <div class={terminalClasses()}>
+              <Terminal />
+            </div>
+          </Show>
 
         <CenterBadge />
 
         <Switch>
           <Match when={terminalState.activeModal === 'CALLSIGN_PROMPT'}>
-            <CallsignPrompt mode="setup" />
+            <CallsignPrompt mode='setup' />
           </Match>
           <Match when={terminalState.activeModal === 'CALLSIGN_CHANGE'}>
-            <CallsignPrompt mode="change" />
+            <CallsignPrompt mode='change' />
           </Match>
           <Match
             when={
@@ -196,10 +197,12 @@ export function App() {
         <AuditViewer />
 
         <AuditQuickButton />
-      </Show>
 
       {/* Mock controller - always visible for development testing */}
       <MockController />
-    </div>
+
+      {/* Browser helper - show button to open CAD in dev mode */}
+      <BrowserHelper />
+    </>
   );
 }
