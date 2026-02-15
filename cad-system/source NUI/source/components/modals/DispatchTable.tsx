@@ -809,9 +809,6 @@ export function DispatchTable() {
           <h2>=== DISPATCH OPERATIONS CENTER ===</h2>
           <div class="dispatch-v2-header-actions">
             <button class="btn" onClick={() => terminalActions.setActiveModal('MAP', { returnModal: 'DISPATCH_PANEL' })}>[MAP]</button>
-            <button class="btn" onClick={() => void refreshData()} disabled={loading()}>
-              [{loading() ? 'SYNCING...' : 'REFRESH'}]
-            </button>
             <button class="modal-close" onClick={closePanel}>[X]</button>
           </div>
         </div>

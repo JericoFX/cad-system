@@ -241,7 +241,6 @@ export function DispatchPanel() {
         </div>
         
         <div class="modal-footer">
-          <button class="btn" onClick={refreshData}>[REFRESH]</button>
           <button class="btn" onClick={closePanel}>[CLOSE]</button>
         </div>
       </div>
