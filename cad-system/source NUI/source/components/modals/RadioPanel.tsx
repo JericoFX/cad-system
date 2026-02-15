@@ -160,10 +160,11 @@ export function RadioPanel() {
             <div class="radio-section">
               <div class="section-header">
                 <h3>CANAL ACTUAL</h3>
-                <Show when={radioState.currentChannel}>
-                  <span class="current-channel">
-                    {radioState.currentChannel} [{radioState.channels[radioState.currentChannel!]?.name}]
-                  </span>
+                <Show when={radioState?.currentChannel}>
+                  <div class="current-channel">
+                    <span class="badge">CANAL ACTUAL</span>
+                    <strong>{radioState?.currentChannel} [{radioState?.channels?.[radioState?.currentChannel!]?.name}]</strong>
+                  </div>
                 </Show>
               </div>
               
