@@ -1,4 +1,4 @@
-import { Switch, Match, Show, createMemo } from 'solid-js';
+import { Switch, Match, Show, createMemo, onMount, onCleanup } from 'solid-js';
 import { Terminal } from './components/Terminal';
 import HackerTerminalBg from './components/HackerTerminalBg';
 import { CenterBadge } from './components/CenterBadge';
@@ -38,11 +38,11 @@ import { ForensicCollection } from './components/modals/ForensicCollection';
 import { ImageViewer } from './components/modals/ImageViewer';
 import { CallsignPrompt } from './components/modals/CallsignPrompt';
 import { BrowserHelper } from './components/BrowserHelper';
-import { terminalState } from './stores/terminalStore';
+import { terminalState, terminalActions } from './stores/terminalStore';
 import { viewerState, viewerActions } from './stores/viewerStore';
 import { uiPrefsState, uiPrefsActions } from './stores/uiPreferencesStore';
 import { featureState } from './stores/featureStore';
-import { appState } from './stores/appStore';
+import { appState, appActions } from './stores/appStore';
 import { CONFIG } from './config';
 import { MockController } from './mocks';
 
@@ -64,16 +64,41 @@ export function App() {
     return classes.join(' ');
   });
 
+  // Handle Escape key to close CAD or active modal
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      // If a modal is open, close it first
+      if (terminalState.activeModal) {
+        terminalActions.setActiveModal(null);
+        return;
+      }
+      
+      // Otherwise close the entire CAD
+      appActions.hide();
+      
+      // Notify server to close NUI
+      fetch('https://cad-system/closeUI', {
+        method: 'POST',
+        body: '{}',
+      }).catch(() => {});
+    }
+  };
+
+  // Attach keydown listener when CAD is visible
+  onMount(() => {
+    window.addEventListener('keydown', handleKeyDown);
+  });
+
+  onCleanup(() => {
+    window.removeEventListener('keydown', handleKeyDown);
+  });
+
   return (
     <>
       <Show when={appState.isVisible}>
         <div class={appClasses()}>
           {/* Hacker background terminal - optimized, no memory leak */}
-          <HackerTerminalBg 
-            maxLines={250}
-            intervalMs={35}
-            seed={20260215}
-          />
+          <HackerTerminalBg maxLines={250} intervalMs={500} seed={20260215} />
 
           <Show when={!CONFIG.DOCK_ONLY && uiPrefsActions.shouldShowTerminal()}>
             <div class={terminalClasses()}>
@@ -81,128 +106,128 @@ export function App() {
             </div>
           </Show>
 
-        <CenterBadge />
+          <CenterBadge />
 
-        <Switch>
-          <Match when={terminalState.activeModal === 'CALLSIGN_PROMPT'}>
-            <CallsignPrompt mode='setup' />
-          </Match>
-          <Match when={terminalState.activeModal === 'CALLSIGN_CHANGE'}>
-            <CallsignPrompt mode='change' />
-          </Match>
-          <Match
-            when={
-              terminalState.activeModal === 'DISPATCH_PANEL' &&
-              featureState.dispatch.visible
-            }
-          >
-            <DispatchTable />
-          </Match>
-          <Match when={terminalState.activeModal === 'CASE_CREATOR'}>
-            <CaseCreator />
-          </Match>
-          <Match when={terminalState.activeModal === 'CASE_MANAGER'}>
-            <CaseManager />
-          </Match>
-          <Match when={terminalState.activeModal === 'MAP'}>
-            <MapModal />
-          </Match>
-          <Match when={terminalState.activeModal === 'EVIDENCE'}>
-            <EvidenceManager />
-          </Match>
-          <Match when={terminalState.activeModal === 'NOTES'}>
-            <NotesEditor />
-          </Match>
-          <Match when={terminalState.activeModal === 'NOTES_FILE'}>
-            <NotesFileManager />
-          </Match>
-          <Match when={terminalState.activeModal === 'UPLOAD'}>
-            <EvidenceUploader />
-          </Match>
-          <Match when={terminalState.activeModal === 'EVIDENCE_DOCUMENT'}>
-            <EvidenceDocumentViewer />
-          </Match>
-          <Match when={terminalState.activeModal === 'PERSON_SEARCH'}>
-            <PersonSearch />
-          </Match>
-          <Match when={terminalState.activeModal === 'VEHICLE_SEARCH'}>
-            <VehicleSearch />
-          </Match>
-          <Match when={terminalState.activeModal === 'FINE_MANAGER'}>
-            <FineManager />
-          </Match>
-          <Match when={terminalState.activeModal === 'POLICE_DASHBOARD'}>
-            <PoliceDashboard />
-          </Match>
-          <Match when={terminalState.activeModal === 'EMS_DASHBOARD'}>
-            <EMSDashboard />
-          </Match>
-          <Match
-            when={
-              terminalState.activeModal === 'NEWS_MANAGER' &&
-              featureState.news.visible
-            }
-          >
-            <NewsManager />
-          </Match>
-          <Match when={terminalState.activeModal === 'RADIO_PANEL'}>
-            <RadioPanel />
-          </Match>
-          <Match when={terminalState.activeModal === 'LICENSE_MANAGER'}>
-            <LicenseManager />
-          </Match>
-          <Match when={terminalState.activeModal === 'PROPERTY_MANAGER'}>
-            <PropertyManager />
-          </Match>
-          <Match when={terminalState.activeModal === 'FLEET_MANAGER'}>
-            <FleetManager />
-          </Match>
-          <Match when={terminalState.activeModal === 'ARREST_FORM'}>
-            <ArrestForm />
-          </Match>
-          <Match when={terminalState.activeModal === 'ARREST_WIZARD'}>
-            <ArrestWizard />
-          </Match>
-          <Match when={terminalState.activeModal === 'PERSON_SNAPSHOT'}>
-            <PersonSnapshot />
-          </Match>
-          <Match when={terminalState.activeModal === 'RADIO_MARKERS'}>
-            <RadioMarkers />
-          </Match>
-          <Match when={terminalState.activeModal === 'BOLO_MANAGER'}>
-            <BoloManager />
-          </Match>
-          <Match
-            when={
-              terminalState.activeModal === 'FORENSIC_COLLECTION' &&
-              featureState.forensics.visible
-            }
-          >
-            <ForensicCollection />
-          </Match>
-        </Switch>
+          <Switch>
+            <Match when={terminalState.activeModal === 'CALLSIGN_PROMPT'}>
+              <CallsignPrompt mode='setup' />
+            </Match>
+            <Match when={terminalState.activeModal === 'CALLSIGN_CHANGE'}>
+              <CallsignPrompt mode='change' />
+            </Match>
+            <Match
+              when={
+                terminalState.activeModal === 'DISPATCH_PANEL' &&
+                featureState.dispatch.visible
+              }
+            >
+              <DispatchTable />
+            </Match>
+            <Match when={terminalState.activeModal === 'CASE_CREATOR'}>
+              <CaseCreator />
+            </Match>
+            <Match when={terminalState.activeModal === 'CASE_MANAGER'}>
+              <CaseManager />
+            </Match>
+            <Match when={terminalState.activeModal === 'MAP'}>
+              <MapModal />
+            </Match>
+            <Match when={terminalState.activeModal === 'EVIDENCE'}>
+              <EvidenceManager />
+            </Match>
+            <Match when={terminalState.activeModal === 'NOTES'}>
+              <NotesEditor />
+            </Match>
+            <Match when={terminalState.activeModal === 'NOTES_FILE'}>
+              <NotesFileManager />
+            </Match>
+            <Match when={terminalState.activeModal === 'UPLOAD'}>
+              <EvidenceUploader />
+            </Match>
+            <Match when={terminalState.activeModal === 'EVIDENCE_DOCUMENT'}>
+              <EvidenceDocumentViewer />
+            </Match>
+            <Match when={terminalState.activeModal === 'PERSON_SEARCH'}>
+              <PersonSearch />
+            </Match>
+            <Match when={terminalState.activeModal === 'VEHICLE_SEARCH'}>
+              <VehicleSearch />
+            </Match>
+            <Match when={terminalState.activeModal === 'FINE_MANAGER'}>
+              <FineManager />
+            </Match>
+            <Match when={terminalState.activeModal === 'POLICE_DASHBOARD'}>
+              <PoliceDashboard />
+            </Match>
+            <Match when={terminalState.activeModal === 'EMS_DASHBOARD'}>
+              <EMSDashboard />
+            </Match>
+            <Match
+              when={
+                terminalState.activeModal === 'NEWS_MANAGER' &&
+                featureState.news.visible
+              }
+            >
+              <NewsManager />
+            </Match>
+            <Match when={terminalState.activeModal === 'RADIO_PANEL'}>
+              <RadioPanel />
+            </Match>
+            <Match when={terminalState.activeModal === 'LICENSE_MANAGER'}>
+              <LicenseManager />
+            </Match>
+            <Match when={terminalState.activeModal === 'PROPERTY_MANAGER'}>
+              <PropertyManager />
+            </Match>
+            <Match when={terminalState.activeModal === 'FLEET_MANAGER'}>
+              <FleetManager />
+            </Match>
+            <Match when={terminalState.activeModal === 'ARREST_FORM'}>
+              <ArrestForm />
+            </Match>
+            <Match when={terminalState.activeModal === 'ARREST_WIZARD'}>
+              <ArrestWizard />
+            </Match>
+            <Match when={terminalState.activeModal === 'PERSON_SNAPSHOT'}>
+              <PersonSnapshot />
+            </Match>
+            <Match when={terminalState.activeModal === 'RADIO_MARKERS'}>
+              <RadioMarkers />
+            </Match>
+            <Match when={terminalState.activeModal === 'BOLO_MANAGER'}>
+              <BoloManager />
+            </Match>
+            <Match
+              when={
+                terminalState.activeModal === 'FORENSIC_COLLECTION' &&
+                featureState.forensics.visible
+              }
+            >
+              <ForensicCollection />
+            </Match>
+          </Switch>
 
-        {viewerState.isOpen && (
-          <ImageViewer
-            images={viewerState.images}
-            title={viewerState.title}
-            onClose={viewerActions.close}
-          />
-        )}
+          {viewerState.isOpen && (
+            <ImageViewer
+              images={viewerState.images}
+              title={viewerState.title}
+              onClose={viewerActions.close}
+            />
+          )}
 
-        <SessionContextBar />
+          <SessionContextBar />
 
-        <DockLauncher />
+          <DockLauncher />
 
-        <FlowProgressOverlay />
-        <FlowMinimizedIndicator />
+          <FlowProgressOverlay />
+          <FlowMinimizedIndicator />
 
-        <AuditViewer />
+          <AuditViewer />
 
-        <AuditQuickButton />
+          <AuditQuickButton />
 
-        {/* HomeScreen disabled - was closing entire CAD on X button */}
-        {/* <HomeScreen /> */}
+          {/* HomeScreen disabled - was closing entire CAD on X button */}
+          {/* <HomeScreen /> */}
         </div>
       </Show>
 

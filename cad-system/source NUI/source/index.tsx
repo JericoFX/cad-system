@@ -5,6 +5,8 @@ import { App } from './App';
 import { userActions } from './stores/userStore';
 import { featureActions } from './stores/featureStore';
 import { codeCatalogActions } from './stores/codeCatalogStore';
+import { appActions } from './stores/appStore';
+import { terminalActions } from './stores/terminalStore';
 
 // Import NUI System
 import { initNuiSystem } from './hooks/useNui';
@@ -15,6 +17,30 @@ if (root) {
 } else {
   console.error('[APP] Root element not found!');
 }
+
+// Global Escape key handler to close CAD
+const handleGlobalKeyDown = (e: KeyboardEvent) => {
+  if (e.key === 'Escape') {
+    // Check if any modal is open - if so, close modal first
+    const { terminalState } = require('./stores/terminalStore');
+    if (terminalState.activeModal) {
+      terminalActions.setActiveModal(null);
+      return;
+    }
+    
+    // Otherwise close the entire CAD
+    appActions.hide();
+    
+    // Notify Lua to release NUI focus
+    fetch('https://cad-system/closeUI', {
+      method: 'POST',
+      body: '{}',
+    }).catch(() => {});
+  }
+};
+
+// Add global keydown listener
+window.addEventListener('keydown', handleGlobalKeyDown);
 
 void (async () => {
   try {
