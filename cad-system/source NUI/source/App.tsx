@@ -198,6 +198,11 @@ export function App() {
 
         <AuditQuickButton />
 
+        {/* HomeScreen disabled - was closing entire CAD on X button */}
+        {/* <HomeScreen /> */}
+        </div>
+      </Show>
+
       {/* Mock controller - always visible for development testing */}
       <MockController />
 
