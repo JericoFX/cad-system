@@ -64,9 +64,8 @@ export function App() {
   });
 
   return (
-    <div class={appClasses()}>
-      {/* Main CAD Application - Only visible when appState.isVisible is true */}
-      <Show when={appState.isVisible}>
+    <Show when={appState.isVisible}>
+      <div class={appClasses()}>
         {/* Hacker background terminal - visible behind everything */}
         <BackgroundTerminal />
 
