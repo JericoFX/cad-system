@@ -277,13 +277,13 @@ export function EvidenceUploader() {
                 class={`type-btn ${uploadMode() === 'url' ? 'selected' : ''}`}
                 onClick={() => { setUploadMode('url'); clearFileSelection(); }}
               >
-                [{uploadMode() === 'url' ? 'X' : ' '}] URL
+                [{uploadMode() === 'url' ? 'X' : ' '}] URL (External)
               </button>
               <button
-                class={`type-btn ${uploadMode() === 'file' ? 'selected' : ''}`}
-                onClick={() => { setUploadMode('file'); setUrl(''); setPreviewUrl(''); }}
+                class={`type-btn ${uploadMode() === 'inventory' ? 'selected' : ''}`}
+                onClick={() => { setUploadMode('inventory'); setUrl(''); setPreviewUrl(''); }}
               >
-                [{uploadMode() === 'file' ? 'X' : ' '}] FILE
+                [{uploadMode() === 'inventory' ? 'X' : ' '}] FROM INVENTORY
               </button>
             </div>
           </div>
