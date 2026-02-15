@@ -9136,28 +9136,28 @@ select option:hover {
 }
 
 .hacker-line--command {
-  color: #00ff00;
-  text-shadow: 0 0 5px rgba(0, 255, 0, 0.3);
+  color: var(--terminal-fg-bright);
+  text-shadow: 0 0 5px rgba(192, 192, 192, 0.3);
 }
 
 .hacker-line--command::before {
   content: '$ ';
-  color: #00aa00;
+  color: var(--terminal-fg-dim);
 }
 
 .hacker-line--output {
-  color: #c0c0c0;
-  opacity: 0.7;
+  color: var(--terminal-fg);
+  opacity: 0.8;
   padding-left: 16px;
 }
 
 .hacker-line--system {
-  color: #ffff00;
-  text-shadow: 0 0 5px rgba(255, 255, 0, 0.2);
+  color: var(--terminal-fg-bright);
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
 }
 
 .hacker-line--error {
-  color: #ff0000;
+  color: var(--terminal-error);
   text-shadow: 0 0 5px rgba(255, 0, 0, 0.3);
 }
 
@@ -9192,7 +9192,7 @@ select option:hover {
   bottom: 0;
   background: radial-gradient(
     ellipse at center,
-    rgba(0, 255, 0, 0.03) 0%,
+    rgba(192, 192, 192, 0.03) 0%,
     transparent 70%
   );
   pointer-events: none;
