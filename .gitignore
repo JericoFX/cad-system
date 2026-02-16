@@ -35,3 +35,6 @@ yarn-error.log*
 # Cache
 .cache/
 *.tsbuildinfo
+
+# Vite cache
+.vite/

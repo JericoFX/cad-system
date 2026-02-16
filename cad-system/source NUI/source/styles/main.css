@@ -1089,7 +1089,7 @@ body {
 }
 
 .evidence-manager {
-  width: 1000px;
+  width: 80vw;
   max-width: 95vw;
 }
 
@@ -1819,7 +1819,7 @@ body {
 
 .image-viewer {
   width: 900px;
-  height: 680px;
+  height: 800px;
   max-width: 95vw;
   max-height: 90vh;
   display: flex;
@@ -9245,7 +9245,8 @@ select option:hover {
 
 /* Enhanced glow animation for active moments */
 @keyframes hackerPulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.12;
   }
   50% {
@@ -9323,7 +9324,9 @@ select option:hover {
   border: 2px solid var(--terminal-border);
   color: var(--terminal-fg-bright);
   outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 
 .callsign-input::placeholder {
@@ -9561,7 +9564,8 @@ select option:hover {
 .progress-bar-fill {
   height: 100%;
   background-color: var(--terminal-system);
-  transition: width 0.1s ease;
+  transition: width 0.15s ease-out;
+  will-change: width;
   opacity: 0.6;
 }
 

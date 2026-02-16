@@ -143,12 +143,13 @@ function CAD.Client.SetUIState(open)
     -- Always disable NUI focus first to ensure clean state
     SetNuiFocus(false, false)
     SetNuiFocusKeepInput(false)
-    
+
     -- Small delay to ensure focus is released before re-enabling if opening
     if uiOpen then
         Wait(50)
         SetNuiFocus(true, true)
-        SetNuiFocusKeepInput(true)
+        -- KeepInput false to prevent other apps from receiving input while CAD is open
+        SetNuiFocusKeepInput(false)
     end
     
     -- Send NUI message with detailed context

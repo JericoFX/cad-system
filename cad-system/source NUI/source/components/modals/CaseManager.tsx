@@ -387,10 +387,11 @@ export function CaseManager() {
               
               <For each={filteredCases()}>
                 {caseItem => (
-                  <div 
-                    class={`case-card ${caseItem.status === 'CLOSED' ? 'closed' : ''}`}
-                    onClick={() => selectCase(caseItem)}
-                  >
+                   <div 
+                     class={`case-card ${caseItem.status === 'CLOSED' ? 'closed' : ''}`}
+                     onClick={() => selectCase(caseItem)}
+                     onDblClick={() => { selectCase(caseItem); setActiveTab('evidence'); }}
+                   >
                     <div class="case-header">
                       <span class="case-id">{caseItem.caseId}</span>
                       <span 
