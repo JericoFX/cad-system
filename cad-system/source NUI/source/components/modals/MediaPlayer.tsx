@@ -226,9 +226,19 @@ export function MediaPlayer() {
                     audioRef.volume = volume() / 100;
                   }
                 }}
+                onCanPlayThrough={() => {
+                  console.log('[MediaPlayer] Audio can play through');
+                }}
+                onError={(e) => {
+                  const audio = e.target as HTMLAudioElement;
+                  console.error('[MediaPlayer] Audio error:', {
+                    code: audio.error?.code,
+                    message: audio.error?.message,
+                    url: viewerState.mediaUrl
+                  });
+                }}
                 loop={isLooping()}
                 preload="auto"
-                crossorigin="anonymous"
               />
 
               {/* Progress Bar */}
@@ -344,7 +354,6 @@ export function MediaPlayer() {
                 controls
                 playsinline
                 preload="metadata"
-                crossorigin="anonymous"
                 onEnded={() => setIsPlaying(false)}
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
