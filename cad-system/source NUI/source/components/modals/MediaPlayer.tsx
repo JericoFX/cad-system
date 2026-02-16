@@ -321,12 +321,12 @@ export function MediaPlayer() {
           >
             <div class="modal-header">
               <h2>{viewerState.title || 'AUDIO PLAYER'}</h2>
-              <button class="modal-close" onClick={handleClose}>×</button>
+              <button class="modal-close" onClick={handleClose}>[X]</button>
             </div>
 
             <div class="audio-content">
               <div class="audio-icon">
-                <svg width="80" height="80" viewBox="0 0 24 24" fill="currentColor">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
                 </svg>
               </div>
@@ -365,7 +365,7 @@ export function MediaPlayer() {
 
             <div class="modal-footer">
               <span class="footer-text">Audio playback</span>
-              <button class="btn" onClick={handleClose}>Close</button>
+              <button class="btn" onClick={handleClose}>[CLOSE]</button>
             </div>
           </div>
         }
@@ -419,7 +419,7 @@ export function MediaPlayer() {
           <div class={`video-controls-overlay ${showControls() ? 'visible' : ''}`}>
             <div class="video-controls-header">
               <h2>{viewerState.title || 'VIDEO PLAYER'}</h2>
-              <button class="modal-close" onClick={handleClose}>×</button>
+              <button class="modal-close" onClick={handleClose}>[X]</button>
             </div>
 
             <div class="video-controls-bottom">
