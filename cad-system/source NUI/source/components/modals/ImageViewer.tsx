@@ -31,10 +31,10 @@ export function ImageViewer(props: ImageViewerProps) {
   };
 
   return (
-    <div class="modal-overlay police-watermark" onClick={handleClose}>
+    <div class="modal-overlay" onClick={handleClose}>
       <div class="modal-content image-viewer" onClick={(e) => e.stopPropagation()}>
         <div class="modal-header">
-          <h2>=== IMAGE VIEWER {props.title ? `- ${props.title}` : ''} [{currentIndex() + 1}/{totalImages()}] ===</h2>
+          <h2>{props.title || 'IMAGE VIEWER'} [{currentIndex() + 1}/{totalImages()}]</h2>
           <button class="modal-close" onClick={handleClose}>[X]</button>
         </div>
 
@@ -47,7 +47,6 @@ export function ImageViewer(props: ImageViewerProps) {
               src={currentImage()} 
               alt="Evidence" 
               class="viewer-image"
-              style={{ 'user-select': 'none', '-webkit-user-drag': 'none' }}
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = 'none';
                 const error = document.createElement('div');
@@ -64,22 +63,22 @@ export function ImageViewer(props: ImageViewerProps) {
             display: 'flex',
             'align-items': 'center',
             'justify-content': 'center',
-            gap: '16px',
-            padding: '12px',
-            'border-top': '1px solid var(--terminal-border)',
-            'border-bottom': '1px solid var(--terminal-border)'
+            gap: '12px',
+            padding: '10px',
+            'border-top': '2px solid var(--terminal-border)',
+            'background-color': 'var(--terminal-bg)'
           }}>
             <button 
               class="btn"
               onClick={() => viewerActions.prevImage()}
               disabled={currentIndex() === 0}
             >
-              [&lt; PREV]
+              [&lt;&lt;]
             </button>
             
             <div class="image-thumbnails" style={{
               display: 'flex',
-              gap: '8px',
+              gap: '6px',
               'max-width': '400px',
               'overflow-x': 'auto',
               padding: '4px'
@@ -91,14 +90,14 @@ export function ImageViewer(props: ImageViewerProps) {
                     alt={`Thumbnail ${index() + 1}`}
                     onClick={() => goToImage(index())}
                     style={{
-                      width: '60px',
-                      height: '45px',
+                      width: '50px',
+                      height: '38px',
                       'object-fit': 'cover',
                       cursor: 'pointer',
                       border: index() === currentIndex() 
                         ? '2px solid var(--terminal-system)' 
                         : '2px solid var(--terminal-border)',
-                      opacity: index() === currentIndex() ? '1' : '0.6'
+                      opacity: index() === currentIndex() ? '1' : '0.5'
                     }}
                   />
                 )}
@@ -110,24 +109,13 @@ export function ImageViewer(props: ImageViewerProps) {
               onClick={() => viewerActions.nextImage()}
               disabled={currentIndex() === totalImages() - 1}
             >
-              [NEXT &gt;]
+              [&gt;&gt;]
             </button>
           </div>
         </Show>
 
-        <div class="image-viewer-info">
-          <div class="image-url">
-            <strong>URL:</strong>
-            <a href={currentImage()} target="_blank" rel="noopener noreferrer">
-              {currentImage()}
-            </a>
-          </div>
-        </div>
-
         <div class="modal-footer">
-          <span style={{ color: '#808080' }}>
-            Use arrows or thumbnails to navigate • Click outside to close
-          </span>
+          <span class="footer-text">Image evidence</span>
           <button class="btn" onClick={handleClose}>[CLOSE]</button>
         </div>
       </div>
