@@ -39,46 +39,16 @@ const sanitizeUrl = (url: string): { valid: boolean; sanitized: string; error?: 
     return { valid: false, sanitized: '', error: 'URL too long (max 2048 characters)' };
   }
   
-  // 5. Validate image extension
-  const validImageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'];
+  // 5. Basic image validation - just check if URL looks like an image
   const pathname = urlObj.pathname.toLowerCase();
-  const hasValidExtension = validImageExtensions.some(ext => pathname.endsWith(ext));
-  
-  if (!hasValidExtension) {
-    // Check if URL contains image indicators in query params or path
-    const imageIndicators = ['image', 'img', 'photo', 'pic', 'jpg', 'png', 'gif'];
-    const hasImageIndicator = imageIndicators.some(indicator => 
-      pathname.includes(indicator) || urlObj.search.toLowerCase().includes(indicator)
-    );
-    
-    if (!hasImageIndicator) {
-      return { valid: false, sanitized: '', error: 'URL must point to an image file (.jpg, .png, .gif, etc.)' };
-    }
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'];
+  const hasImageExtension = imageExtensions.some(ext => pathname.endsWith(ext));
+
+  if (!hasImageExtension && !urlObj.search.toLowerCase().includes('image')) {
+    // Allow URLs without extension - will be validated by trying to load
+    console.log('[EvidenceUploader] URL without image extension, will validate by loading');
   }
-  
-  // 6. Check allowed domains
-  const allowedDomains = [
-    'imgur.com',
-    'i.imgur.com',
-    'discordapp.com',
-    'cdn.discordapp.com',
-    'fivem.net',
-    'cfx.re',
-    'github.com',
-    'raw.githubusercontent.com',
-    'postimg.cc',
-    'i.postimg.cc',
-    'gyazo.com',
-    'i.gyazo.com',
-  ];
-  
-  const domain = urlObj.hostname.toLowerCase();
-  const isWhitelisted = allowedDomains.some(allowed => domain.includes(allowed));
-  
-  if (!isWhitelisted) {
-    return { valid: false, sanitized: '', error: `Domain ${domain} not in whitelist. Allowed: imgur, discord, gyazo, etc.` };
-  }
-  
+
   return { valid: true, sanitized };
 };
 
@@ -88,25 +58,23 @@ const validateImageContent = async (url: string): Promise<{ valid: boolean; erro
     const img = new Image();
     const timeout = setTimeout(() => {
       resolve({ valid: false, error: 'Image load timeout' });
-    }, 10000);
-    
+    }, 15000);
+
     img.onload = () => {
       clearTimeout(timeout);
-      // Check image dimensions
-      if (img.width < 10 || img.height < 10) {
-        resolve({ valid: false, error: 'Image too small' });
-      } else if (img.width > 10000 || img.height > 10000) {
-        resolve({ valid: false, error: 'Image too large' });
+      // Only check if image has valid dimensions (> 1px)
+      if (img.width < 1 || img.height < 1) {
+        resolve({ valid: false, error: 'Invalid image dimensions' });
       } else {
         resolve({ valid: true });
       }
     };
-    
+
     img.onerror = () => {
       clearTimeout(timeout);
       resolve({ valid: false, error: 'Failed to load image' });
     };
-    
+
     img.crossOrigin = 'anonymous';
     img.src = url;
   });
@@ -114,7 +82,7 @@ const validateImageContent = async (url: string): Promise<{ valid: boolean; erro
 
 export function EvidenceUploader() {
   const [url, setUrl] = createSignal('');
-  const [evidenceType, setEvidenceType] = createSignal<'PHOTO' | 'VIDEO' | 'DOCUMENT' | 'AUDIO'>('PHOTO');
+  const [evidenceType, setEvidenceType] = createSignal<'PHOTO' | 'VIDEO' | 'AUDIO'>('PHOTO');
   const [description, setDescription] = createSignal('');
   const [isUploading, setIsUploading] = createSignal(false);
   const [validationError, setValidationError] = createSignal('');
@@ -347,7 +315,7 @@ export function EvidenceUploader() {
           <div class="form-section">
             <label class="form-label">[EVIDENCE TYPE]</label>
             <div class="type-selector">
-              <For each={['PHOTO', 'VIDEO', 'DOCUMENT', 'AUDIO'] as const}>
+              <For each={['PHOTO', 'VIDEO', 'AUDIO'] as const}>
                 {(type) => (
                   <button
                     class={`type-btn ${evidenceType() === type ? 'selected' : ''}`}

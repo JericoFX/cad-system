@@ -69,6 +69,9 @@ export const evidenceCollectionScenario: Scenario = {
               description: `Surveillance video ${i + 1}`,
               duration: '00:15:30',
               source: 'Security Camera',
+              url: i === 0 
+                ? 'https://www.w3schools.com/html/mov_bbb.mp4'
+                : `https://files.fivemerr.com/videos/sample_video_${i + 1}.mp4`,
             },
             attachedBy: 'ANALYST_001',
             attachedAt: new Date(Date.now() - (i + 11) * 86400000).toISOString(),
@@ -83,6 +86,9 @@ export const evidenceCollectionScenario: Scenario = {
               description: `Wiretap recording ${i + 1}`,
               duration: '02:30:00',
               source: 'Phone Line 1',
+              url: i === 0
+                ? 'https://www.w3schools.com/html/horse.mp3'
+                : `https://files.fivemerr.com/audio/sample_audio_${i + 1}.mp3`,
             },
             attachedBy: 'ANALYST_001',
             attachedAt: new Date(Date.now() - (i + 16) * 86400000).toISOString(),

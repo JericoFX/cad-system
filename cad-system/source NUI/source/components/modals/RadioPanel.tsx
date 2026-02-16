@@ -179,18 +179,21 @@ export function RadioPanel() {
               <div class="radio-controls">
                 <button 
                   class={`btn ${isTalking() ? 'btn-danger' : 'btn-success'}`}
-                  onMouseDown={toggleTalk}
-                  onMouseUp={toggleTalk}
-                  onTouchStart={toggleTalk}
+                  onMouseDown={startTalk}
+                  onMouseUp={stopTalk}
+                  onMouseLeave={stopTalk}
+                  onTouchStart={startTalk}
                   onTouchEnd={toggleTalk}
+                  disabled={!radioState.currentUser}
                 >
                   {isTalking() ? '🎤 HABLANDO' : '🎤 PTT'}
                 </button>
                 <button 
-                  class={`btn ${radioState.isMuted ? 'btn-danger' : 'btn-secondary'}`}
+                  class={`btn ${radioState?.isMuted ? 'btn-danger' : 'btn-secondary'}`}
                   onClick={() => radioActions.toggleMute()}
+                  disabled={!radioState.currentUser}
                 >
-                  {radioState.isMuted ? '🔇 Muteado' : '🔊 Sonido'}
+                  {radioState?.isMuted ? '🔇 Muteado' : '🔊 Sonido'}
                 </button>
                 <button 
                   class="btn btn-secondary"
@@ -346,11 +349,11 @@ export function RadioPanel() {
                 <div class="users-list">
                   <For each={currentChannelUsers()}>
                     {(user) => (
-                      <div class={`user-item ${user.isTalking ? 'talking' : ''}`}>
+                      <div class={`user-item ${user?.isTalking ? 'talking' : ''}`}>
                         <div class="user-status">
-                          {user.isTalking && <span class="talking-indicator">🎤</span>}
-                          {user.isMuted && <span>🔇</span>}
-                          {user.isDeafened && <span>🙉</span>}
+                          {user?.isTalking && <span class="talking-indicator">🎤</span>}
+                          {user?.isMuted && <span>🔇</span>}
+                          {user?.isDeafened && <span>🙉</span>}
                         </div>
                         <div class="user-info">
                           <strong>{user.name}</strong>

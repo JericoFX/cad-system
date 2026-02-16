@@ -31,7 +31,7 @@ const DEFAULT_DOCK_ITEMS: DockItem[] = [
     tooltip: 'Case Manager',
     category: 'cases',
     shortcut: 'F2',
-    roles: ['police', 'ems', 'dispatch', 'admin'],
+    roles: ['police', 'dispatch', 'admin', 'ems'],
   },
   {
     id: 'case-create',
@@ -41,7 +41,7 @@ const DEFAULT_DOCK_ITEMS: DockItem[] = [
     modal: 'CASE_CREATOR',
     tooltip: 'Create Case',
     category: 'cases',
-    roles: ['police', 'ems', 'dispatch', 'admin'],
+    roles: ['police', 'dispatch', 'admin'],
   },
   {
     id: 'dispatch',
@@ -52,7 +52,7 @@ const DEFAULT_DOCK_ITEMS: DockItem[] = [
     tooltip: 'Dispatch Panel',
     category: 'dispatch',
     shortcut: 'F3',
-    roles: ['police', 'ems', 'dispatch', 'admin'],
+    roles: ['police', 'dispatch', 'admin'],
   },
   {
     id: 'map',
@@ -63,7 +63,7 @@ const DEFAULT_DOCK_ITEMS: DockItem[] = [
     tooltip: 'Tactical Map',
     category: 'dispatch',
     shortcut: 'F6',
-    roles: ['police', 'ems', 'dispatch', 'admin'],
+    roles: ['police', 'dispatch', 'admin'],
   },
   {
     id: 'person',
@@ -73,7 +73,7 @@ const DEFAULT_DOCK_ITEMS: DockItem[] = [
     modal: 'PERSON_SEARCH',
     tooltip: 'Search Person',
     category: 'search',
-    roles: ['police', 'ems', 'dispatch', 'admin'],
+    roles: ['police', 'dispatch', 'admin'],
   },
   {
     id: 'vehicle',
@@ -93,7 +93,7 @@ const DEFAULT_DOCK_ITEMS: DockItem[] = [
     modal: 'EVIDENCE',
     tooltip: 'Evidence Manager',
     category: 'evidence',
-    roles: ['police', 'dispatch', 'admin'],
+    roles: ['police', 'dispatch', 'admin', 'ems'],
   },
   {
     id: 'notes',
@@ -103,7 +103,7 @@ const DEFAULT_DOCK_ITEMS: DockItem[] = [
     modal: 'NOTES',
     tooltip: 'Notes Editor',
     category: 'cases',
-    roles: ['police', 'ems', 'dispatch', 'admin'],
+    roles: ['police', 'dispatch', 'admin'],
   },
   {
     id: 'bolo',
@@ -153,7 +153,7 @@ const DEFAULT_DOCK_ITEMS: DockItem[] = [
     modal: 'NEWS_MANAGER',
     tooltip: 'News Desk',
     category: 'news',
-    roles: ['dispatch', 'admin'],
+    roles: ['dispatch', 'admin', 'ems'],
   },
   {
     id: 'radio',
@@ -164,7 +164,7 @@ const DEFAULT_DOCK_ITEMS: DockItem[] = [
     tooltip: 'Radio Panel',
     category: 'comms',
     shortcut: 'F4',
-    roles: ['police', 'ems', 'dispatch', 'admin'],
+    roles: ['police', 'dispatch', 'admin'],
   },
 ];
 

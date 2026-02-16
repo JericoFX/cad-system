@@ -2,6 +2,8 @@ import { createStore } from 'solid-js/store';
 
 interface ViewerState {
   isOpen: boolean;
+  mediaType: 'image' | 'video' | 'audio' | null;
+  mediaUrl: string | null;
   images: string[];
   currentIndex: number;
   title?: string;
@@ -9,6 +11,8 @@ interface ViewerState {
 
 const initialState: ViewerState = {
   isOpen: false,
+  mediaType: null,
+  mediaUrl: null,
   images: [],
   currentIndex: 0,
   title: undefined,
@@ -20,6 +24,8 @@ export const viewerActions = {
   openImages: (images: string[], title?: string) => {
     setViewerState({
       isOpen: true,
+      mediaType: 'image',
+      mediaUrl: null,
       images,
       currentIndex: 0,
       title,
@@ -29,7 +35,31 @@ export const viewerActions = {
   openImage: (url: string, title?: string) => {
     setViewerState({
       isOpen: true,
+      mediaType: 'image',
+      mediaUrl: url,
       images: [url],
+      currentIndex: 0,
+      title,
+    });
+  },
+
+  openVideo: (url: string, title?: string) => {
+    setViewerState({
+      isOpen: true,
+      mediaType: 'video',
+      mediaUrl: url,
+      images: [],
+      currentIndex: 0,
+      title,
+    });
+  },
+
+  openAudio: (url: string, title?: string) => {
+    setViewerState({
+      isOpen: true,
+      mediaType: 'audio',
+      mediaUrl: url,
+      images: [],
       currentIndex: 0,
       title,
     });
@@ -56,6 +86,8 @@ export const viewerActions = {
   close: () => {
     setViewerState({
       isOpen: false,
+      mediaType: null,
+      mediaUrl: null,
       images: [],
       currentIndex: 0,
       title: undefined,
