@@ -142,6 +142,12 @@ export function MediaPlayer() {
       mediaUrl: viewerState.mediaUrl
     });
 
+    // Initialize volume
+    const media = videoRef || audioRef;
+    if (media) {
+      media.volume = volume() / 100;
+    }
+
     progressInterval = setInterval(() => {
       const media = videoRef || audioRef;
       if (media) {
@@ -209,6 +215,17 @@ export function MediaPlayer() {
                 onEnded={() => setIsPlaying(false)}
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
+                onVolumeChange={() => {
+                  if (audioRef) {
+                    setVolume(Math.round(audioRef.volume * 100));
+                  }
+                }}
+                onLoadedMetadata={() => {
+                  console.log('[MediaPlayer] Audio metadata loaded');
+                  if (audioRef) {
+                    audioRef.volume = volume() / 100;
+                  }
+                }}
                 loop={isLooping()}
                 preload="auto"
                 crossorigin="anonymous"
@@ -316,26 +333,46 @@ export function MediaPlayer() {
           </div>
 
           <div class="video-container">
-            <video
-              ref={videoRef}
-              src={viewerState.mediaUrl || ''}
-              controls
-              autoplay
-              playsinline
-              preload="auto"
-              crossorigin="anonymous"
-              onEnded={() => setIsPlaying(false)}
-              onPlay={() => setIsPlaying(true)}
-              onPause={() => setIsPlaying(false)}
-              onError={(e) => {
-                console.error('[MediaPlayer] Video error:', e);
-                console.error('[MediaPlayer] Video URL:', viewerState.mediaUrl);
-                console.error('[MediaPlayer] Error code:', (e.target as HTMLVideoElement).error?.code);
-                console.error('[MediaPlayer] Error message:', (e.target as HTMLVideoElement).error?.message);
-              }}
-              onLoadedData={() => console.log('[MediaPlayer] Video loaded')}
-              onCanPlay={() => console.log('[MediaPlayer] Video can play')}
-            />
+            <Show when={viewerState.mediaUrl} fallback={
+              <div style={{ color: 'var(--terminal-error)', padding: '20px' }}>
+                Error: No video URL provided
+              </div>
+            }>
+              <video
+                ref={videoRef}
+                src={viewerState.mediaUrl || ''}
+                controls
+                playsinline
+                preload="metadata"
+                crossorigin="anonymous"
+                onEnded={() => setIsPlaying(false)}
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
+                onVolumeChange={() => {
+                  if (videoRef) {
+                    setVolume(Math.round(videoRef.volume * 100));
+                  }
+                }}
+                onError={(e) => {
+                  const video = e.target as HTMLVideoElement;
+                  console.error('[MediaPlayer] Video error:', {
+                    code: video.error?.code,
+                    message: video.error?.message,
+                    url: viewerState.mediaUrl,
+                    networkState: video.networkState,
+                    readyState: video.readyState
+                  });
+                }}
+                onLoadedData={() => console.log('[MediaPlayer] Video loaded')}
+                onCanPlay={() => console.log('[MediaPlayer] Video can play')}
+                onLoadedMetadata={() => {
+                  console.log('[MediaPlayer] Video metadata loaded');
+                  if (videoRef) {
+                    videoRef.volume = volume() / 100;
+                  }
+                }}
+              />
+            </Show>
           </div>
         </div>
       </Show>
