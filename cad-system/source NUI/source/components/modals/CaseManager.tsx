@@ -605,7 +605,7 @@ export function CaseManager() {
                         class="btn-small"
                         onClick={() => viewEvidence(ev)}
                       >
-                        {[VIEW {ev.evidenceType.includes('VIDEO') ? 'VIDEO' : ev.evidenceType.includes('AUDIO') ? 'AUDIO' : 'IMAGE'}]}
+                        [VIEW {ev.evidenceType.includes('VIDEO') ? 'VIDEO' : ev.evidenceType.includes('AUDIO') ? 'AUDIO' : 'IMAGE'}]
                       </button>
                     </Show>
                   </div>
