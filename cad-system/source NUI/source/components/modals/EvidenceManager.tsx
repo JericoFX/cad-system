@@ -417,12 +417,31 @@ export function EvidenceManager() {
                   <button 
                     class="btn btn-primary" 
                     style={{ 'margin-top': '8px' }}
-                    onClick={() => viewerActions.openImage(
-                      (selectedEvidence()!.data as { url?: string }).url!,
-                      `${selectedEvidence()!.evidenceType} - ${('stagingId' in selectedEvidence()!) ? (selectedEvidence() as StagingEvidence).stagingId : (selectedEvidence() as Evidence).evidenceId}`
-                    )}
+                    onClick={() => {
+                      const ev = selectedEvidence()!;
+                      const url = (ev.data as { url?: string }).url!;
+                      const title = `${ev.evidenceType} - ${('stagingId' in ev) ? (ev as StagingEvidence).stagingId : (ev as Evidence).evidenceId}`;
+                      
+                      // Detect media type
+                      const isVideo = ev.evidenceType === 'VIDEO' || ev.evidenceType === 'VIDEO_URL' || url.match(/\.(mp4|webm|ogg|mov)$/i);
+                      const isAudio = ev.evidenceType === 'AUDIO' || ev.evidenceType === 'AUDIO_URL' || url.match(/\.(mp3|wav|ogg|m4a|aac)$/i);
+                      
+                      if (isVideo) {
+                        viewerActions.openVideo(url, title);
+                      } else if (isAudio) {
+                        viewerActions.openAudio(url, title);
+                      } else {
+                        viewerActions.openImage(url, title);
+                      }
+                    }}
                   >
-                    [VIEW IMAGE]
+                    [VIEW {(() => {
+                      const ev = selectedEvidence()!;
+                      const url = (ev.data as { url?: string }).url || '';
+                      const isVideo = ev.evidenceType === 'VIDEO' || ev.evidenceType === 'VIDEO_URL' || url.match(/\.(mp4|webm|ogg|mov)$/i);
+                      const isAudio = ev.evidenceType === 'AUDIO' || ev.evidenceType === 'AUDIO_URL' || url.match(/\.(mp3|wav|ogg|m4a|aac)$/i);
+                      return isVideo ? 'VIDEO' : isAudio ? 'AUDIO' : 'IMAGE';
+                    })()}]
                   </button>
                 </Show>
                 

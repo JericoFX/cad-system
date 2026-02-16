@@ -9487,15 +9487,14 @@ select option:hover {
 
 /* MediaPlayer Styles */
 .video-player {
-  width: 100vw;
-  height: 100vh;
-  max-width: 100vw;
-  max-height: 100vh;
+  width: 900px;
+  height: 680px;
+  max-width: 95vw;
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
-  background-color: black;
-  border: none;
-  padding: 0;
+  background-color: var(--terminal-bg);
+  border: 2px solid var(--terminal-border);
   position: relative;
 }
 
@@ -9522,13 +9521,14 @@ select option:hover {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 15px 20px;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), transparent);
+  padding: 10px 15px;
+  background-color: var(--terminal-bg);
+  border-bottom: 2px solid var(--terminal-border);
 }
 
 .video-controls-header h2 {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--font-size-small);
   color: var(--terminal-fg-bright);
   font-family: var(--font-terminal);
 }
@@ -9537,8 +9537,9 @@ select option:hover {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 20px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
+  padding: 15px;
+  background-color: var(--terminal-bg);
+  border-top: 2px solid var(--terminal-border);
   gap: 10px;
 }
 
@@ -9548,14 +9549,14 @@ select option:hover {
   align-items: center;
   justify-content: center;
   background-color: black;
-  padding-top: 50px;
 }
 
 .video-container video {
   max-width: 100%;
-  max-height: calc(100vh - 60px);
+  max-height: 100%;
   width: auto;
-  height: auto;
+  height: 100%;
+  object-fit: contain;
 }
 
 .audio-player {
@@ -9609,9 +9610,9 @@ select option:hover {
 
 .progress-bar-container {
   flex: 1;
-  height: 20px;
-  background-color: rgba(192, 192, 192, 0.2);
-  border: 1px solid var(--terminal-border-dim);
+  height: 18px;
+  background-color: var(--terminal-bg);
+  border: 2px solid var(--terminal-border);
   cursor: pointer;
   position: relative;
 }
@@ -9621,22 +9622,29 @@ select option:hover {
   height: 100%;
   position: relative;
   overflow: hidden;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent,
+    transparent 4px,
+    var(--terminal-border-dim) 4px,
+    var(--terminal-border-dim) 5px
+  );
 }
 
 .progress-bar-fill {
   height: 100%;
   background-color: var(--terminal-system);
   transition: width 0.1s ease;
+  opacity: 0.6;
 }
 
 .progress-bar-handle {
   position: absolute;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 12px;
-  height: 24px;
+  top: 0;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 100%;
   background-color: var(--terminal-fg-bright);
-  border: 1px solid var(--terminal-border);
   cursor: grab;
 }
 
@@ -9648,47 +9656,54 @@ select option:hover {
 .media-controls,
 .audio-controls {
   display: flex;
-  gap: 16px;
+  gap: 8px;
   margin-top: 20px;
 }
 
 .control-btn {
-  background-color: transparent;
-  border: 1px solid var(--terminal-border);
+  background-color: var(--terminal-bg);
+  border: 2px solid var(--terminal-border);
   color: var(--terminal-fg);
-  padding: 8px 12px;
+  padding: 4px 8px;
   font-family: var(--font-terminal);
-  font-size: 14px;
+  font-size: var(--font-size-small);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  min-width: 32px;
+  min-height: 28px;
 }
 
 .control-btn:hover {
-  background-color: rgba(192, 192, 192, 0.1);
-  border-color: var(--terminal-fg-bright);
+  background-color: var(--terminal-border);
+  color: var(--terminal-bg);
+}
+
+.control-btn:active {
+  background-color: var(--terminal-fg-bright);
 }
 
 .control-btn.active {
-  color: var(--terminal-system);
+  background-color: var(--terminal-system);
+  color: var(--terminal-bg);
   border-color: var(--terminal-system);
 }
 
 .control-btn svg {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   fill: currentColor;
 }
 
 .play-btn {
-  padding: 12px 16px;
+  padding: 6px 12px;
+  min-width: 44px;
 }
 
 .play-btn svg {
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
 }
 
 /* Volume */
@@ -9710,9 +9725,9 @@ select option:hover {
 
 .volume-bar-container {
   flex: 1;
-  height: 16px;
-  background-color: rgba(192, 192, 192, 0.2);
-  border: 1px solid var(--terminal-border-dim);
+  height: 14px;
+  background-color: var(--terminal-bg);
+  border: 2px solid var(--terminal-border);
   cursor: pointer;
   position: relative;
 }
@@ -9722,22 +9737,29 @@ select option:hover {
   height: 100%;
   position: relative;
   overflow: hidden;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent,
+    transparent 4px,
+    var(--terminal-border-dim) 4px,
+    var(--terminal-border-dim) 5px
+  );
 }
 
 .volume-bar-fill {
   height: 100%;
   background-color: var(--terminal-fg-dim);
   transition: width 0.1s ease;
+  opacity: 0.6;
 }
 
 .volume-bar-handle {
   position: absolute;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 10px;
-  height: 20px;
+  top: 0;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 100%;
   background-color: var(--terminal-fg-bright);
-  border: 1px solid var(--terminal-border);
   cursor: grab;
 }
 
