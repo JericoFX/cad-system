@@ -81,16 +81,25 @@ export function RadioPanel() {
     setMessageText('');
   };
   
+  const startTalk = () => {
+    if (!radioState.currentUser || isTalking()) return;
+    setIsTalking(true);
+    radioActions.setTalking(true);
+    playPTTStart();
+  };
+
+  const stopTalk = () => {
+    if (!isTalking()) return;
+    setIsTalking(false);
+    radioActions.setTalking(false);
+    playPTTEnd();
+  };
+
   const toggleTalk = () => {
-    const newState = !isTalking();
-    setIsTalking(newState);
-    radioActions.setTalking(newState);
-    
-    // Play PTT sounds
-    if (newState) {
-      playPTTStart();
+    if (isTalking()) {
+      stopTalk();
     } else {
-      playPTTEnd();
+      startTalk();
     }
   };
   

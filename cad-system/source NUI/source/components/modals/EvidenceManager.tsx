@@ -27,6 +27,17 @@ type SelectedEvidence = Evidence | StagingEvidence;
 
 const FileExplorer = (await import('../FileExplorer')).FileExplorer;
 
+const extractUrl = (data: unknown): string | null => {
+  if (!data || typeof data !== 'object') return null;
+  const d = data as Record<string, unknown>;
+  if (typeof d.url === 'string' && d.url.trim()) return d.url;
+  if (typeof d.metadata === 'object' && d.metadata !== null) {
+    const meta = d.metadata as Record<string, unknown>;
+    if (typeof meta.url === 'string' && meta.url.trim()) return meta.url;
+  }
+  return null;
+};
+
 export function EvidenceManager() {
   const [currentCase, setCurrentCase] = createSignal<Case | null>(null);
   const [selectedEvidence, setSelectedEvidence] = createSignal<SelectedEvidence | null>(null);
@@ -407,11 +418,11 @@ export function EvidenceManager() {
                 <div><strong>Type:</strong> {selectedEvidence()!.evidenceType}</div>
                 <div><strong>Date:</strong> {new Date(('createdAt' in selectedEvidence()!) ? (selectedEvidence() as StagingEvidence).createdAt : (selectedEvidence() as Evidence).attachedAt).toLocaleString()}</div>
                 
-                <Show when={(selectedEvidence()!.data as { url?: string })?.url}>
+                <Show when={extractUrl(selectedEvidence()!.data)}>
                   <div style={{ 'margin-top': '12px', 'word-break': 'break-all' }}>
                     <strong>URL:</strong><br/>
-                    <a href={(selectedEvidence()!.data as { url?: string }).url} target="_blank" style={{ color: '#00ffff' }}>
-                      {(selectedEvidence()!.data as { url?: string }).url}
+                    <a href={extractUrl(selectedEvidence()!.data)!} target="_blank" style={{ color: '#00ffff' }}>
+                      {extractUrl(selectedEvidence()!.data)}
                     </a>
                   </div>
                   <button 
@@ -419,10 +430,9 @@ export function EvidenceManager() {
                     style={{ 'margin-top': '8px' }}
                     onClick={() => {
                       const ev = selectedEvidence()!;
-                      const url = (ev.data as { url?: string }).url!;
+                      const url = extractUrl(ev.data)!;
                       const title = `${ev.evidenceType} - ${('stagingId' in ev) ? (ev as StagingEvidence).stagingId : (ev as Evidence).evidenceId}`;
                       
-                      // Detect media type
                       const isVideo = ev.evidenceType === 'VIDEO' || ev.evidenceType === 'VIDEO_URL' || url.match(/\.(mp4|webm|ogg|mov)$/i);
                       const isAudio = ev.evidenceType === 'AUDIO' || ev.evidenceType === 'AUDIO_URL' || url.match(/\.(mp3|wav|ogg|m4a|aac)$/i);
                       
@@ -437,7 +447,7 @@ export function EvidenceManager() {
                   >
                     [VIEW {(() => {
                       const ev = selectedEvidence()!;
-                      const url = (ev.data as { url?: string }).url || '';
+                      const url = extractUrl(ev.data) || '';
                       const isVideo = ev.evidenceType === 'VIDEO' || ev.evidenceType === 'VIDEO_URL' || url.match(/\.(mp4|webm|ogg|mov)$/i);
                       const isAudio = ev.evidenceType === 'AUDIO' || ev.evidenceType === 'AUDIO_URL' || url.match(/\.(mp3|wav|ogg|m4a|aac)$/i);
                       return isVideo ? 'VIDEO' : isAudio ? 'AUDIO' : 'IMAGE';

@@ -162,8 +162,10 @@ export function MediaPlayer() {
   });
 
   const getProgressPercent = () => {
-    if (duration() <= 0) return 0;
-    return (currentTime() / duration()) * 100;
+    const dur = duration();
+    if (dur <= 0 || !isFinite(dur)) return 0;
+    const percent = (currentTime() / dur) * 100;
+    return Math.min(100, Math.max(0, percent));
   };
 
   const renderControls = () => (
@@ -215,7 +217,7 @@ export function MediaPlayer() {
           style={{ width: '120px' }}
         >
           <div class='progress-bar-track'>
-            <div class='progress-bar-fill' style={{ width: `${volume()}%` }} />
+            <div class='progress-bar-fill' style={{ width: `${volume()}% ` }} />
           </div>
         </div>
         <span>{volume()}%</span>

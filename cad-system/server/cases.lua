@@ -97,6 +97,13 @@ local function saveCaseDb(caseObj)
 end
 
 lib.callback.register('cad:createCase', CAD.Auth.WithGuard('heavy', function(source, payload, officer)
+    -- Police, sheriff, dispatch, and EMS can create cases
+    local job = tostring(officer.job or ''):lower()
+    local allowedJobs = { police = true, sheriff = true, dispatch = true, ems = true, ambulance = true }
+    if not allowedJobs[job] and not officer.isAdmin then
+        return { ok = false, error = 'insufficient_permissions' }
+    end
+
     local title = CAD.Server.SanitizeString(payload.title, 255)
     if title == '' then
         return { ok = false, error = 'title_required' }
@@ -331,22 +338,34 @@ Badge: %s
     
     -- Create paper item if ox_inventory available
     local itemId = nil
-    if CAD.Config.Evidence and CAD.Config.Evidence.TicketItemName then
+    if GetResourceState('ox_inventory') == 'started' and CAD.Config.Evidence and CAD.Config.Evidence.TicketItemName then
         local itemName = CAD.Config.Evidence.TicketItemName
-        local metadata = {
-            caseId = caseId,
-            reportType = "CASE_REPORT",
-            printedBy = officer.name,
-            printedAt = CAD.Server.ToIso(),
-            description = string.format("Case %s Report", caseId)
-        }
         
-        local success, result = pcall(function()
-            return exports.ox_inventory:AddItem(source, itemName, 1, metadata)
+        -- Validate item exists in ox_inventory
+        local itemExists = pcall(function()
+            return exports.ox_inventory:GetItem(source, itemName, nil, false)
         end)
         
-        if success and result then
-            itemId = result
+        if itemExists then
+            local metadata = {
+                caseId = caseId,
+                reportType = "CASE_REPORT",
+                printedBy = officer.name,
+                printedAt = CAD.Server.ToIso(),
+                description = string.format("Case %s Report", caseId)
+            }
+            
+            local success, result = pcall(function()
+                return exports.ox_inventory:AddItem(source, itemName, 1, metadata)
+            end)
+            
+            if success and result then
+                itemId = result
+            else
+                CAD.Log('warn', 'Failed to add case report item for officer %s: %s', source, tostring(result))
+            end
+        else
+            CAD.Log('warn', 'Case report item %s does not exist in ox_inventory', itemName)
         end
     end
     

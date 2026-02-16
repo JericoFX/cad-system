@@ -14,7 +14,7 @@ CAD.Config = {
     -- Use 'auto' for mixed/shared setups.
     -- Force a value only if your server is single-framework.
     Framework = {
-        Preferred = 'auto', -- auto | qbox | qb-core | esx | standalone
+        Preferred = 'qb-core', -- auto | qbox | qb-core | esx | standalone
     },
 
     -- Feature toggles for backend + UI.

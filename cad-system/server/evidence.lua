@@ -183,3 +183,35 @@ lib.callback.register('cad:getCaseEvidence', CAD.Auth.WithGuard('default', funct
     end
     return caseObj.evidence or {}
 end))
+
+-- Debug callback to create evidence item from image URL
+lib.callback.register('cad:debug:createEvidenceItem', CAD.Auth.WithGuard('default', function(source, data)
+    if not CAD.Config.Debug then
+        return { ok = false, error = 'debug_disabled' }
+    end
+
+    if GetResourceState('ox_inventory') ~= 'started' then
+        return { ok = false, error = 'ox_inventory_not_available' }
+    end
+
+    local itemName = CAD.Config.Evidence and CAD.Config.Evidence.TicketItemName or 'cad_ticket'
+    local metadata = {
+        type = 'EVIDENCE',
+        evidenceType = data.evidenceType or 'PHOTO',
+        imageUrl = data.imageUrl,
+        description = data.description or 'Debug evidence',
+        createdAt = CAD.Server.ToIso(),
+        createdBy = CAD.Auth.GetOfficerData(source).name,
+        isCADEvidence = true,
+    }
+
+    local success, result = pcall(function()
+        return exports.ox_inventory:AddItem(source, itemName, 1, metadata)
+    end)
+
+    if success and result then
+        return { ok = true, itemId = result }
+    else
+        return { ok = false, error = 'inventory_error' }
+    end
+end))

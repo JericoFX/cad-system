@@ -1,8 +1,46 @@
 --[[
-C.A.D. System
+C.A.D. System - Exports for External Resources
 Created by JericoFX
 GitHub: https://github.com/JericoFX
 License: GNU GPL v3
+
+AVAILABLE EXPORTS:
+
+Dispatch Functions:
+- exports('cad-system'):CreateDispatchCall(data) - Create a new dispatch call
+  data = { type, priority, title, description, location, coordinates }
+  Returns: call object or nil
+
+- exports('cad-system'):GetActiveCalls() - Get all active dispatch calls
+  Returns: table of calls
+
+- exports('cad-system'):AssignUnit(callId, unitId) - Assign unit to call
+  Returns: boolean
+
+- exports('cad-system'):CloseDispatchCall(callId) - Close a dispatch call
+  Returns: boolean
+
+- exports('cad-system'):GetUnitStatus(unitId) - Get unit status
+  Returns: unit object or nil
+
+- exports('cad-system'):SetUnitStatus(unitId, statusCode) - Set unit status
+  Returns: boolean
+
+Case Functions:
+- exports('cad-system'):CreateCase(source, data) - Create a new case
+- exports('cad-system'):GetCase(caseId) - Get case by ID
+- exports('cad-system'):UpdateCase(caseId, data) - Update case
+- exports('cad-system'):CloseCase(caseId) - Close a case
+- exports('cad-system'):SearchCases(query) - Search cases
+
+Evidence Functions:
+- exports('cad-system'):CreateEvidenceBag(source, data) - Create evidence bag
+- exports('cad-system'):GetEvidenceById(evidenceId) - Get evidence
+- exports('cad-system'):AttachEvidenceToCase(source, evidenceId, caseId) - Attach evidence
+
+Utility Functions:
+- exports('cad-system'):CheckPermission(source, role) - Check if player has role
+- exports('cad-system'):GetOfficerData(source) - Get officer data
 ]]
 
 CAD = CAD or {}

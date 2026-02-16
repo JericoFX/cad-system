@@ -32,7 +32,11 @@ function CAD.Client.CollectEvidence(evidenceType, description)
 end
 
 if CAD.Config.Debug == true then
-    RegisterCommand('collectevidence', function()
+    -- Debug command using ox_lib
+    lib.addCommand('collectevidence', {
+        help = 'Debug: Collect evidence',
+        restricted = false,
+    }, function()
         local input = lib.inputDialog('Collect Evidence (Debug)', {
             { type = 'input', label = 'Evidence Type', placeholder = 'PHOTO / DOCUMENT / DNA', required = true },
             { type = 'textarea', label = 'Description', required = false },
@@ -43,5 +47,51 @@ if CAD.Config.Debug == true then
         end
 
         CAD.Client.CollectEvidence(input[1], input[2])
-    end, false)
+    end)
+
+    -- Debug command to create evidence item from image URL using ox_lib
+    lib.addCommand('cadevidencedebug', {
+        help = 'Debug: Create evidence item with image URL',
+        restricted = 'group.admin', -- Only admins can use this
+    }, function()
+        local input = lib.inputDialog('CAD Evidence Debug - Create Evidence Item', {
+            { type = 'input', label = 'Image URL', placeholder = 'https://i.imgur.com/example.jpg', required = true },
+            { type = 'input', label = 'Description', placeholder = 'Evidence description', required = false },
+            { type = 'select', label = 'Evidence Type', options = {
+                { value = 'PHOTO', label = '📷 Photo' },
+                { value = 'DOCUMENT', label = '📄 Document' },
+                { value = 'VIDEO', label = '🎥 Video' },
+            }, required = true },
+        })
+
+        if not input or not input[1] or input[1] == '' then
+            lib.notify({ title = 'CAD Debug', description = 'Cancelled or no URL provided', type = 'error' })
+            return
+        end
+
+        local imageUrl = input[1]
+        local description = input[2] or 'Debug evidence'
+        local evType = input[3] or 'PHOTO'
+
+        -- Call server to create evidence item
+        local result = lib.callback.await('cad:debug:createEvidenceItem', false, {
+            imageUrl = imageUrl,
+            description = description,
+            evidenceType = evType,
+        })
+
+        if result and result.ok then
+            lib.notify({
+                title = 'CAD Debug',
+                description = ('Created evidence item: %s'):format(result.itemId or 'ok'),
+                type = 'success',
+            })
+        else
+            lib.notify({
+                title = 'CAD Debug',
+                description = ('Failed: %s'):format(result and result.error or 'unknown'),
+                type = 'error',
+            })
+        end
+    end)
 end
