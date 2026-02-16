@@ -36,6 +36,7 @@ import { RadioMarkers } from './components/modals/RadioMarkers';
 import { BoloManager } from './components/modals/BoloManager';
 import { ForensicCollection } from './components/modals/ForensicCollection';
 import { ImageViewer } from './components/modals/ImageViewer';
+import { MediaPlayer } from './components/modals/MediaPlayer';
 import { CallsignPrompt } from './components/modals/CallsignPrompt';
 import { BrowserHelper } from './components/BrowserHelper';
 import { terminalState, terminalActions } from './stores/terminalStore';
@@ -207,12 +208,16 @@ export function App() {
             </Match>
           </Switch>
 
-          {viewerState.isOpen && (
+          {viewerState.isOpen && viewerState.mediaType === 'image' && (
             <ImageViewer
               images={viewerState.images}
               title={viewerState.title}
               onClose={viewerActions.close}
             />
+          )}
+
+          {viewerState.isOpen && (viewerState.mediaType === 'video' || viewerState.mediaType === 'audio') && (
+            <MediaPlayer />
           )}
 
           <SessionContextBar />

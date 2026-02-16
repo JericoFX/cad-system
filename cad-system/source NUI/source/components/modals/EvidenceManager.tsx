@@ -90,10 +90,8 @@ export function EvidenceManager() {
     
     Object.entries(cadState.cases).forEach(([caseId, caseData]) => {
       const evidenceList = caseData.evidence || [];
-      if (evidenceList.length === 0) {
-        return;
-      }
-
+      
+      // Always show case folder, even if empty
       const folderName = `📁 ${caseId} - ${caseData.title}`;
       files.push({
         name: folderName,
@@ -103,6 +101,7 @@ export function EvidenceManager() {
         icon: '📂'
       });
       
+      // Only add evidence files if they exist
       evidenceList.forEach(ev => {
         files.push({
           name: buildEvidenceFileName(ev.evidenceId, ev.evidenceType),
@@ -195,9 +194,45 @@ export function EvidenceManager() {
       }
       
       const url = data.url;
-      if (url && (url.endsWith('.jpg') || url.endsWith('.jpeg') || url.endsWith('.png') || url.endsWith('.gif') || url.endsWith('.webp') || url.includes('imgur') || url.includes('image'))) {
-        viewerActions.openImage(url, `${ev.evidenceType} - ${evidenceId}`);
-        return;
+      
+      // Helper functions for URL detection by extension only
+      const isImageUrl = (url: string): boolean => {
+        const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
+        const lower = url.toLowerCase();
+        return imageExtensions.some(ext => lower.endsWith(ext));
+      };
+
+      const isVideoUrl = (url: string): boolean => {
+        const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov'];
+        const lower = url.toLowerCase();
+        return videoExtensions.some(ext => lower.endsWith(ext));
+      };
+
+      const isAudioUrl = (url: string): boolean => {
+        const audioExtensions = ['.mp3', '.wav', '.ogg', '.m4a', '.aac'];
+        const lower = url.toLowerCase();
+        return audioExtensions.some(ext => lower.endsWith(ext));
+      };
+
+      // Priority: 1) evidenceType explicit, 2) URL extension
+      if (url) {
+        // VIDEO first (explicit type or extension)
+        if (ev.evidenceType === 'VIDEO' || isVideoUrl(url)) {
+          viewerActions.openVideo(url, `${ev.evidenceType} - ${evidenceId}`);
+          return;
+        }
+
+        // AUDIO second (explicit type or extension)
+        if (ev.evidenceType === 'AUDIO' || isAudioUrl(url)) {
+          viewerActions.openAudio(url, `${ev.evidenceType} - ${evidenceId}`);
+          return;
+        }
+
+        // IMAGE last (by extension only)
+        if (isImageUrl(url)) {
+          viewerActions.openImage(url, `${ev.evidenceType} - ${evidenceId}`);
+          return;
+        }
       }
 
       const hasDocumentPayload =

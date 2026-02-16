@@ -267,6 +267,24 @@ Includes simulated responses for:
 
 - `DOC.md` - module-by-module behavior and flow notes
 
+## Media capture options
+
+The CAD system supports integration with media capture services for screenshots, videos, and audio.
+
+### FiveMerr (Recommended)
+
+**Primary option** - Built by a friend with full API support for videos, audio, photos, and more.
+
+- Website: https://fivemerr.com/
+- Features: Video upload, audio, photos, API access
+
+### Medal (Alternative)
+
+Lagless screenshot and video capture with auto-clipping support.
+
+- GitHub: https://github.com/get-wrecked/fivem
+- CFX Forum: https://forum.cfx.re/t/free-medal-lagless-screenshots-event-auto-clipping/5355630
+
 ## Quick troubleshooting
 
 - CAD does not open:
