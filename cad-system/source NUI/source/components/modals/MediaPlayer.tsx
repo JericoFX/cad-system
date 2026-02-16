@@ -80,6 +80,7 @@ export function MediaPlayer() {
   };
 
   onMount(() => {
+    console.log('[MediaPlayer] Mounted with mediaType:', viewerState.mediaType, 'mediaUrl:', viewerState.mediaUrl);
     progressInterval = setInterval(() => {
       const media = videoRef || audioRef;
       if (media) {
@@ -232,7 +233,8 @@ export function MediaPlayer() {
             'flex-direction': 'column',
             'background-color': 'black',
             border: 'none',
-            padding: 0
+            padding: 0,
+            position: 'relative'
           }}
         >
           <div class="modal-header" style={{ 
@@ -240,29 +242,44 @@ export function MediaPlayer() {
             top: 0,
             left: 0,
             right: 0,
-            'z-index': 10,
-            'background-color': 'rgba(0, 0, 0, 0.7)'
+            'z-index': 100,
+            'background-color': 'rgba(0, 0, 0, 0.8)',
+            padding: '10px 20px'
           }}>
-            <h2>
+            <h2 style={{ margin: 0, 'font-size': '14px' }}>
               {viewerState.title ? `=== ${viewerState.title} ===` : '=== VIDEO PLAYER ==='}
             </h2>
-            <button class="modal-close" onClick={handleClose}>[X]</button>
+            <button class="modal-close" onClick={handleClose} style={{ 'font-size': '14px' }}>[X]</button>
           </div>
 
-          <video
-            ref={videoRef}
-            src={viewerState.mediaUrl || ''}
-            controls
-            autoplay
-            style={{
-              width: '100%',
-              height: '100%',
-              'object-fit': 'contain'
-            }}
-            onEnded={() => setIsPlaying(false)}
-            onPlay={() => setIsPlaying(true)}
-            onPause={() => setIsPlaying(false)}
-          />
+          <div style={{
+            flex: 1,
+            display: 'flex',
+            'align-items': 'center',
+            'justify-content': 'center',
+            'background-color': 'black',
+            'padding-top': '50px'
+          }}>
+            <video
+              ref={videoRef}
+              src={viewerState.mediaUrl || ''}
+              controls
+              autoplay
+              playsinline
+              preload="auto"
+              style={{
+                'max-width': '100%',
+                'max-height': 'calc(100vh - 60px)',
+                width: 'auto',
+                height: 'auto'
+              }}
+              onEnded={() => setIsPlaying(false)}
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
+              onError={(e) => console.error('[MediaPlayer] Video error:', e, 'URL:', viewerState.mediaUrl)}
+              onLoadedData={() => console.log('[MediaPlayer] Video loaded successfully')}
+            />
+          </div>
         </div>
       </Show>
     </div>
