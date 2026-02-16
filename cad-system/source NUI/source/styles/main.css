@@ -9484,3 +9484,251 @@ select option:hover {
   margin: 0;
   line-height: 1.6;
 }
+
+/* MediaPlayer Styles */
+.video-player {
+  width: 100vw;
+  height: 100vh;
+  max-width: 100vw;
+  max-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: black;
+  border: none;
+  padding: 0;
+  position: relative;
+}
+
+.video-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background-color: rgba(0, 0, 0, 0.8);
+  padding: 10px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.video-header h2 {
+  margin: 0;
+  font-size: 14px;
+  color: var(--terminal-fg-bright);
+}
+
+.video-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: black;
+  padding-top: 50px;
+}
+
+.video-container video {
+  max-width: 100%;
+  max-height: calc(100vh - 60px);
+  width: auto;
+  height: auto;
+}
+
+.audio-player {
+  width: 800px;
+  height: 600px;
+  max-width: 800px;
+  max-height: 600px;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--terminal-bg);
+  border: 2px solid var(--terminal-border);
+}
+
+.audio-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  gap: 20px;
+}
+
+.audio-icon {
+  font-size: 48px;
+  color: var(--terminal-system-bright);
+}
+
+.audio-icon svg {
+  width: 80px;
+  height: 80px;
+  fill: currentColor;
+}
+
+/* Progress Bar */
+.progress-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 600px;
+}
+
+.time-display {
+  font-family: var(--font-terminal);
+  font-size: 14px;
+  color: var(--terminal-fg);
+  min-width: 50px;
+  text-align: center;
+}
+
+.progress-bar-container {
+  flex: 1;
+  height: 20px;
+  background-color: rgba(192, 192, 192, 0.2);
+  border: 1px solid var(--terminal-border-dim);
+  cursor: pointer;
+  position: relative;
+}
+
+.progress-bar-track {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background-color: var(--terminal-system);
+  transition: width 0.1s ease;
+}
+
+.progress-bar-handle {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 12px;
+  height: 24px;
+  background-color: var(--terminal-fg-bright);
+  border: 1px solid var(--terminal-border);
+  cursor: grab;
+}
+
+.progress-bar-handle:active {
+  cursor: grabbing;
+}
+
+/* Audio Controls */
+.audio-controls {
+  display: flex;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.control-btn {
+  background-color: transparent;
+  border: 1px solid var(--terminal-border);
+  color: var(--terminal-fg);
+  padding: 8px 12px;
+  font-family: var(--font-terminal);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.control-btn:hover {
+  background-color: rgba(192, 192, 192, 0.1);
+  border-color: var(--terminal-fg-bright);
+}
+
+.control-btn.active {
+  color: var(--terminal-system);
+  border-color: var(--terminal-system);
+}
+
+.control-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.play-btn {
+  padding: 12px 16px;
+}
+
+.play-btn svg {
+  width: 32px;
+  height: 32px;
+}
+
+/* Volume */
+.volume-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+  width: 100%;
+  max-width: 300px;
+}
+
+.volume-container svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+  color: var(--terminal-fg);
+}
+
+.volume-bar-container {
+  flex: 1;
+  height: 16px;
+  background-color: rgba(192, 192, 192, 0.2);
+  border: 1px solid var(--terminal-border-dim);
+  cursor: pointer;
+  position: relative;
+}
+
+.volume-bar-track {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.volume-bar-fill {
+  height: 100%;
+  background-color: var(--terminal-fg-dim);
+  transition: width 0.1s ease;
+}
+
+.volume-bar-handle {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 10px;
+  height: 20px;
+  background-color: var(--terminal-fg-bright);
+  border: 1px solid var(--terminal-border);
+  cursor: grab;
+}
+
+.volume-bar-handle:active {
+  cursor: grabbing;
+}
+
+.volume-value {
+  font-family: var(--font-terminal);
+  font-size: 12px;
+  color: var(--terminal-fg);
+  min-width: 40px;
+  text-align: right;
+}
+
+.footer-text {
+  color: var(--terminal-fg-dim);
+  font-size: 12px;
+}

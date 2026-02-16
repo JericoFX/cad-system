@@ -206,8 +206,36 @@ export function CaseManager() {
     terminalActions.addLine('Evidence added', 'output');
   };
 
-  const viewEvidenceImage = (url: string) => {
-    viewerActions.openImage(url, 'Evidence');
+  const viewEvidence = (ev: Evidence) => {
+    const evidenceData = ev.data as { url?: string; description?: string };
+    const url = evidenceData.url || '';
+    const title = evidenceData.description || `Evidence - ${ev.evidenceId}`;
+    
+    switch (ev.evidenceType) {
+      case 'PHOTO_URL':
+      case 'PHOTO':
+        viewerActions.openImage(url, title);
+        break;
+      case 'VIDEO_URL':
+      case 'VIDEO':
+        viewerActions.openVideo(url, title);
+        break;
+      case 'AUDIO_URL':
+      case 'AUDIO':
+        viewerActions.openAudio(url, title);
+        break;
+      default:
+        // For other types, try to detect by URL extension
+        const lowerUrl = url.toLowerCase();
+        if (lowerUrl.match(/\.(mp4|webm|ogg|mov)$/)) {
+          viewerActions.openVideo(url, title);
+        } else if (lowerUrl.match(/\.(mp3|wav|ogg|m4a|aac)$/)) {
+          viewerActions.openAudio(url, title);
+        } else if (lowerUrl.match(/\.(jpg|jpeg|png|gif|webp)$/)) {
+          viewerActions.openImage(url, title);
+        }
+        break;
+    }
   };
 
   const addTask = () => {
@@ -526,6 +554,7 @@ export function CaseManager() {
               >
                 <option value="PHOTO_URL">Photo URL</option>
                 <option value="VIDEO_URL">Video URL</option>
+                <option value="AUDIO_URL">Audio URL</option>
                 <option value="DOCUMENT">Document</option>
                 <option value="PHYSICAL">Physical Item</option>
               </select>
@@ -557,6 +586,13 @@ export function CaseManager() {
                 {ev => (
                   (() => {
                     const evidenceData = ev.data as { url?: string; description?: string };
+                    const isViewable = ev.evidenceType === 'PHOTO_URL' || 
+                                       ev.evidenceType === 'PHOTO' ||
+                                       ev.evidenceType === 'VIDEO_URL' ||
+                                       ev.evidenceType === 'VIDEO' ||
+                                       ev.evidenceType === 'AUDIO_URL' ||
+                                       ev.evidenceType === 'AUDIO' ||
+                                       evidenceData.url?.match(/\.(jpg|jpeg|png|gif|webp|mp4|webm|mp3|wav|ogg|m4a)$/i);
                     return (
                   <div class="evidence-item">
                     <div class="evidence-header">
@@ -564,29 +600,13 @@ export function CaseManager() {
                       <span class="evidence-id">{ev.evidenceId}</span>
                     </div>
                     <div class="evidence-desc">{evidenceData.description || 'No description'}</div>
-                    <Show when={evidenceData.url}>
-                      <div class="evidence-url">
-                        <a 
-                          href={evidenceData.url} 
-                          target="_blank"
-                          onClick={(e) => {
-                            if (ev.evidenceType === 'PHOTO_URL') {
-                              e.preventDefault();
-                              viewEvidenceImage(evidenceData.url || '');
-                            }
-                          }}
-                        >
-                          {evidenceData.url?.substring(0, 50)}...
-                        </a>
-                      </div>
-                      <Show when={ev.evidenceType === 'PHOTO_URL'}>
-                        <button 
-                          class="btn-small"
-                          onClick={() => viewEvidenceImage(evidenceData.url || '')}
-                        >
-                          [VIEW IMAGE]
-                        </button>
-                      </Show>
+                    <Show when={evidenceData.url && isViewable}>
+                      <button 
+                        class="btn-small"
+                        onClick={() => viewEvidence(ev)}
+                      >
+                        {[VIEW {ev.evidenceType.includes('VIDEO') ? 'VIDEO' : ev.evidenceType.includes('AUDIO') ? 'AUDIO' : 'IMAGE'}]}
+                      </button>
                     </Show>
                   </div>
                     );
