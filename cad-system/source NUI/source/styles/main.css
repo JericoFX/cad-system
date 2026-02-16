@@ -9499,23 +9499,47 @@ select option:hover {
   position: relative;
 }
 
-.video-header {
+.video-controls-overlay {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  z-index: 100;
-  background-color: rgba(0, 0, 0, 0.8);
-  padding: 10px 20px;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.video-controls-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.video-controls-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 15px 20px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), transparent);
 }
 
-.video-header h2 {
+.video-controls-header h2 {
   margin: 0;
   font-size: 14px;
   color: var(--terminal-fg-bright);
+  font-family: var(--font-terminal);
+}
+
+.video-controls-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
+  gap: 10px;
 }
 
 .video-container {
@@ -9620,7 +9644,8 @@ select option:hover {
   cursor: grabbing;
 }
 
-/* Audio Controls */
+/* Media Controls */
+.media-controls,
 .audio-controls {
   display: flex;
   gap: 16px;
