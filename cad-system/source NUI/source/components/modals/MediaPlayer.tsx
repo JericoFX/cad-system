@@ -1,5 +1,4 @@
 import { Show, createSignal, onMount, onCleanup, createEffect } from 'solid-js';
-import { terminalActions } from '~/stores/terminalStore';
 import { viewerState, viewerActions } from '~/stores/viewerStore';
 
 export function MediaPlayer() {
@@ -33,7 +32,7 @@ export function MediaPlayer() {
       media.pause();
       media.currentTime = 0;
     }
-    terminalActions.setActiveModal(null);
+    // Only close viewer, don't close parent modal
     viewerActions.close();
   };
 
