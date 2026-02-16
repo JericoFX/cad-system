@@ -10,14 +10,12 @@ export function MediaPlayer() {
   const [isLooping, setIsLooping] = createSignal(false);
   const [isDragging, setIsDragging] = createSignal(false);
   const [isVolumeDragging, setIsVolumeDragging] = createSignal(false);
-  const [showControls, setShowControls] = createSignal(true);
 
   let videoRef: HTMLVideoElement | undefined;
   let audioRef: HTMLAudioElement | undefined;
   let progressInterval: ReturnType<typeof setInterval> | undefined;
   let progressBarRef: HTMLDivElement | undefined;
   let volumeBarRef: HTMLDivElement | undefined;
-  let controlsTimeout: ReturnType<typeof setTimeout> | undefined;
 
   const formatTime = (seconds: number): string => {
     if (!isFinite(seconds) || isNaN(seconds)) return '00:00';
@@ -29,9 +27,6 @@ export function MediaPlayer() {
   const handleClose = () => {
     if (progressInterval) {
       clearInterval(progressInterval);
-    }
-    if (controlsTimeout) {
-      clearTimeout(controlsTimeout);
     }
     const media = videoRef || audioRef;
     if (media) {
@@ -49,7 +44,7 @@ export function MediaPlayer() {
     if (isPlaying()) {
       media.pause();
     } else {
-      media.play().catch(err => {
+      media.play().catch((err) => {
         console.error('[MediaPlayer] Playback error:', err);
       });
     }
@@ -73,15 +68,6 @@ export function MediaPlayer() {
     const newLoop = !isLooping();
     media.loop = newLoop;
     setIsLooping(newLoop);
-  };
-
-  const toggleFullscreen = () => {
-    if (!videoRef) return;
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
-    } else {
-      videoRef.requestFullscreen();
-    }
   };
 
   const handleProgressBarClick = (e: MouseEvent) => {
@@ -135,18 +121,6 @@ export function MediaPlayer() {
     setIsVolumeDragging(false);
   };
 
-  const handleMouseMove = () => {
-    setShowControls(true);
-    if (controlsTimeout) {
-      clearTimeout(controlsTimeout);
-    }
-    controlsTimeout = setTimeout(() => {
-      if (isPlaying()) {
-        setShowControls(false);
-      }
-    }, 3000);
-  };
-
   createEffect(() => {
     if (isDragging() || isVolumeDragging()) {
       window.addEventListener('mousemove', handleProgressBarMouseMove);
@@ -162,11 +136,6 @@ export function MediaPlayer() {
   });
 
   onMount(() => {
-    console.log('[MediaPlayer] Mounted:', {
-      mediaType: viewerState.mediaType,
-      mediaUrl: viewerState.mediaUrl
-    });
-
     const media = videoRef || audioRef;
     if (media) {
       media.volume = volume() / 100;
@@ -187,9 +156,6 @@ export function MediaPlayer() {
     if (progressInterval) {
       clearInterval(progressInterval);
     }
-    if (controlsTimeout) {
-      clearTimeout(controlsTimeout);
-    }
     window.removeEventListener('mousemove', handleProgressBarMouseMove);
     window.removeEventListener('mousemove', handleVolumeMouseMove);
     window.removeEventListener('mouseup', handleProgressBarMouseUp);
@@ -201,136 +167,90 @@ export function MediaPlayer() {
     return (currentTime() / duration()) * 100;
   };
 
-  const getVolumePercent = () => {
-    return volume();
-  };
-
-  const renderControls = (isVideo: boolean) => (
+  const renderControls = () => (
     <>
       {/* Progress Bar */}
-      <div class="progress-container" style={isVideo ? { 'max-width': '800px' } : {}}>
-        <span class="time-display">{formatTime(currentTime())}</span>
-        <div 
-          class="progress-bar-container"
+      <div class='progress-container'>
+        <span class='time-display'>{formatTime(currentTime())}</span>
+        <div
+          class='progress-bar-container'
           ref={progressBarRef}
           onMouseDown={handleProgressBarMouseDown}
         >
-          <div class="progress-bar-track">
-            <div 
-              class="progress-bar-fill"
+          <div class='progress-bar-track'>
+            <div
+              class='progress-bar-fill'
               style={{ width: `${getProgressPercent()}%` }}
             />
           </div>
-          <div 
-            class="progress-bar-handle"
-            style={{ left: `${getProgressPercent()}%` }}
-          />
         </div>
-        <span class="time-display">{formatTime(duration())}</span>
+        <span class='time-display'>{formatTime(duration())}</span>
       </div>
 
       {/* Controls */}
-      <div class="media-controls" style={isVideo ? { 'margin-top': '15px' } : { 'margin-top': '20px' }}>
-        <button class="control-btn" onClick={() => seekRelative(-10)} title="Rewind 10s">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/>
-          </svg>
+      <div class='media-controls'>
+        <button class='btn' onClick={() => seekRelative(-10)}>
+          {'[<<]'}
         </button>
-        
-        <button class="control-btn play-btn" onClick={togglePlay} title={isPlaying() ? 'Pause' : 'Play'}>
-          {isPlaying() ? (
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-            </svg>
-          ) : (
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M8 5v14l11-7z"/>
-            </svg>
-          )}
+        <button class='btn btn-primary' onClick={togglePlay}>
+          {isPlaying() ? '[||]' : '[>]'}
         </button>
-        
-        <button class="control-btn" onClick={() => seekRelative(10)} title="Forward 10s">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/>
-          </svg>
+        <button class='btn' onClick={() => seekRelative(10)}>
+          {'[>>]'}
         </button>
-        
-        <button 
-          class={`control-btn ${isLooping() ? 'active' : ''}`} 
+        <button
+          class={`btn ${isLooping() ? 'btn-primary' : ''}`}
           onClick={toggleLoop}
-          title="Loop"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
-          </svg>
+          [R]
         </button>
-
-        {isVideo && (
-          <button class="control-btn" onClick={toggleFullscreen} title="Fullscreen">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
-            </svg>
-          </button>
-        )}
       </div>
 
       {/* Volume */}
-      <div class="volume-container" style={isVideo ? { 'margin-top': '15px', 'max-width': '250px' } : { 'margin-top': '20px' }}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
-        </svg>
-        <div 
-          class="volume-bar-container"
+      <div class='volume-container'>
+        <span>VOL:</span>
+        <div
+          class='progress-bar-container'
           ref={volumeBarRef}
           onMouseDown={handleVolumeMouseDown}
+          style={{ width: '120px' }}
         >
-          <div class="volume-bar-track">
-            <div 
-              class="volume-bar-fill"
-              style={{ width: `${getVolumePercent()}%` }}
-            />
+          <div class='progress-bar-track'>
+            <div class='progress-bar-fill' style={{ width: `${volume()}%` }} />
           </div>
-          <div 
-            class="volume-bar-handle"
-            style={{ left: `${getVolumePercent()}%` }}
-          />
         </div>
-        <span class="volume-value">{volume()}%</span>
+        <span>{volume()}%</span>
       </div>
     </>
   );
 
   return (
-    <div 
-      class="modal-overlay" 
-      onClick={handleClose}
-      style={{ 
-        'background-color': 'rgba(0, 0, 0, 0.95)',
-        display: 'flex',
-        'align-items': 'center',
-        'justify-content': 'center'
-      }}
-    >
-      <Show 
+    <div class='modal-overlay' onClick={handleClose}>
+      <Show
         when={viewerState.mediaType === 'video'}
         fallback={
           // AUDIO PLAYER
-          <div 
-            class="modal-content audio-player" 
+          <div
+            class='modal-content'
             onClick={(e) => e.stopPropagation()}
+            style={{ width: '600px' }}
           >
-            <div class="modal-header">
+            <div class='modal-header'>
               <h2>{viewerState.title || 'AUDIO PLAYER'}</h2>
-              <button class="modal-close" onClick={handleClose}>[X]</button>
+              <button class='modal-close' onClick={handleClose}>
+                [X]
+              </button>
             </div>
 
-            <div class="audio-content">
-              <div class="audio-icon">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-                </svg>
-              </div>
-
+            <div
+              style={{
+                padding: '20px',
+                display: 'flex',
+                'flex-direction': 'column',
+                'align-items': 'center',
+                gap: '15px',
+              }}
+            >
               <audio
                 ref={audioRef}
                 src={viewerState.mediaUrl || ''}
@@ -343,88 +263,104 @@ export function MediaPlayer() {
                   }
                 }}
                 onLoadedMetadata={() => {
-                  console.log('[MediaPlayer] Audio metadata loaded');
                   if (audioRef) {
                     audioRef.volume = volume() / 100;
                   }
                 }}
                 onError={(e) => {
                   const audio = e.target as HTMLAudioElement;
-                  console.error('[MediaPlayer] Audio error:', {
-                    code: audio.error?.code,
-                    message: audio.error?.message,
-                    url: viewerState.mediaUrl
-                  });
+                  console.error(
+                    '[MediaPlayer] Audio error:',
+                    audio.error?.message,
+                  );
                 }}
                 loop={isLooping()}
-                preload="auto"
+                preload='auto'
               />
 
-              {renderControls(false)}
+              {renderControls()}
             </div>
 
-            <div class="modal-footer">
-              <span class="footer-text">Audio playback</span>
-              <button class="btn" onClick={handleClose}>[CLOSE]</button>
+            <div class='modal-footer'>
+              <button class='btn' onClick={handleClose}>
+                [CLOSE]
+              </button>
             </div>
           </div>
         }
       >
-        {/* VIDEO PLAYER - Fullscreen with TUI controls */}
-        <div 
-          class="modal-content video-player" 
+        {/* VIDEO PLAYER */}
+        <div
+          class='modal-content'
           onClick={(e) => e.stopPropagation()}
-          onMouseMove={handleMouseMove}
+          style={{ width: '900px', height: '680px' }}
         >
-          <video
-            ref={videoRef}
-            src={viewerState.mediaUrl || ''}
-            playsinline
-            preload="metadata"
-            onEnded={() => setIsPlaying(false)}
-            onPlay={() => setIsPlaying(true)}
-            onPause={() => setIsPlaying(false)}
-            onVolumeChange={() => {
-              if (videoRef) {
-                setVolume(Math.round(videoRef.volume * 100));
-              }
-            }}
-            onError={(e) => {
-              const video = e.target as HTMLVideoElement;
-              console.error('[MediaPlayer] Video error:', {
-                code: video.error?.code,
-                message: video.error?.message,
-                url: viewerState.mediaUrl,
-                networkState: video.networkState,
-                readyState: video.readyState
-              });
-            }}
-            onLoadedData={() => console.log('[MediaPlayer] Video loaded')}
-            onCanPlay={() => console.log('[MediaPlayer] Video can play')}
-            onLoadedMetadata={() => {
-              console.log('[MediaPlayer] Video metadata loaded');
-              if (videoRef) {
-                videoRef.volume = volume() / 100;
-              }
-            }}
+          <div class='modal-header'>
+            <h2>{viewerState.title || 'VIDEO PLAYER'}</h2>
+            <button class='modal-close' onClick={handleClose}>
+              [X]
+            </button>
+          </div>
+
+          <div
             style={{
-              width: '100%',
-              height: '100%',
-              'object-fit': 'contain',
-              'background-color': 'black'
+              flex: 1,
+              display: 'flex',
+              'align-items': 'center',
+              'justify-content': 'center',
+              'background-color': 'black',
             }}
-          />
+          >
+            <video
+              ref={videoRef}
+              src={viewerState.mediaUrl || ''}
+              playsinline
+              preload='metadata'
+              onEnded={() => setIsPlaying(false)}
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
+              onVolumeChange={() => {
+                if (videoRef) {
+                  setVolume(Math.round(videoRef.volume * 100));
+                }
+              }}
+              onError={(e) => {
+                const video = e.target as HTMLVideoElement;
+                console.error(
+                  '[MediaPlayer] Video error:',
+                  video.error?.message,
+                );
+              }}
+              onLoadedMetadata={() => {
+                if (videoRef) {
+                  videoRef.volume = volume() / 100;
+                }
+              }}
+              style={{
+                'max-width': '100%',
+                'max-height': '100%',
+                'object-fit': 'contain',
+              }}
+            />
+          </div>
 
-          {/* Overlay Controls */}
-          <div class={`video-controls-overlay ${showControls() ? 'visible' : ''}`}>
-            <div class="video-controls-header">
-              <h2>{viewerState.title || 'VIDEO PLAYER'}</h2>
-              <button class="modal-close" onClick={handleClose}>[X]</button>
-            </div>
+          <div
+            style={{
+              padding: '15px',
+              display: 'flex',
+              'flex-direction': 'column',
+              'align-items': 'center',
+              gap: '10px',
+              'border-top': '2px solid var(--terminal-border)',
+            }}
+          >
+            {renderControls()}
+          </div>
 
-            <div class="video-controls-bottom">
-              {renderControls(true)}
-            </div>
+          <div class='modal-footer'>
+            <button class='btn' onClick={handleClose}>
+              [CLOSE]
+            </button>
           </div>
         </div>
       </Show>
