@@ -6,6 +6,14 @@ export function VehicleCAD() {
   const [radarActive, setRadarActive] = createSignal(true);
   const [licenseScanActive, setLicenseScanActive] = createSignal(false);
   const [scanProgress, setScanProgress] = createSignal(0);
+  const [attachedVehicle, setAttachedVehicle] = createSignal<{
+    plate: string;
+    model: string;
+    color: string;
+    owner: string;
+    status: string;
+    warrants: string[];
+  } | null>(null);
   const [radarData, setRadarData] = createSignal<{
     id: number;
     coords: { x: number; y: number; z: number };
@@ -17,6 +25,27 @@ export function VehicleCAD() {
   let radarCanvas: HTMLCanvasElement | undefined;
 
   const drawRadar = () => {
+
+  // Attach to vehicle
+  const attachToVehicle = () => {
+    // Find nearest vehicle
+    const nearest = radarData().sort((a, b) => a.distance - b.distance)[0];
+    if (!nearest) return;
+
+    // Mock vehicle data
+    const vehicle = {
+      plate: `MOCK-${Math.floor(Math.random() * 900) + 100}`,
+      model: 'police',
+      color: 'Black and White',
+      owner: 'CIT-123456',
+      status: nearest.isWanted ? 'WANTED' : 'NORMAL',
+      warrants: nearest.isWanted ? ['Speeding', 'Theft'] : []
+    };
+
+    setAttachedVehicle(vehicle);
+    terminalActions.addLine(`✓ Attached to vehicle: ${vehicle.plate}`, 'output');
+  };
+
     if (!radarCanvas || !radarActive()) return;
 
     const ctx = radarCanvas.getContext('2d');
@@ -162,6 +191,13 @@ export function VehicleCAD() {
                   [SCAN LICENSE]
                 </button>
                 
+                <button 
+                  class="btn"
+                  onClick={attachToVehicle}
+                >
+                  [VEHICLE INFO]
+                </button>
+                
                 {licenseScanActive() && (
                   <div class="scan-progress">
                     Scanning...
@@ -208,6 +244,28 @@ export function VehicleCAD() {
           <span>Speed: {cadState.vehicleSpeed.toFixed(1)} MPH | Radar Range: 100m</span>
           <button class="btn" onClick={() => terminalActions.setActiveModal(null)}>[CLOSE]</button>
         </div>
+
+        {/* Attached Vehicle Info */}
+        <Show when={attachedVehicle()}>
+          <div class="attached-vehicle">
+            <h3>ATTACHED VEHICLE: {attachedVehicle()!.plate}</h3>
+            <div class="vehicle-details">
+              <div>Model: {attachedVehicle()!.model}</div>
+              <div>Color: {attachedVehicle()!.color}</div>
+              <div>Owner: {attachedVehicle()!.owner}</div>
+              <div>Status: <span class={attachedVehicle()!.status === 'WANTED' ? 'status-wanted' : ''}>{attachedVehicle()!.status}</span></div>
+              <Show when={attachedVehicle()!.warrants.length > 0}>
+                <div>Warrants:
+                  <ul>
+                    <For each={attachedVehicle()!.warrants}>
+                      {warrant => <li>- {warrant}</li>}
+                    </For>
+                  </ul>
+                </div>
+              </Show>
+            </div>
+          </div>
+        </Show>
       </div>
     </div>
   );
