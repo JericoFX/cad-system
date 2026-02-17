@@ -286,6 +286,114 @@ export function CaseManager() {
     }
   };
 
+  const createNewCase = () => {
+    const newCaseId = `CASE_${Date.now()}`;
+    const newCase: Case = {
+      caseId: newCaseId,
+      title: 'New Case',
+      caseType: 'GENERAL',
+      status: 'OPEN',
+      priority: 3,
+      createdAt: new Date().toISOString(),
+      notes: [],
+      evidence: [],
+      tasks: []
+    };
+
+    cadActions.addCase(newCase);
+    selectCase(newCase);
+    
+    // Create dispatch call
+    createDispatchCall(newCase);
+    
+    terminalActions.addLine(`✓ Case ${newCaseId} created`, 'output');
+  };
+
+  const requestHelp = () => {
+    const caseItem = selectedCase();
+    if (!caseItem) {
+      terminalActions.addLine('No case selected to request help', 'error');
+      return;
+    }
+
+    // Create high priority dispatch
+    createDispatchCall(caseItem, true);
+    
+    terminalActions.addLine(`✓ Help requested for case ${caseItem.caseId}`, 'output');
+  };
+
+  const createDispatchCall = (caseItem: Case, isEmergency = false) => {
+    const dispatchData = {
+      callId: `CALL_${Date.now()}`,
+      type: caseItem.caseType,
+      priority: isEmergency ? 1 : caseItem.priority,
+      location: 'Auto-generated from case',
+      description: `Case: ${caseItem.title}`,
+      status: 'PENDING',
+      units: [],
+      createdAt: new Date().toISOString(),
+      subjects: [{
+        id: 'UNKNOWN',
+        name: 'Case Subjects',
+        description: 'Auto-generated from case'
+      }]
+    };
+
+    // Send to dispatch system
+    fetchNui('cad:dispatch:create', dispatchData);
+    
+    // Broadcast via radio
+    fetchNui('cad:radio:broadcast', {
+      channel: 'ALL_UNITS',
+      message: `10-3${isEmergency ? '1' : '2'}: ${caseItem.title} - ${caseItem.caseId}`
+    });
+  };
+
+  const generateFine = () => {
+    const caseItem = selectedCase();
+    if (!caseItem) return;
+
+    const input = lib.inputDialog('Create Fine', [
+      {
+        type: 'input',
+        label: 'Violation',
+        required: true,
+        placeholder: 'Speeding'
+      },
+      {
+        type: 'number',
+        label: 'Amount ($)',
+        required: true,
+        placeholder: '250',
+        min: 10,
+        max: 5000
+      },
+      {
+        type: 'textarea',
+        label: 'Notes',
+        required: false,
+        placeholder: 'Details about the violation...'
+      }
+    ]);
+
+    if (!input) return;
+
+    const [violation, amount, notes] = input;
+
+    const fine = {
+      fineId: `FINE_${Date.now()}`,
+      caseId: caseItem.caseId,
+      violation,
+      amount: Number(amount),
+      notes,
+      createdAt: new Date().toISOString(),
+      status: 'PENDING'
+    };
+
+    cadActions.addFine(fine);
+    terminalActions.addLine(`✓ Fine created: $${amount} for ${violation}`, 'output');
+  };
+
   return (
     <div class="modal-overlay" onClick={closeModal}>
       <div class="modal-content case-manager" onClick={e => e.stopPropagation()}>
@@ -340,45 +448,55 @@ export function CaseManager() {
               </div>
             </Show>
 
-            <div class="case-filters">
-              <input
-                type="text"
-                class="dos-input"
-                placeholder="Search cases..."
-                value={searchQuery()}
-                onInput={e => setSearchQuery(e.currentTarget.value)}
-              />
-              <select 
-                class="dos-select"
-                value={statusFilter()}
-                onChange={e => setStatusFilter(e.currentTarget.value)}
-              >
-                <option value="all">All Status</option>
-                <option value="OPEN">Open</option>
-                <option value="CLOSED">Closed</option>
-              </select>
-              <select 
-                class="dos-select"
-                value={typeFilter()}
-                onChange={e => setTypeFilter(e.currentTarget.value)}
-              >
-                <option value="all">All Types</option>
-                <For each={caseTypes()}>
-                  {type => <option value={type}>{type}</option>}
-                </For>
-              </select>
-              <select 
-                class="dos-select"
-                value={priorityFilter()}
-                onChange={e => setPriorityFilter(e.currentTarget.value)}
-              >
-                <option value="all">All Priorities</option>
-                <option value="1">Critical</option>
-                <option value="2">High</option>
-                <option value="3">Normal</option>
-                <option value="4">Low</option>
-              </select>
-            </div>
+         <div class="case-filters">
+           <input
+             type="text"
+             class="dos-input"
+             placeholder="Search cases..."
+             value={searchQuery()}
+             onInput={e => setSearchQuery(e.currentTarget.value)}
+           />
+           
+           <div class="case-actions">
+             <button class="btn btn-primary" onClick={createNewCase}>
+               [+ NEW CASE]
+             </button>
+             <button class="btn" onClick={requestHelp}>
+               [REQUEST HELP]
+             </button>
+           </div>
+           
+           <select 
+             class="dos-select"
+             value={statusFilter()}
+             onChange={e => setStatusFilter(e.currentTarget.value)}
+           >
+             <option value="all">All Status</option>
+             <option value="OPEN">Open</option>
+             <option value="CLOSED">Closed</option>
+           </select>
+           <select 
+             class="dos-select"
+             value={typeFilter()}
+             onChange={e => setTypeFilter(e.currentTarget.value)}
+           >
+             <option value="all">All Types</option>
+             <For each={caseTypes()}>
+               {type => <option value={type}>{type}</option>}
+             </For>
+           </select>
+           <select 
+             class="dos-select"
+             value={priorityFilter()}
+             onChange={e => setPriorityFilter(e.currentTarget.value)}
+           >
+             <option value="all">All Priorities</option>
+             <option value="1">Critical</option>
+             <option value="2">High</option>
+             <option value="3">Normal</option>
+             <option value="4">Low</option>
+           </select>
+         </div>
 
             <div class="cases-list">
               <Show when={filteredCases().length === 0}>

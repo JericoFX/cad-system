@@ -1,0 +1,81 @@
+--[[
+CAD ID-Based Person Search Integration
+Enables searching people by ID card directly from inventory
+]]
+
+-- Register ID card usage export
+exports('useIdCard', function(data)
+    local citizenId = data.metadata.citizenid
+    local firstname = data.metadata.firstname
+    local lastname = data.metadata.lastname
+
+    if not citizenId or citizenId == '' then
+        lib.notify({
+            title = 'CAD',
+            description = 'Invalid ID card data',
+            type = 'error'
+        })
+        return
+    end
+
+    -- Send to NUI for person search
+    SendNUIMessage({
+        action = 'searchPerson',
+        data = {
+            citizenId = citizenId,
+            name = (firstname and lastname) and (firstname .. ' ' .. lastname) or 'Unknown'
+        }
+    })
+
+    lib.notify({
+        title = 'CAD',
+        description = ('Searching person: %s'):format(citizenId),
+        type = 'inform'
+    })
+end)
+
+-- Register driver's license usage
+exports('useDriverLicense', function(data)
+    local citizenId = data.metadata.citizenid
+    
+    if not citizenId or citizenId == '' then
+        lib.notify({
+            title = 'CAD',
+            description = 'Invalid driver license data',
+            type = 'error'
+        })
+        return
+    end
+
+    SendNUIMessage({
+        action = 'searchPerson',
+        data = {
+            citizenId = citizenId,
+            name = (data.metadata.firstname .. ' ' .. data.metadata.lastname),
+            licenseType = 'DRIVER'
+        }
+    })
+    lib.notify({
+        title = 'CAD',
+        description = ('Searching driver: %s'):format(citizenId),
+        type = 'inform'
+    })
+end)
+
+-- Handle NUI response
+RegisterNUICallback('personSearchResult', function(data, cb)
+    if data.success then
+        lib.notify({
+            title = 'CAD',
+            description = ('Person found: %s'):format(data.citizenId),
+            type = 'success'
+        })
+    else
+        lib.notify({
+            title = 'CAD',
+            description = 'Person not found',
+            type = 'error'
+        })
+    end
+    cb({ ok = true })
+end)
