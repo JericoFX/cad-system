@@ -1050,64 +1050,52 @@ const mockHandlers: Record<string, (data: unknown) => unknown> = {
       return originalFetch(input, init);
     };
 
-    // Add browser command handler
+    // Handle NUI messages from mock environment
     window.addEventListener('message', (event) => {
-      if (event.data.action === 'terminalCommand') {
-        const command = event.data.command;
+      if (event.data.action === 'vehicleContext') {
+        terminalActions.setVehicleContext(event.data.data.isInVehicle);
+        terminalActions.setVehicleSpeed(event.data.data.speed || 0);
         
-        if (command.startsWith('/vehiclecad')) {
-          const isInVehicle = !cadState.isInVehicle;
-          window.postMessage({
-            action: 'vehicleContext',
-            data: {
-              isInVehicle,
-              speed: isInVehicle ? 35 : 0
-            }
-          }, '*');
-          
-          setTimeout(() => {
-            terminalActions.addLine(`✓ Vehicle CAD ${isInVehicle ? 'activated' : 'deactivated'}`, 'output');
-          }, 100);
-        }
-
-        if (command.startsWith('/scanplate')) {
-          window.postMessage({
-            action: 'scanLicense',
-            data: {
-              plate: `MOCK-${Math.floor(Math.random() * 900) + 100}`
-            }
-          }, '*');
-          
-          setTimeout(() => {
-            terminalActions.addLine('Scanning license plate...', 'output');
-          }, 100);
-        }
-
-        if (command.startsWith('/idsearch')) {
-          const citizenId = command.split(' ')[1];
-          if (!citizenId) {
-            setTimeout(() => {
-              terminalActions.addLine('✗ Usage: /idsearch CIT-123456', 'error');
-            }, 100);
-            return;
+        if (event.data.data.isInVehicle) {
+          terminalActions.addLine('✓ Vehicle CAD activated', 'system');
+          terminalActions.setActiveModal('VEHICLE_CAD');
+        } else {
+          terminalActions.addLine('✓ Vehicle CAD deactivated', 'system');
+          if (terminalState.activeModal === 'VEHICLE_CAD') {
+            terminalActions.setActiveModal(null);
           }
-
-          window.postMessage({
-            action: 'searchPerson',
-            data: {
-              citizenId,
-              name: 'Mock Person'
-            }
-          }, '*');
-          
-          setTimeout(() => {
-            terminalActions.addLine(`Searching person: ${citizenId}`, 'output');
-          }, 100);
         }
+      }
+
+      if (event.data.action === 'searchPerson') {
+        const person = mockPersonsData.find(p => p.citizenId === event.data.data.citizenId);
+        if (person) {
+          terminalActions.addLine(`✓ Person found: ${person.name}`, 'output');
+          terminalActions.setActiveModal('PERSON_SEARCH', {
+            personId: person.citizenId,
+            personData: person
+          });
+        } else {
+          terminalActions.addLine(`✗ Person not found`, 'error');
+        }
+      }
+
+      if (event.data.action === 'scanLicense') {
+        terminalActions.addLine(`✓ License scan complete: ${event.data.data.plate}`, 'output');
+        terminalActions.setActiveModal('VEHICLE_SEARCH', {
+          plate: event.data.data.plate,
+          vehicle: {
+            plate: event.data.data.plate,
+            model: 'police',
+            color: 'Black and White',
+            owner: 'CIT-123456',
+            status: 'STOLEN'
+          }
+        });
       }
     });
 
-    // Simulate vehicle context for browser testing
+    // Auto-simulate vehicle context for browser testing
     setTimeout(() => {
       window.postMessage({
         action: 'vehicleContext',
@@ -1117,6 +1105,17 @@ const mockHandlers: Record<string, (data: unknown) => unknown> = {
         }
       }, '*');
     }, 1000);
+
+    // Auto-simulate ID search for demonstration
+    setTimeout(() => {
+      window.postMessage({
+        action: 'searchPerson',
+        data: {
+          citizenId: 'CIT-123456',
+          name: 'John Doe'
+        }
+      }, '*');
+    }, 2000);
 
     console.log('[MOCK] NUI mock system initialized');
     console.log('[MOCK] Available mock data:');
