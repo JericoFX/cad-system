@@ -18,6 +18,9 @@ interface TerminalState {
   currentPath: string;
   activeModal: string | null;
   modalData: unknown;
+  isInPoliceVehicle: boolean;
+  uiMode: 'normal' | 'compact';
+  vehicleSpeed: number;
 }
 
 const bootLines = generateMiniBoot().map((content, index) => ({
@@ -35,6 +38,9 @@ const initialState: TerminalState = {
   currentPath: '/',
   activeModal: null,
   modalData: null,
+  isInPoliceVehicle: false,
+  uiMode: 'normal',
+  vehicleSpeed: 0,
 };
 
 export const [terminalState, setTerminalState] = createStore(initialState);
@@ -122,5 +128,27 @@ export const terminalActions = {
   
   clearAll: () => {
     setTerminalState({ ...initialState });
+  },
+  
+  setVehicleContext: (isInVehicle: boolean) => {
+    setTerminalState('isInPoliceVehicle', isInVehicle);
+  },
+  
+  setUIMode: (mode: 'normal' | 'compact') => {
+    setTerminalState('uiMode', mode);
+  },
+  
+  setVehicleSpeed: (speed: number) => {
+    setTerminalState('vehicleSpeed', speed);
+  },
+  
+  openVehicleCAD: () => {
+    terminalActions.setActiveModal('VEHICLE_CAD');
+  },
+  
+  closeVehicleCAD: () => {
+    if (terminalState.activeModal === 'VEHICLE_CAD') {
+      terminalActions.setActiveModal(null);
+    }
   },
 };
