@@ -1104,6 +1104,23 @@ const mockHandlers: Record<string, (data: unknown) => unknown> = {
           speed: 35
         }
       }, '*');
+      
+      // Simulate speed increase to trigger compact mode
+      let currentSpeed = 35;
+      const speedInterval = setInterval(() => {
+        currentSpeed += 5;
+        window.postMessage({
+          action: 'vehicleContext',
+          data: {
+            isInVehicle: true,
+            speed: currentSpeed
+          }
+        }, '*');
+        
+        if (currentSpeed >= 50) {
+          clearInterval(speedInterval);
+        }
+      }, 2000);
     }, 1000);
 
     // Auto-simulate ID search for demonstration
@@ -1118,6 +1135,7 @@ const mockHandlers: Record<string, (data: unknown) => unknown> = {
     }, 2000);
 
     console.log('[MOCK] NUI mock system initialized');
+    console.log('[MOCK] Speed simulation active - will reach compact mode in 3 seconds');
     console.log('[MOCK] Available mock data:');
     console.log(`  - Cases: ${Object.keys(mockCases).length}`);
     console.log(`  - Staging Evidence: ${mockStagingEvidence.length}`);
