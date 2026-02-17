@@ -285,6 +285,61 @@ Lagless screenshot and video capture with auto-clipping support.
 - GitHub: https://github.com/get-wrecked/fivem
 - CFX Forum: https://forum.cfx.re/t/free-medal-lagless-screenshots-event-auto-clipping/5355630
 
+## Vehicle Integration Testing Guide
+
+### Debug Commands for Vehicle CAD Testing
+
+| Command | Action |
+|---------|--------|
+| Press `F10` | Toggle vehicle CAD context |
+| `/vehiclecad` | Same as F10 (toggle on/off) |
+
+When activated:
+- Automatically opens Vehicle CAD interface
+- Simulates driving at 35 MPH
+- Radar system becomes active
+
+### License Scan Simulation
+| Command | Action |
+|---------|--------|
+| `/scanplate` | Simulate license plate scan |
+
+Example output:
+```
+> /scanplate
+✓ License scan complete: CAD-789
+```
+
+### Mock Radar Data
+When in vehicle CAD mode, radar automatically shows:
+- 1-2 vehicles within 100m range
+- 25% chance of a **WANTED** vehicle (shown in red)
+- Random distances and positions
+
+### UI Behavior Testing
+| Scenario | Expected Behavior |
+|----------|-------------------|
+| Speed > 40 MPH | UI switches to COMPACT MODE |
+| Speed < 10 MPH | UI returns to NORMAL MODE |
+| Not in vehicle CAD | Standard CAD interface shows |
+| Press X near vehicle | License scan animation plays |
+
+### Troubleshooting
+
+1. **Commands not working?**
+   - Verify `CAD.Config.Debug = true`
+   - Restart the resource after making config changes
+
+2. **No radar data showing?**
+   - Ensure you've activated vehicle CAD with F10
+   - Check browser console for NUI errors
+
+3. **UI not switching?**
+   - Confirm `terminalState.isInPoliceVehicle` is being updated
+   - Check vehicle_cad.lua for proper context detection
+
+> **Note**: These debug tools are automatically disabled in production (when `Debug = false`)
+
 ## Quick troubleshooting
 
 - CAD does not open:
