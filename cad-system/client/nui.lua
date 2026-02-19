@@ -1,4 +1,4 @@
-
+-- Function that i get invented because why not.
 
 local function wrapNui(name, handler)
     RegisterNUICallback(name, function(data, cb)

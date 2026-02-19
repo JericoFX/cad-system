@@ -1,6 +1,7 @@
-
+-- PARA EL JERICO DEL FUTURO, ESTO ES SOLO PARA QUE OX_INVENTORY SEPA USAR LAS COSAS
 
 exports('useIdCard', function(data)
+    -- Posiblemente necesite usar los datos de QB osea el GetPlayerData()
     local citizenId = data.metadata.citizenid
     local firstname = data.metadata.firstname
     local lastname = data.metadata.lastname

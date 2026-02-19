@@ -401,7 +401,7 @@ local function withDispatchGuard(bucket, handler)
         return handler(source, payload, officer)
     end)
 end
-
+-- Yes i love pcalls
 saveCallDb = function(call)
     local ok, err = pcall(function()
         MySQL.insert.await([[

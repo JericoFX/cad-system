@@ -1,4 +1,4 @@
-
+-- Modulo forence, intento hacer mas de lo que puedo, para que verga lo hago?
 
 CAD = CAD or {}
 CAD.ForensicClient = CAD.ForensicClient or {}
@@ -8,7 +8,7 @@ local textUiVisible = false
 local lastTraceRefresh = 0
 
 local function nearbyLab()
-    local ped = PlayerPedId()
+    local ped = cache.ped or PlayerPedId()
     if not ped or ped == 0 then return nil end
 
     local coords = GetEntityCoords(ped)
@@ -44,7 +44,7 @@ local function refreshNearbyTraces(force)
 end
 
 local function getNearestTrace()
-    local ped = PlayerPedId()
+    local ped = cache.ped or PlayerPedId()
     if not ped or ped == 0 then
         return nil
     end
@@ -162,7 +162,7 @@ RegisterCommand('forensiclab', function()
         type = 'inform',
     })
 end, false)
-
+-- Esto se tiene que quitar por puntos de ox
 CreateThread(function()
     while true do
         if CAD.IsFeatureEnabled and not CAD.IsFeatureEnabled('Forensics') then
@@ -219,6 +219,6 @@ RegisterCommand('forensictrace', function()
         lib.notify({ title = 'CAD', description = ('Trace created: %s'):format(response.trace.traceId), type = 'success' })
         refreshNearbyTraces(true)
     else
-        lib.notify({ title = 'CAD', description = ('Cannot create trace: %s'):format(response and response.error or 'unknown_error'), type = 'error' })
+        lib.notify({ title = 'CAD', description = ('Canot create trace: %s'):format(response and response.error or 'unknown_error'), type = 'error' })
     end
 end, false)

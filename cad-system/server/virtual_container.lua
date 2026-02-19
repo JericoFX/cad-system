@@ -1,4 +1,4 @@
-
+-- This is a way to not use stash from ox and use my own implementations, basically a table that handle the items... thats it
 
 CAD = CAD or {}
 CAD.VirtualContainer = CAD.VirtualContainer or {}
