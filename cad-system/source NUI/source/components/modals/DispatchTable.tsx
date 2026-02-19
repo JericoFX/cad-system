@@ -470,7 +470,7 @@ export function DispatchTable() {
   };
 
   const recommendedUnit = createMemo(() => {
-    // Tip rapido: si no hay unit libre o la call ya cerro, no sugerimos nada.
+    // Tip rapido: si no hay unit libre o la call ya cerro, no hacemos nada papu.
     const call = selectedCall();
     const settings = dispatchSettings();
     if (!call || call.status === 'CLOSED') {
@@ -830,8 +830,7 @@ export function DispatchTable() {
   };
 
   const autoAssignBestUnit = async () => {
-    // Single-click assignment using the current best suggestion.
-    const call = selectedCall();
+   const call = selectedCall();
     const suggestion = recommendedUnit();
 
     if (!call || call.status === 'CLOSED') {
@@ -960,7 +959,6 @@ export function DispatchTable() {
   createEffect(() => {
     const settings = dispatchSettings();
     // Solo reloj local para timestamps.
-    // Los datos llegan por estado publico de dispatch.
     const clockInterval = window.setInterval(() => {
       setNowMs(Date.now());
     }, settings.clockTickMs);

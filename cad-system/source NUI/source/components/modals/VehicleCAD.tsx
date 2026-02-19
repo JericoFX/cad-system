@@ -1,4 +1,11 @@
-import { createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js';
+import {
+  createMemo,
+  createSignal,
+  For,
+  onCleanup,
+  onMount,
+  Show,
+} from 'solid-js';
 import { appActions } from '~/stores/appStore';
 import { cadActions, type Person, type Vehicle } from '~/stores/cadStore';
 import {
@@ -170,8 +177,11 @@ export function VehicleCAD() {
   const [personQuery, setPersonQuery] = createSignal('');
   const [vehicles, setVehicles] = createSignal<LookupVehicle[]>([]);
   const [persons, setPersons] = createSignal<LookupPerson[]>([]);
-  const [selectedVehicle, setSelectedVehicle] = createSignal<LookupVehicle | null>(null);
-  const [selectedPerson, setSelectedPerson] = createSignal<LookupPerson | null>(null);
+  const [selectedVehicle, setSelectedVehicle] =
+    createSignal<LookupVehicle | null>(null);
+  const [selectedPerson, setSelectedPerson] = createSignal<LookupPerson | null>(
+    null,
+  );
   const [readerStatus, setReaderStatus] = createSignal('ID SLOT: UNKNOWN');
   const [loadingScan, setLoadingScan] = createSignal(false);
   const [loadingSearch, setLoadingSearch] = createSignal(false);
@@ -186,20 +196,26 @@ export function VehicleCAD() {
 
   const quickRiskColor = createMemo(() => {
     if (!quickLock()) return 'var(--terminal-fg-dim)';
-    if (quickLock()!.riskLevel === 'HIGH') return 'var(--terminal-error-bright)';
-    if (quickLock()!.riskLevel === 'MEDIUM') return 'var(--terminal-system-bright)';
+    if (quickLock()!.riskLevel === 'HIGH')
+      return 'var(--terminal-error-bright)';
+    if (quickLock()!.riskLevel === 'MEDIUM')
+      return 'var(--terminal-system-bright)';
     return 'var(--priority-low)';
   });
 
   const resolveReaderEndpoint = async (): Promise<string | null> => {
     try {
-      const vehicleReader = await fetchNui<VehicleReaderContext>('cad:vehicle:getReaderContext');
-      if (vehicleReader.ok && vehicleReader.hasReader && vehicleReader.endpointId) {
+      const vehicleReader = await fetchNui<VehicleReaderContext>(
+        'cad:vehicle:getReaderContext',
+      );
+      if (
+        vehicleReader.ok &&
+        vehicleReader.hasReader &&
+        vehicleReader.endpointId
+      ) {
         return vehicleReader.endpointId;
       }
-    } catch {
-      // caller handles no reader endpoint
-    }
+    } catch {}
 
     return null;
   };
@@ -212,12 +228,19 @@ export function VehicleCAD() {
     }
 
     try {
-      const response = await fetchNui<{ slots?: Array<{ slot: number }> }>('cad:idreader:getContainer', {
-        terminalId: endpointId,
-      });
+      const response = await fetchNui<{ slots?: Array<{ slot: number }> }>(
+        'cad:idreader:getContainer',
+        {
+          terminalId: endpointId,
+        },
+      );
 
-      const occupied = Array.isArray(response.slots) ? response.slots.length : 0;
-      setReaderStatus(occupied > 0 ? `ID SLOT: OCCUPIED (${occupied})` : 'ID SLOT: EMPTY');
+      const occupied = Array.isArray(response.slots)
+        ? response.slots.length
+        : 0;
+      setReaderStatus(
+        occupied > 0 ? `ID SLOT: OCCUPIED (${occupied})` : 'ID SLOT: EMPTY',
+      );
     } catch {
       setReaderStatus('ID SLOT: UNKNOWN');
     }
@@ -232,16 +255,22 @@ export function VehicleCAD() {
 
     setLoadingSearch(true);
     try {
-      const response = await fetchNui<LookupVehiclesResponse>('cad:lookup:searchVehicles', {
-        query: clean,
-        limit: 15,
-      });
+      const response = await fetchNui<LookupVehiclesResponse>(
+        'cad:lookup:searchVehicles',
+        {
+          query: clean,
+          limit: 15,
+        },
+      );
 
       const rows = Array.isArray(response.vehicles) ? response.vehicles : [];
       setVehicles(rows);
       rows.forEach((vehicle) => cadActions.addVehicle(vehicle));
     } catch (error) {
-      terminalActions.addLine(`Vehicle search failed: ${String(error)}`, 'error');
+      terminalActions.addLine(
+        `Vehicle search failed: ${String(error)}`,
+        'error',
+      );
     } finally {
       setLoadingSearch(false);
     }
@@ -256,16 +285,22 @@ export function VehicleCAD() {
 
     setLoadingSearch(true);
     try {
-      const response = await fetchNui<LookupPersonsResponse>('cad:lookup:searchPersons', {
-        query: clean,
-        limit: 15,
-      });
+      const response = await fetchNui<LookupPersonsResponse>(
+        'cad:lookup:searchPersons',
+        {
+          query: clean,
+          limit: 15,
+        },
+      );
 
       const rows = Array.isArray(response.persons) ? response.persons : [];
       setPersons(rows);
       rows.forEach((person) => cadActions.addPerson(person));
     } catch (error) {
-      terminalActions.addLine(`Person search failed: ${String(error)}`, 'error');
+      terminalActions.addLine(
+        `Person search failed: ${String(error)}`,
+        'error',
+      );
     } finally {
       setLoadingSearch(false);
     }
@@ -288,7 +323,10 @@ export function VehicleCAD() {
 
       setVehicleNotes(Array.isArray(response.notes) ? response.notes : []);
     } catch (error) {
-      terminalActions.addLine(`Vehicle notes failed: ${String(error)}`, 'error');
+      terminalActions.addLine(
+        `Vehicle notes failed: ${String(error)}`,
+        'error',
+      );
     } finally {
       setLoadingNotes(false);
     }
@@ -319,14 +357,20 @@ export function VehicleCAD() {
 
   const loadStops = async (plate?: string) => {
     try {
-      const response = await fetchNui<StopLogsResponse>('cad:vehicle:getRecentStops', {
-        plate: plate || '',
-        limit: 8,
-      });
+      const response = await fetchNui<StopLogsResponse>(
+        'cad:vehicle:getRecentStops',
+        {
+          plate: plate || '',
+          limit: 8,
+        },
+      );
 
       setRecentStops(Array.isArray(response.stops) ? response.stops : []);
     } catch (error) {
-      terminalActions.addLine(`Stop log unavailable: ${String(error)}`, 'error');
+      terminalActions.addLine(
+        `Stop log unavailable: ${String(error)}`,
+        'error',
+      );
     }
   };
 
@@ -374,7 +418,9 @@ export function VehicleCAD() {
 
     if (summary.ownerId) {
       await searchPersons(summary.ownerId);
-      const owner = persons().find((person) => person.citizenid === summary.ownerId) || null;
+      const owner =
+        persons().find((person) => person.citizenid === summary.ownerId) ||
+        null;
       if (owner) {
         setSelectedPerson(owner);
         await loadPersonNotes(owner.citizenid);
@@ -383,7 +429,7 @@ export function VehicleCAD() {
 
     terminalActions.addLine(
       `Front lock: ${summary.plate} (${summary.riskLevel}${summary.riskTags.length > 0 ? ` / ${summary.riskTags.join(', ')}` : ''})`,
-      'output'
+      'output',
     );
   };
 
@@ -392,7 +438,9 @@ export function VehicleCAD() {
 
     setLoadingScan(true);
     try {
-      const scan = await fetchNui<ScanResult>('cad:vehicle:scanFront', { maxDistance: 70 });
+      const scan = await fetchNui<ScanResult>('cad:vehicle:scanFront', {
+        maxDistance: 70,
+      });
       await lockFront(scan);
     } catch (error) {
       terminalActions.addLine(`Manual scan failed: ${String(error)}`, 'error');
@@ -410,9 +458,12 @@ export function VehicleCAD() {
     }
 
     try {
-      const list = await fetchNui<ReaderListResponse>('cad:idreader:listDocuments', {
-        terminalId: endpointId,
-      });
+      const list = await fetchNui<ReaderListResponse>(
+        'cad:idreader:listDocuments',
+        {
+          terminalId: endpointId,
+        },
+      );
 
       const docs = Array.isArray(list.documents) ? list.documents : [];
       if (!list.ok || docs.length === 0) {
@@ -480,7 +531,10 @@ export function VehicleCAD() {
         setVehicleQuery(vehicle.plate);
         await loadVehicleNotes(vehicle.plate);
         await loadStops(vehicle.plate);
-        terminalActions.addLine(`Reader vehicle loaded: ${vehicle.plate}`, 'output');
+        terminalActions.addLine(
+          `Reader vehicle loaded: ${vehicle.plate}`,
+          'output',
+        );
         return;
       }
 
@@ -491,7 +545,10 @@ export function VehicleCAD() {
         setTab('person');
         setPersonQuery(person.citizenid);
         await loadPersonNotes(person.citizenid);
-        terminalActions.addLine(`Reader person loaded: ${person.firstName} ${person.lastName}`, 'output');
+        terminalActions.addLine(
+          `Reader person loaded: ${person.firstName} ${person.lastName}`,
+          'output',
+        );
         return;
       }
 
@@ -501,7 +558,10 @@ export function VehicleCAD() {
     }
   };
 
-  const addNote = async (entityType: 'PERSON' | 'VEHICLE', entityId: string) => {
+  const addNote = async (
+    entityType: 'PERSON' | 'VEHICLE',
+    entityId: string,
+  ) => {
     const content = noteContent().trim();
     if (!content) {
       terminalActions.addLine('Write a note first', 'error');
@@ -522,7 +582,10 @@ export function VehicleCAD() {
       } else {
         await loadPersonNotes(entityId);
       }
-      terminalActions.addLine(`${entityType} note saved (${entityId})`, 'output');
+      terminalActions.addLine(
+        `${entityType} note saved (${entityId})`,
+        'output',
+      );
     } catch (error) {
       terminalActions.addLine(`Could not save note: ${String(error)}`, 'error');
     }
@@ -537,16 +600,22 @@ export function VehicleCAD() {
     const initialTitle = selectedV
       ? `Traffic stop - ${selectedV.plate}`
       : lock
-      ? `Traffic stop - ${lock.plate}`
-      : 'Traffic stop';
+        ? `Traffic stop - ${lock.plate}`
+        : 'Traffic stop';
 
     const initialDescription = [
       `Source: Vehicle Tablet`,
       `Created: ${now}`,
       lock ? `Locked Plate: ${lock.plate}` : null,
-      lock ? `Risk: ${lock.riskLevel}${lock.riskTags.length > 0 ? ` (${lock.riskTags.join(', ')})` : ''}` : null,
-      selectedV ? `Vehicle: ${selectedV.year} ${selectedV.make} ${selectedV.model}` : null,
-      selectedP ? `Person: ${selectedP.firstName} ${selectedP.lastName} (${selectedP.citizenid})` : null,
+      lock
+        ? `Risk: ${lock.riskLevel}${lock.riskTags.length > 0 ? ` (${lock.riskTags.join(', ')})` : ''}`
+        : null,
+      selectedV
+        ? `Vehicle: ${selectedV.year} ${selectedV.make} ${selectedV.model}`
+        : null,
+      selectedP
+        ? `Person: ${selectedP.firstName} ${selectedP.lastName} (${selectedP.citizenid})`
+        : null,
       lock?.noteHint ? `Hint: ${lock.noteHint}` : null,
     ]
       .filter(Boolean)
@@ -554,7 +623,9 @@ export function VehicleCAD() {
 
     terminalActions.setActiveModal('CASE_CREATOR', {
       personId: selectedP?.citizenid,
-      personName: selectedP ? `${selectedP.firstName} ${selectedP.lastName}` : undefined,
+      personName: selectedP
+        ? `${selectedP.firstName} ${selectedP.lastName}`
+        : undefined,
       initialTitle,
       initialDescription,
       initialPriority: lock?.riskLevel === 'HIGH' ? 1 : 2,
@@ -575,7 +646,8 @@ export function VehicleCAD() {
     void refreshReaderStatus();
     void loadStops();
 
-    const modalData = (terminalState.modalData as { plate?: string } | null) || null;
+    const modalData =
+      (terminalState.modalData as { plate?: string } | null) || null;
     if (modalData?.plate) {
       setVehicleQuery(modalData.plate);
       void searchVehicles(modalData.plate);
@@ -597,7 +669,7 @@ export function VehicleCAD() {
       }}
     >
       <div
-        class="modal-content"
+        class='modal-content'
         style={{
           width: 'min(96vw, 1600px)',
           height: 'min(92vh, 980px)',
@@ -605,40 +677,57 @@ export function VehicleCAD() {
           'flex-direction': 'column',
         }}
       >
-        <div class="modal-header">
+        <div class='modal-header'>
           <h2>VEHICLE TABLET - TRAFFIC STOP</h2>
           <div style={{ color: quickRiskColor(), 'font-size': '12px' }}>
             {quickLock()
               ? `LOCK ${quickLock()!.plate} / ${quickLock()!.riskLevel}`
               : 'NO FRONT LOCK'}
           </div>
-          <button class="modal-close" onClick={closeModal}>
+          <button class='modal-close' onClick={closeModal}>
             [X]
           </button>
         </div>
 
-        <div style={{ padding: '10px', display: 'flex', gap: '8px', 'flex-wrap': 'wrap' }}>
-          <Button.Root class="btn btn-primary" onClick={() => void runManualScan()} disabled={loadingScan()}>
+        <div
+          style={{
+            padding: '10px',
+            display: 'flex',
+            gap: '8px',
+            'flex-wrap': 'wrap',
+          }}
+        >
+          <Button.Root
+            class='btn btn-primary'
+            onClick={() => void runManualScan()}
+            disabled={loadingScan()}
+          >
             [{loadingScan() ? 'SCANNING...' : 'LOCK FRONT'}]
           </Button.Root>
-          <Button.Root class="btn" onClick={() => void readInsertedDocument()}>
+          <Button.Root class='btn' onClick={() => void readInsertedDocument()}>
             [READ ID]
           </Button.Root>
-          <Button.Root class="btn" onClick={() => void insertDocument()}>
+          <Button.Root class='btn' onClick={() => void insertDocument()}>
             [INSERT ID]
           </Button.Root>
-          <Button.Root class="btn" onClick={() => void ejectDocument()}>
+          <Button.Root class='btn' onClick={() => void ejectDocument()}>
             [EJECT]
           </Button.Root>
-          <Button.Root class="btn" onClick={createCaseFromStop}>
+          <Button.Root class='btn' onClick={createCaseFromStop}>
             [CREATE CASE]
           </Button.Root>
-          <span style={{ color: 'var(--terminal-fg-dim)', 'align-self': 'center' }}>{readerStatus()}</span>
+          <span
+            style={{ color: 'var(--terminal-fg-dim)', 'align-self': 'center' }}
+          >
+            {readerStatus()}
+          </span>
         </div>
 
         <Tabs.Root
           value={tab()}
-          onValueChange={(value) => setTab(value as 'vehicle' | 'person' | 'notes')}
+          onValueChange={(value) =>
+            setTab(value as 'vehicle' | 'person' | 'notes')
+          }
           style={{ margin: '0 10px' }}
         >
           <Tabs.List>
@@ -650,24 +739,28 @@ export function VehicleCAD() {
 
         <div style={{ flex: '1', overflow: 'auto', padding: '10px' }}>
           <Show when={tab() === 'vehicle'}>
-            <div class="search-toolbar">
+            <div class='search-toolbar'>
               <Input.Root
-                type="text"
-                class="dos-input"
+                type='text'
+                class='dos-input'
                 value={vehicleQuery()}
                 onInput={(e) => setVehicleQuery(e.currentTarget.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') void searchVehicles(vehicleQuery());
                 }}
-                placeholder="Plate / owner / model"
+                placeholder='Plate / owner / model'
               />
-              <Button.Root class="btn" onClick={() => void searchVehicles(vehicleQuery())} disabled={loadingSearch()}>
+              <Button.Root
+                class='btn'
+                onClick={() => void searchVehicles(vehicleQuery())}
+                disabled={loadingSearch()}
+              >
                 [SEARCH]
               </Button.Root>
             </div>
 
-            <div class="search-content">
-              <div class="search-results-panel">
+            <div class='search-content'>
+              <div class='search-results-panel'>
                 <For each={vehicles()}>
                   {(vehicle) => (
                     <div
@@ -678,53 +771,80 @@ export function VehicleCAD() {
                         void loadStops(vehicle.plate);
                       }}
                     >
-                      <div class="result-plate">{vehicle.plate}</div>
-                      <div class="result-vehicle">{vehicle.year} {vehicle.make} {vehicle.model}</div>
-                      <div class="result-color">Owner: {vehicle.ownerName}</div>
+                      <div class='result-plate'>{vehicle.plate}</div>
+                      <div class='result-vehicle'>
+                        {vehicle.year} {vehicle.make} {vehicle.model}
+                      </div>
+                      <div class='result-color'>Owner: {vehicle.ownerName}</div>
                     </div>
                   )}
                 </For>
                 <Show when={vehicles().length === 0}>
-                  <div class="dispatch-empty">No vehicles in results.</div>
+                  <div class='dispatch-empty'>No vehicles in results.</div>
                 </Show>
               </div>
 
-              <div class="vehicle-details-panel">
-                <Show when={selectedVehicle()} fallback={<div class="dispatch-empty">Select vehicle.</div>}>
-                  <div class="info-grid">
-                    <div class="info-item">
+              <div class='vehicle-details-panel'>
+                <Show
+                  when={selectedVehicle()}
+                  fallback={<div class='dispatch-empty'>Select vehicle.</div>}
+                >
+                  <div class='info-grid'>
+                    <div class='info-item'>
                       <label>Plate</label>
-                      <span class="value plate-value">{selectedVehicle()!.plate}</span>
+                      <span class='value plate-value'>
+                        {selectedVehicle()!.plate}
+                      </span>
                     </div>
-                    <div class="info-item">
+                    <div class='info-item'>
                       <label>Owner</label>
-                      <span class="value">{selectedVehicle()!.ownerName}</span>
+                      <span class='value'>{selectedVehicle()!.ownerName}</span>
                     </div>
-                    <div class="info-item full-width">
+                    <div class='info-item full-width'>
                       <label>Vehicle</label>
-                      <span class="value">{selectedVehicle()!.year} {selectedVehicle()!.make} {selectedVehicle()!.model}</span>
+                      <span class='value'>
+                        {selectedVehicle()!.year} {selectedVehicle()!.make}{' '}
+                        {selectedVehicle()!.model}
+                      </span>
                     </div>
-                    <div class="info-item full-width">
+                    <div class='info-item full-width'>
                       <label>Flags</label>
-                      <span class="value">
-                        {selectedVehicle()!.flags.length > 0 ? selectedVehicle()!.flags.join(', ') : 'NONE'}
+                      <span class='value'>
+                        {selectedVehicle()!.flags.length > 0
+                          ? selectedVehicle()!.flags.join(', ')
+                          : 'NONE'}
                       </span>
                     </div>
                   </div>
 
                   <div style={{ 'margin-top': '10px' }}>
                     <Textarea.Root
-                      class="dos-textarea"
+                      class='dos-textarea'
                       rows={3}
                       value={noteContent()}
                       onInput={(e) => setNoteContent(e.currentTarget.value)}
-                      placeholder="Vehicle note..."
+                      placeholder='Vehicle note...'
                     />
-                    <div style={{ display: 'flex', gap: '8px', 'margin-top': '6px', 'align-items': 'center' }}>
-                      <Button.Root class="btn" onClick={() => setImportantNote(!importantNote())}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: '8px',
+                        'margin-top': '6px',
+                        'align-items': 'center',
+                      }}
+                    >
+                      <Button.Root
+                        class='btn'
+                        onClick={() => setImportantNote(!importantNote())}
+                      >
                         [{importantNote() ? 'X' : ' '}] IMPORTANT
                       </Button.Root>
-                      <Button.Root class="btn btn-primary" onClick={() => void addNote('VEHICLE', selectedVehicle()!.plate)}>
+                      <Button.Root
+                        class='btn btn-primary'
+                        onClick={() =>
+                          void addNote('VEHICLE', selectedVehicle()!.plate)
+                        }
+                      >
                         [SAVE VEHICLE NOTE]
                       </Button.Root>
                     </div>
@@ -735,24 +855,28 @@ export function VehicleCAD() {
           </Show>
 
           <Show when={tab() === 'person'}>
-            <div class="search-toolbar">
+            <div class='search-toolbar'>
               <Input.Root
-                type="text"
-                class="dos-input"
+                type='text'
+                class='dos-input'
                 value={personQuery()}
                 onInput={(e) => setPersonQuery(e.currentTarget.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') void searchPersons(personQuery());
                 }}
-                placeholder="Citizen ID / first / last"
+                placeholder='Citizen ID / first / last'
               />
-              <Button.Root class="btn" onClick={() => void searchPersons(personQuery())} disabled={loadingSearch()}>
+              <Button.Root
+                class='btn'
+                onClick={() => void searchPersons(personQuery())}
+                disabled={loadingSearch()}
+              >
                 [SEARCH]
               </Button.Root>
             </div>
 
-            <div class="search-content">
-              <div class="search-results-panel">
+            <div class='search-content'>
+              <div class='search-results-panel'>
                 <For each={persons()}>
                   {(person) => (
                     <div
@@ -762,51 +886,80 @@ export function VehicleCAD() {
                         void loadPersonNotes(person.citizenid);
                       }}
                     >
-                      <div class="result-name">{person.firstName} {person.lastName}</div>
-                      <div class="result-id">CID: {person.citizenid}</div>
-                      <div class="result-meta">DOB: {person.dateOfBirth || 'UNKNOWN'}</div>
+                      <div class='result-name'>
+                        {person.firstName} {person.lastName}
+                      </div>
+                      <div class='result-id'>CID: {person.citizenid}</div>
+                      <div class='result-meta'>
+                        DOB: {person.dateOfBirth || 'UNKNOWN'}
+                      </div>
                     </div>
                   )}
                 </For>
                 <Show when={persons().length === 0}>
-                  <div class="dispatch-empty">No persons in results.</div>
+                  <div class='dispatch-empty'>No persons in results.</div>
                 </Show>
               </div>
 
-              <div class="vehicle-details-panel">
-                <Show when={selectedPerson()} fallback={<div class="dispatch-empty">Select person.</div>}>
-                  <div class="info-grid">
-                    <div class="info-item">
+              <div class='vehicle-details-panel'>
+                <Show
+                  when={selectedPerson()}
+                  fallback={<div class='dispatch-empty'>Select person.</div>}
+                >
+                  <div class='info-grid'>
+                    <div class='info-item'>
                       <label>Name</label>
-                      <span class="value">{selectedPerson()!.firstName} {selectedPerson()!.lastName}</span>
+                      <span class='value'>
+                        {selectedPerson()!.firstName}{' '}
+                        {selectedPerson()!.lastName}
+                      </span>
                     </div>
-                    <div class="info-item">
+                    <div class='info-item'>
                       <label>Citizen ID</label>
-                      <span class="value">{selectedPerson()!.citizenid}</span>
+                      <span class='value'>{selectedPerson()!.citizenid}</span>
                     </div>
-                    <div class="info-item">
+                    <div class='info-item'>
                       <label>DOB</label>
-                      <span class="value">{selectedPerson()!.dateOfBirth || 'UNKNOWN'}</span>
+                      <span class='value'>
+                        {selectedPerson()!.dateOfBirth || 'UNKNOWN'}
+                      </span>
                     </div>
-                    <div class="info-item">
+                    <div class='info-item'>
                       <label>Phone</label>
-                      <span class="value">{selectedPerson()!.phone || 'UNKNOWN'}</span>
+                      <span class='value'>
+                        {selectedPerson()!.phone || 'UNKNOWN'}
+                      </span>
                     </div>
                   </div>
 
                   <div style={{ 'margin-top': '10px' }}>
                     <Textarea.Root
-                      class="dos-textarea"
+                      class='dos-textarea'
                       rows={3}
                       value={noteContent()}
                       onInput={(e) => setNoteContent(e.currentTarget.value)}
-                      placeholder="Person note..."
+                      placeholder='Person note...'
                     />
-                    <div style={{ display: 'flex', gap: '8px', 'margin-top': '6px', 'align-items': 'center' }}>
-                      <Button.Root class="btn" onClick={() => setImportantNote(!importantNote())}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: '8px',
+                        'margin-top': '6px',
+                        'align-items': 'center',
+                      }}
+                    >
+                      <Button.Root
+                        class='btn'
+                        onClick={() => setImportantNote(!importantNote())}
+                      >
                         [{importantNote() ? 'X' : ' '}] IMPORTANT
                       </Button.Root>
-                      <Button.Root class="btn btn-primary" onClick={() => void addNote('PERSON', selectedPerson()!.citizenid)}>
+                      <Button.Root
+                        class='btn btn-primary'
+                        onClick={() =>
+                          void addNote('PERSON', selectedPerson()!.citizenid)
+                        }
+                      >
                         [SAVE PERSON NOTE]
                       </Button.Root>
                     </div>
@@ -817,80 +970,99 @@ export function VehicleCAD() {
           </Show>
 
           <Show when={tab() === 'notes'}>
-            <div class="dispatch-grid">
-              <div class="dispatch-section">
+            <div class='dispatch-grid'>
+              <div class='dispatch-section'>
                 <h3>VEHICLE IMPORTANT NOTES</h3>
-                <Show when={!loadingNotes()} fallback={<div class="dispatch-empty">Loading...</div>}>
+                <Show
+                  when={!loadingNotes()}
+                  fallback={<div class='dispatch-empty'>Loading...</div>}
+                >
                   <For each={vehicleNotes()}>
                     {(note) => (
-                      <div class="dispatch-item">
-                        <div class="dispatch-item-header">
-                          <span class="dispatch-item-title">{note.important ? 'IMPORTANT' : 'NOTE'}</span>
-                          <span>{new Date(note.timestamp).toLocaleString()}</span>
+                      <div class='dispatch-item'>
+                        <div class='dispatch-item-header'>
+                          <span class='dispatch-item-title'>
+                            {note.important ? 'IMPORTANT' : 'NOTE'}
+                          </span>
+                          <span>
+                            {new Date(note.timestamp).toLocaleString()}
+                          </span>
                         </div>
-                        <div class="dispatch-item-meta">{note.content}</div>
+                        <div class='dispatch-item-meta'>{note.content}</div>
                       </div>
                     )}
                   </For>
                   <Show when={vehicleNotes().length === 0}>
-                    <div class="dispatch-empty">No notes for selected vehicle.</div>
+                    <div class='dispatch-empty'>
+                      No notes for selected vehicle.
+                    </div>
                   </Show>
                 </Show>
               </div>
 
-              <div class="dispatch-section">
+              <div class='dispatch-section'>
                 <h3>PERSON IMPORTANT NOTES</h3>
-                <Show when={!loadingNotes()} fallback={<div class="dispatch-empty">Loading...</div>}>
+                <Show
+                  when={!loadingNotes()}
+                  fallback={<div class='dispatch-empty'>Loading...</div>}
+                >
                   <For each={personNotes()}>
                     {(note) => (
-                      <div class="dispatch-item">
-                        <div class="dispatch-item-header">
-                          <span class="dispatch-item-title">{note.important ? 'IMPORTANT' : 'NOTE'}</span>
-                          <span>{new Date(note.timestamp).toLocaleString()}</span>
+                      <div class='dispatch-item'>
+                        <div class='dispatch-item-header'>
+                          <span class='dispatch-item-title'>
+                            {note.important ? 'IMPORTANT' : 'NOTE'}
+                          </span>
+                          <span>
+                            {new Date(note.timestamp).toLocaleString()}
+                          </span>
                         </div>
-                        <div class="dispatch-item-meta">{note.content}</div>
+                        <div class='dispatch-item-meta'>{note.content}</div>
                       </div>
                     )}
                   </For>
                   <Show when={personNotes().length === 0}>
-                    <div class="dispatch-empty">No notes for selected person.</div>
+                    <div class='dispatch-empty'>
+                      No notes for selected person.
+                    </div>
                   </Show>
                 </Show>
               </div>
 
-              <div class="dispatch-section">
+              <div class='dispatch-section'>
                 <h3>RECENT STOP LOG</h3>
                 <For each={recentStops()}>
                   {(stop) => (
-                    <div class="dispatch-item">
-                      <div class="dispatch-item-header">
-                        <span class="dispatch-item-title">{stop.plate}</span>
+                    <div class='dispatch-item'>
+                      <div class='dispatch-item-header'>
+                        <span class='dispatch-item-title'>{stop.plate}</span>
                         <span>{stop.riskLevel}</span>
                       </div>
-                      <div class="dispatch-item-meta">
-                        {new Date(stop.createdAt).toLocaleString()} - {stop.vehicleModel || 'UNKNOWN'}
+                      <div class='dispatch-item-meta'>
+                        {new Date(stop.createdAt).toLocaleString()} -{' '}
+                        {stop.vehicleModel || 'UNKNOWN'}
                       </div>
                       <Show when={stop.noteHint}>
-                        <div class="dispatch-item-meta">{stop.noteHint}</div>
+                        <div class='dispatch-item-meta'>{stop.noteHint}</div>
                       </Show>
                     </div>
                   )}
                 </For>
                 <Show when={recentStops().length === 0}>
-                  <div class="dispatch-empty">No recent stops.</div>
+                  <div class='dispatch-empty'>No recent stops.</div>
                 </Show>
               </div>
             </div>
           </Show>
         </div>
 
-        <div class="modal-footer">
+        <div class='modal-footer'>
           <span>
             {quickLock()
               ? `LOCKED ${quickLock()!.plate} / ${quickLock()!.riskLevel} / ${quickLock()!.riskTags.join(', ') || 'NONE'}`
               : 'NO LOCKED FRONT VEHICLE'}
           </span>
-          <Button.Root class="btn" onClick={closeModal}>
+          <Button.Root class='btn' onClick={closeModal}>
             [CLOSE]
           </Button.Root>
         </div>

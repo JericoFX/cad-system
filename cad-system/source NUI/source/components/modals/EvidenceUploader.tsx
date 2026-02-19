@@ -12,7 +12,6 @@ const sanitizeUrl = (url: string): { valid: boolean; sanitized: string; error?: 
     return { valid: false, sanitized: '', error: 'URL cannot be empty' };
   }
   
-  // 1. Check for dangerous protocols
   const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:'];
   const lowerUrl = sanitized.toLowerCase();
   
@@ -22,12 +21,9 @@ const sanitizeUrl = (url: string): { valid: boolean; sanitized: string; error?: 
     }
   }
   
-  // 2. Add https if missing
   if (!sanitized.match(/^https?:\/\//i)) {
     sanitized = 'https://' + sanitized;
   }
-  
-  // 3. Validate URL format
   let urlObj: URL;
   try {
     urlObj = new URL(sanitized);
@@ -35,25 +31,21 @@ const sanitizeUrl = (url: string): { valid: boolean; sanitized: string; error?: 
     return { valid: false, sanitized: '', error: 'Invalid URL format' };
   }
   
-  // 4. Check URL length
   if (sanitized.length > 2048) {
     return { valid: false, sanitized: '', error: 'URL too long (max 2048 characters)' };
   }
   
-  // 5. Basic image validation - just check if URL looks like an image
   const pathname = urlObj.pathname.toLowerCase();
   const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'];
   const hasImageExtension = imageExtensions.some(ext => pathname.endsWith(ext));
 
   if (!hasImageExtension && !urlObj.search.toLowerCase().includes('image')) {
-    // Allow URLs without extension - will be validated by trying to load
     console.log('[EvidenceUploader] URL without image extension, will validate by loading');
   }
 
   return { valid: true, sanitized };
 };
 
-// Validate image content by attempting to load it
 const validateImageContent = async (url: string): Promise<{ valid: boolean; error?: string }> => {
   return new Promise((resolve) => {
     const img = new Image();
@@ -63,7 +55,6 @@ const validateImageContent = async (url: string): Promise<{ valid: boolean; erro
 
     img.onload = () => {
       clearTimeout(timeout);
-      // Only check if image has valid dimensions (> 1px)
       if (img.width < 1 || img.height < 1) {
         resolve({ valid: false, error: 'Invalid image dimensions' });
       } else {
@@ -172,7 +163,6 @@ export function EvidenceUploader() {
       }
       finalUrl = sanitization.sanitized;
       
-      // Validate image content
       const contentValidation = await validateImageContent(finalUrl);
       if (!contentValidation.valid) {
         setValidationError(contentValidation.error || 'Invalid image content');
@@ -230,7 +220,6 @@ export function EvidenceUploader() {
         
         cadActions.addCaseEvidence(caseId, evidence);
         
-        // Show success notification
         setUploadSuccess(true);
         setTimeout(() => {
           setUploadSuccess(false);

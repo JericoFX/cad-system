@@ -29,7 +29,6 @@ export function PhotoReleaseModal(props: PhotoReleaseModalProps) {
     setError(null);
 
     try {
-      // Calculate expiry date
       const days = parseInt(expiryDays());
       const expiryDate = days > 0 
         ? new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString()

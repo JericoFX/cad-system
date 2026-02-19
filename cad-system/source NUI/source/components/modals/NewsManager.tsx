@@ -15,7 +15,6 @@ import {
 import type { PhotoMetadata } from '~/stores/photoStore';
 import { Button, Modal, Tabs } from '~/components/ui';
 
-// Lazy load photo components
 const NewsPhotoImporter = lazy(() => import('./NewsPhotoImporter').then(m => ({ default: m.NewsPhotoImporter })));
 const ReleasedEvidenceFeed = lazy(() => import('./ReleasedEvidenceFeed').then(m => ({ default: m.ReleasedEvidenceFeed })));
 
@@ -296,7 +295,6 @@ export function NewsManager() {
     setGallery(gallery().filter((_, i) => i !== index));
   };
   
-  // Handle imported photos from camera
   const handlePhotosImported = (photos: PhotoMetadata[]) => {
     setGallery((prev) => [
       ...prev,
@@ -598,7 +596,6 @@ export function NewsManager() {
           <Show when={activeTab() === 'released'}>
             <ReleasedEvidenceFeed 
               onPhotoSelect={(photo) => {
-                // Add selected photo to gallery
                 setGallery([...gallery(), { 
                   url: photo.photoUrl, 
                   caption: photo.description || `Released evidence - ${photo.photoId}`

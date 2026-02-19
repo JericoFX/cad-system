@@ -33,7 +33,6 @@ export function MediaPlayer() {
       media.pause();
       media.currentTime = 0;
     }
-    // Only close viewer, don't close parent modal
     viewerActions.close();
   };
 
@@ -227,11 +226,10 @@ export function MediaPlayer() {
   );
 
   return (
-        <Modal.Root onClose={handleClose} useContentWrapper={false}>
+    <Modal.Root onClose={handleClose} useContentWrapper={false}>
       <Show
         when={viewerState.mediaType === 'video'}
         fallback={
-          // AUDIO PLAYER
           <div
             class='modal-content'
             onClick={(e) => e.stopPropagation()}

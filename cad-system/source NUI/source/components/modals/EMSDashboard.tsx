@@ -210,7 +210,6 @@ export function EMSDashboard() {
   };
 
   const getBloodAnalysisProgress = (request: BloodSampleRequest) => {
-    // Progress bar: elapsed time / total duration.
     const durationMs = Number(request.analysisDurationMs || 0);
     if (durationMs <= 0) {
       return 0;
@@ -248,7 +247,7 @@ export function EMSDashboard() {
   };
 
   const loadBloodRequests = async () => {
-    // Trae la cola desde backend y la pinta en pantalla.
+    // Trae la cola desde backend y la manda a la pantalla.
     setBloodLoading(true);
 
     try {
@@ -342,7 +341,6 @@ export function EMSDashboard() {
 
   createEffect(() => {
     const refreshMs = hasActiveBloodAnalysis() ? 3000 : 12000;
-    // Refresh faster while analysis is running to keep ETA accurate.
     const refreshTimer = window.setInterval(() => {
       void loadBloodRequests();
     }, refreshMs);
@@ -444,7 +442,6 @@ export function EMSDashboard() {
   };
 
   const handleHandoff = (patient: Patient) => {
-    // Require an active case to avoid orphaning the handoff report.
     if (!cadState.currentCase) {
       terminalActions.addLine('No active case. Create or select a case first.', 'error');
       terminalActions.addLine('Use: case create <type> <title>', 'output');

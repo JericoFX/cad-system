@@ -9,7 +9,6 @@ import { featureState, featureActions } from '~/stores/featureStore';
 
 export function HomeScreen() {
   const handleAction = (action: { command?: string; modal?: string }) => {
-    // Close the entire CAD application
     appActions.hide();
     
     if (action.modal) {

@@ -1,3 +1,4 @@
+// Dont have a fucking idea of that this does but is nice
 import { createEffect, createSignal, onCleanup } from 'solid-js';
 import { hackerState, type HackerLine } from '~/stores/hackerStore';
 
@@ -9,7 +10,6 @@ type HackerTerminalBgProps = {
   class?: string;
 };
 
-// PRNG seedable
 function mulberry32(seed: number) {
   return function () {
     let t = (seed += 0x6d2b79f5);
@@ -54,34 +54,97 @@ function port(rng: () => number) {
 function makeLineFactory(seed: number) {
   const rng = mulberry32(seed);
 
-  const verbs = ['INIT', 'SCAN', 'PROBE', 'AUTH', 'BYPASS', 'INJECT', 'DUMP', 'PATCH', 'HOOK', 'TRACE', 'SNIFF', 'CRACK', 'SYNC', 'RESOLVE', 'EXFIL', 'VERIFY'];
-  const targets = ['gateway', 'edge-node', 'auth-service', 'db-cluster', 'cdn', 'vault', 'telemetry', 'router', 'proxy', 'kernel', 'hypervisor', 'daemon', 'control-plane'];
-  const statuses = ['OK', 'WARN', 'FAIL', 'RETRY', 'TIMEOUT', 'DENIED', 'GRANTED', 'PARTIAL'];
-  const hints = ['rotating keys', 'salt=auto', 'ttl=15s', 'backoff=2x', 'cipher=aes-256-gcm', 'sig=ed25519', 'mode=stealth', 'cache=warm', 'delta=+0.42ms', 'pktloss=0.3%'];
+  const verbs = [
+    'INIT',
+    'SCAN',
+    'PROBE',
+    'AUTH',
+    'BYPASS',
+    'INJECT',
+    'DUMP',
+    'PATCH',
+    'HOOK',
+    'TRACE',
+    'SNIFF',
+    'CRACK',
+    'SYNC',
+    'RESOLVE',
+    'EXFIL',
+    'VERIFY',
+  ];
+  const targets = [
+    'gateway',
+    'edge-node',
+    'auth-service',
+    'db-cluster',
+    'cdn',
+    'vault',
+    'telemetry',
+    'router',
+    'proxy',
+    'kernel',
+    'hypervisor',
+    'daemon',
+    'control-plane',
+  ];
+  const statuses = [
+    'OK',
+    'WARN',
+    'FAIL',
+    'RETRY',
+    'TIMEOUT',
+    'DENIED',
+    'GRANTED',
+    'PARTIAL',
+  ];
+  const hints = [
+    'rotating keys',
+    'salt=auto',
+    'ttl=15s',
+    'backoff=2x',
+    'cipher=aes-256-gcm',
+    'sig=ed25519',
+    'mode=stealth',
+    'cache=warm',
+    'delta=+0.42ms',
+    'pktloss=0.3%',
+  ];
 
   const formats: Array<() => string> = [
-    () => `${pick(rng, verbs)} ${pick(rng, targets)} :: ${pick(rng, statuses)} (${pick(rng, hints)})`,
-    () => `tcp://${ip(rng)}:${port(rng)} -> ${ip(rng)}:${port(rng)}  SYN ACK  seq=0x${hex(rng, 8)}`,
-    () => `sha256:${hex(rng, 64)}  file=blob_${hex(rng, 6)}.bin  size=${((rng() * 9000) | 0) + 512}B`,
+    () =>
+      `${pick(rng, verbs)} ${pick(rng, targets)} :: ${pick(rng, statuses)} (${pick(rng, hints)})`,
+    () =>
+      `tcp://${ip(rng)}:${port(rng)} -> ${ip(rng)}:${port(rng)}  SYN ACK  seq=0x${hex(rng, 8)}`,
+    () =>
+      `sha256:${hex(rng, 64)}  file=blob_${hex(rng, 6)}.bin  size=${((rng() * 9000) | 0) + 512}B`,
     () => `SQL> SELECT * FROM sessions WHERE token='${hex(rng, 24)}' LIMIT 1;`,
-    () => `mem[0x${hex(rng, 8)}]=0x${hex(rng, 8)}  op=write  pid=${((rng() * 9000) | 0) + 100}`,
-    () => `trace: ${pick(rng, targets)}.${pick(rng, ['start', 'step', 'commit', 'rollback', 'finalize'])}() latency=${((rng() * 120) | 0) + 1}ms`,
-    () => `jwt=${hex(rng, 16)}.${hex(rng, 24)}.${hex(rng, 12)}  aud=${pick(rng, ['api', 'panel', 'svc', 'edge'])}`,
-    () => `netstat -tuln | grep ESTABLISHED | wc -l = ${((rng() * 50) | 0) + 10}`,
+    () =>
+      `mem[0x${hex(rng, 8)}]=0x${hex(rng, 8)}  op=write  pid=${((rng() * 9000) | 0) + 100}`,
+    () =>
+      `trace: ${pick(rng, targets)}.${pick(rng, ['start', 'step', 'commit', 'rollback', 'finalize'])}() latency=${((rng() * 120) | 0) + 1}ms`,
+    () =>
+      `jwt=${hex(rng, 16)}.${hex(rng, 24)}.${hex(rng, 12)}  aud=${pick(rng, ['api', 'panel', 'svc', 'edge'])}`,
+    () =>
+      `netstat -tuln | grep ESTABLISHED | wc -l = ${((rng() * 50) | 0) + 10}`,
     () => `ps aux | grep cad_daemon | awk '{print $2}' > /var/run/cad.pid`,
-    () => `openssl enc -aes-256-cbc -in /dev/urandom -out /tmp/${hex(rng, 8)}.enc -k ${hex(rng, 32)}`,
-    () => `curl -X POST https://api.internal/v1/${pick(rng, ['auth', 'sync', 'log', 'config'])}/ --data '${hex(rng, 64)}'`,
-    () => `rsync -avz --progress /var/log/cad/ backup@backup.local:/backups/cad/${hex(rng, 8)}/`,
-    () => `grep -r "${hex(rng, 8)}" /var/cad/evidence/ | head -n ${((rng() * 10) | 0) + 1}`,
+    () =>
+      `openssl enc -aes-256-cbc -in /dev/urandom -out /tmp/${hex(rng, 8)}.enc -k ${hex(rng, 32)}`,
+    () =>
+      `curl -X POST https://api.internal/v1/${pick(rng, ['auth', 'sync', 'log', 'config'])}/ --data '${hex(rng, 64)}'`,
+    () =>
+      `rsync -avz --progress /var/log/cad/ backup@backup.local:/backups/cad/${hex(rng, 8)}/`,
+    () =>
+      `grep -r "${hex(rng, 8)}" /var/cad/evidence/ | head -n ${((rng() * 10) | 0) + 1}`,
     () => `df -h /var | tail -1 | awk '{print $5}' # disk usage check`,
-    () => `tail -f /var/log/cad/system.log | grep ${pick(rng, ['ERROR', 'WARN', 'INFO', 'DEBUG'])}`,
-    () => `uptime # load average: ${(rng() * 2).toFixed(2)}, ${(rng() * 2).toFixed(2)}, ${(rng() * 2).toFixed(2)}`,
+    () =>
+      `tail -f /var/log/cad/system.log | grep ${pick(rng, ['ERROR', 'WARN', 'INFO', 'DEBUG'])}`,
+    () =>
+      `uptime # load average: ${(rng() * 2).toFixed(2)}, ${(rng() * 2).toFixed(2)}, ${(rng() * 2).toFixed(2)}`,
   ];
 
   return () => `[${timestamp(rng)}] ${formats[(rng() * formats.length) | 0]()}`;
 }
 
-// Ring buffer: O(1) push, no crece infinito, no memory leak
 function createRingBuffer(capacity: number) {
   const arr = new Array<string>(capacity);
   let head = 0;
@@ -105,11 +168,15 @@ function createRingBuffer(capacity: number) {
   return { push, toArray };
 }
 
-// Format HackerLine from store to string
 function formatHackerLine(line: HackerLine): string {
-  const prefix = line.type === 'command' ? '$ ' : 
-                 line.type === 'error' ? '✗ ' : 
-                 line.type === 'system' ? '⚡ ' : '  ';
+  const prefix =
+    line.type === 'command'
+      ? '$ '
+      : line.type === 'error'
+        ? '✗ '
+        : line.type === 'system'
+          ? '⚡ '
+          : '  ';
   return `[${new Date(line.timestamp).toLocaleTimeString()}] ${prefix}${line.content}`;
 }
 
@@ -134,7 +201,6 @@ export default function HackerTerminalBg(props: HackerTerminalBgProps) {
   function updateLines() {
     const autoLines = ring.toArray();
     const userLines = storeLines();
-    // Combine: user actions first (more important), then auto-generated
     setLines([...userLines, ...autoLines].slice(-maxLines()));
   }
 
@@ -150,14 +216,12 @@ export default function HackerTerminalBg(props: HackerTerminalBgProps) {
     }
   }
 
-  // Watch hackerStore for user actions
   createEffect(() => {
     const userLines = hackerState.lines.map(formatHackerLine);
     setStoreLines(userLines);
     updateLines();
   });
 
-  // Re-init if props change
   createEffect(() => {
     const capacity = maxLines();
     const s = seed();
@@ -167,13 +231,11 @@ export default function HackerTerminalBg(props: HackerTerminalBgProps) {
     if (!props.paused) start();
   });
 
-  // Start/stop based on paused prop
   createEffect(() => {
     if (props.paused) stop();
     else start();
   });
 
-  // Auto-scroll without heavy calculations
   createEffect(() => {
     lines();
     queueMicrotask(() => {
@@ -193,7 +255,8 @@ export default function HackerTerminalBg(props: HackerTerminalBgProps) {
         inset: '0',
         'pointer-events': 'none',
         opacity: '0.08',
-        'font-family': 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+        'font-family':
+          'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
         'font-size': '11px',
         'line-height': '1.4',
         'white-space': 'pre',
@@ -212,7 +275,8 @@ export default function HackerTerminalBg(props: HackerTerminalBgProps) {
         }}
       >
         {lines().join('\n')}
-        {'\n'}<span style={{ animation: 'blink 1s step-end infinite' }}>_</span>
+        {'\n'}
+        <span style={{ animation: 'blink 1s step-end infinite' }}>_</span>
       </div>
       <style>{`
         @keyframes blink {

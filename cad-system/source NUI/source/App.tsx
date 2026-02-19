@@ -1,3 +1,5 @@
+// PREPARE FOR THE IMPORT SEA!!!
+
 import { Switch, Match, Show, createMemo, onMount, onCleanup } from 'solid-js';
 import { Terminal } from './components/Terminal';
 import HackerTerminalBg from './components/HackerTerminalBg';
@@ -126,10 +128,13 @@ export function App() {
     };
   });
 
-  // Handle Escape key to close CAD or active modal
+  // Handle Escape key to close CAD or active modal << bring this from my old computermdt
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
-      if (terminalState.activeModal === 'VEHICLE_CAD' && terminalState.isInPoliceVehicle) {
+      if (
+        terminalState.activeModal === 'VEHICLE_CAD' &&
+        terminalState.isInPoliceVehicle
+      ) {
         void fetchNui('cad:vehicle:setOpen', { open: false }).catch(() => {});
         terminalActions.closeVehicleCAD();
         return;
@@ -138,17 +143,14 @@ export function App() {
       if (terminalState.isInPoliceVehicle) {
         return;
       }
-
-      // If a modal is open, close it first
       if (terminalState.activeModal) {
         terminalActions.setActiveModal(null);
         return;
       }
-      
-      // Otherwise close the entire CAD
+
       appActions.hide();
-      
-      // Notify server to close NUI
+
+      // this cause me a lot of "why the fuck the mouse is in my screen yet!"
       fetch('https://cad-system/closeUI', {
         method: 'POST',
         body: '{}',
@@ -156,7 +158,6 @@ export function App() {
     }
   };
 
-  // Attach keydown listener when CAD is visible
   onMount(() => {
     window.addEventListener('keydown', handleKeyDown);
   });
@@ -170,7 +171,7 @@ export function App() {
       <Show when={appState.isVisible}>
         <div class={appClasses()}>
           <Show when={!isVehicleOverlayMode()}>
-            {/* Hacker background terminal - optimized, no memory leak */}
+            {/* This was taken from a friend, if him used IA i dont know, but it work*/}
             <HackerTerminalBg maxLines={250} intervalMs={500} seed={20260215} />
           </Show>
 
@@ -283,42 +284,47 @@ export function App() {
             <Match when={terminalState.activeModal === 'PERSON_SNAPSHOT'}>
               <PersonSnapshot />
             </Match>
-             <Match when={terminalState.activeModal === 'RADIO_MARKERS'}>
-               <RadioMarkers />
-             </Match>
-             <Match when={terminalState.activeModal === 'BOLO_MANAGER'}>
-               <BoloManager />
-             </Match>
-             <Match when={terminalState.activeModal === 'VEHICLE_CAD'}>
-               <VehicleCAD />
-             </Match>
-             <Match
-               when={
-                 terminalState.activeModal === 'FORENSIC_COLLECTION' &&
-                 featureState.forensics.visible
-               }
-             >
-               <ForensicCollection />
-             </Match>
-             <Match when={terminalState.activeModal === 'PHOTO_PREVIEW' && photoPreviewData()}>
-               <PhotoCapturePreview
-                 photoData={photoPreviewData()!}
-                 onClose={() => terminalActions.setActiveModal(null)}
-               />
-             </Match>
-           </Switch>
+            <Match when={terminalState.activeModal === 'RADIO_MARKERS'}>
+              <RadioMarkers />
+            </Match>
+            <Match when={terminalState.activeModal === 'BOLO_MANAGER'}>
+              <BoloManager />
+            </Match>
+            <Match when={terminalState.activeModal === 'VEHICLE_CAD'}>
+              <VehicleCAD />
+            </Match>
+            <Match
+              when={
+                terminalState.activeModal === 'FORENSIC_COLLECTION' &&
+                featureState.forensics.visible
+              }
+            >
+              <ForensicCollection />
+            </Match>
+            <Match
+              when={
+                terminalState.activeModal === 'PHOTO_PREVIEW' &&
+                photoPreviewData()
+              }
+            >
+              <PhotoCapturePreview
+                photoData={photoPreviewData()!}
+                onClose={() => terminalActions.setActiveModal(null)}
+              />
+            </Match>
+          </Switch>
 
-           {viewerState.isOpen && viewerState.mediaType === 'image' && (
-             <ImageViewer
-               images={viewerState.images}
-               title={viewerState.title}
-               onClose={viewerActions.close}
-             />
-           )}
+          {viewerState.isOpen && viewerState.mediaType === 'image' && (
+            <ImageViewer
+              images={viewerState.images}
+              title={viewerState.title}
+              onClose={viewerActions.close}
+            />
+          )}
 
-           {viewerState.isOpen && (viewerState.mediaType === 'video' || viewerState.mediaType === 'audio') && (
-             <MediaPlayer />
-           )}
+          {viewerState.isOpen &&
+            (viewerState.mediaType === 'video' ||
+              viewerState.mediaType === 'audio') && <MediaPlayer />}
 
           <Show when={!isVehicleOverlayMode()}>
             <SessionContextBar />
@@ -332,16 +338,9 @@ export function App() {
 
             <AuditQuickButton />
           </Show>
-
-          {/* HomeScreen disabled - was closing entire CAD on X button */}
-          {/* <HomeScreen /> */}
         </div>
       </Show>
-
-      {/* Mock controller - always visible for development testing */}
       <MockController />
-
-      {/* Browser helper - show button to open CAD in dev mode */}
       <BrowserHelper />
     </>
   );
