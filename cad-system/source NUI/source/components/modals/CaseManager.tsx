@@ -272,7 +272,6 @@ export function CaseManager() {
         viewerActions.openAudio(url, title);
         break;
       default:
-        // For other types, try to detect by URL extension
         const lowerUrl = url.toLowerCase();
         if (lowerUrl.match(/\.(mp4|webm|ogg|mov)$/)) {
           viewerActions.openVideo(url, title);
@@ -344,7 +343,6 @@ export function CaseManager() {
       return;
     }
 
-    // Create high priority dispatch
     void createDispatchCall(caseItem, true);
     
     terminalActions.addLine(`✓ Help requested for case ${caseItem.caseId}`, 'output');

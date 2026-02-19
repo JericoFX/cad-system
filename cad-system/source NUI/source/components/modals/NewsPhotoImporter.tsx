@@ -89,7 +89,7 @@ export function NewsPhotoImporter(props: NewsPhotoImporterProps) {
   };
 
   onMount(async () => {
-    // Load both sources
+    // TO ME: FROM ME: ALWAYS LOAD IMPORTANT THING ON "ONMOUNT"
     await Promise.all([
       photoActions.fetchInventoryPhotos(),
       photoActions.fetchReleasedPhotos(),
@@ -196,7 +196,7 @@ export function NewsPhotoImporter(props: NewsPhotoImporterProps) {
       if (newSet.has(photoId)) {
         newSet.delete(photoId);
       } else {
-        // Check max limit
+        // Chequea el limite por favor, siempre lo mismo!
         const max = props.maxPhotos || 10;
         if (newSet.size >= max) {
           terminalActions.addLine(`Maximum ${max} photos allowed`, 'error');
@@ -215,7 +215,6 @@ export function NewsPhotoImporter(props: NewsPhotoImporterProps) {
     };
     const photos: PhotoMetadata[] = [];
     
-    // Get selected photos from both sources
     selectedPhotos().forEach(photoId => {
       const photo = lookup[photoId];
       if (photo) {

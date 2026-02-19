@@ -123,7 +123,6 @@ export function EvidenceManager() {
     Object.entries(cadState.cases).forEach(([caseId, caseData]) => {
       const evidenceList = caseData.evidence || [];
       
-      // Always show case folder, even if empty
       const folderName = `📁 ${caseId} - ${caseData.title}`;
       files.push({
         name: folderName,
@@ -133,7 +132,6 @@ export function EvidenceManager() {
         icon: '📂'
       });
       
-      // Only add evidence files if they exist
       evidenceList.forEach(ev => {
         files.push({
           name: buildEvidenceFileName(ev.evidenceId, ev.evidenceType),
@@ -387,7 +385,7 @@ export function EvidenceManager() {
       
       const url = data.url;
       
-      // Helper functions for URL detection by extension only
+      // Helper functions for URL detection by extension only << stack overflow :)
       const isImageUrl = (url: string): boolean => {
         const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
         const lower = url.toLowerCase();
@@ -406,21 +404,17 @@ export function EvidenceManager() {
         return audioExtensions.some(ext => lower.endsWith(ext));
       };
 
-      // Priority: 1) evidenceType explicit, 2) URL extension
       if (url) {
-        // VIDEO first (explicit type or extension)
         if (ev.evidenceType === 'VIDEO' || isVideoUrl(url)) {
           viewerActions.openVideo(url, `${ev.evidenceType} - ${evidenceId}`);
           return;
         }
 
-        // AUDIO second (explicit type or extension)
         if (ev.evidenceType === 'AUDIO' || isAudioUrl(url)) {
           viewerActions.openAudio(url, `${ev.evidenceType} - ${evidenceId}`);
           return;
         }
 
-        // IMAGE last (by extension only)
         if (isImageUrl(url)) {
           viewerActions.openImage(url, `${ev.evidenceType} - ${evidenceId}`);
           return;
@@ -489,7 +483,7 @@ export function EvidenceManager() {
       cadActions.addCaseEvidence(currentCase()!.caseId, result);
       terminalActions.addLine(`Evidence attached to case ${currentCase()!.caseId}`, 'output');
       setSelectedEvidence(null);
-      setCurrentPath(''); // Go back to root to see updated structure
+      setCurrentPath(''); 
     } catch (error) {
       terminalActions.addLine(`Failed to attach evidence: ${error}`, 'error');
     }

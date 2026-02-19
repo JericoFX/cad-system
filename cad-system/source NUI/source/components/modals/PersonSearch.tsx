@@ -63,7 +63,6 @@ export function PersonSearch() {
 
   const handleSearch = () => {
     if (!searchQuery().trim()) return;
-    // Search results are derived reactively by the memo.
   };
 
   onMount(() => {
@@ -167,7 +166,6 @@ export function PersonSearch() {
   };
 
   const readFromIdReader = async () => {
-    // Read identity data from the terminal reader and prefill person details.
     try {
       const context = await fetchNui<{
         ok: boolean;

@@ -89,7 +89,7 @@ export const FineManager: Component<FineManagerProps> = (props) => {
     
     if (targetType() === 'PERSON') {
       const persons = Object.values(cadState.persons);
-      if (!query) return persons.slice(0, 20); // Show first 20 if no search
+      if (!query) return persons.slice(0, 20); 
       
       return persons.filter(p => 
         p.firstName?.toLowerCase().includes(query) ||
@@ -98,7 +98,7 @@ export const FineManager: Component<FineManagerProps> = (props) => {
       ).slice(0, 20);
     } else {
       const vehicles = Object.values(cadState.vehicles);
-      if (!query) return vehicles.slice(0, 20); // Show first 20 if no search
+      if (!query) return vehicles.slice(0, 20); 
       
       return vehicles.filter(v => 
         v.plate?.toLowerCase().includes(query) ||
