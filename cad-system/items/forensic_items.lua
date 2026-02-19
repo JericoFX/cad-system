@@ -1,10 +1,7 @@
---[[
-CAD Forensic - ox_inventory Items
-Defines all forensic tools and evidence items for inventory system
-]]
+
 
 local items = {
-    -- Forensic Tools
+
     ['forensic_kit'] = {
         label = 'Forensic Kit',
         weight = 200,
@@ -55,7 +52,6 @@ local items = {
         }
     },
 
-    -- Collected Evidence Items
     ['collected_blood'] = {
         label = 'Blood Sample',
         weight = 10,
@@ -75,6 +71,16 @@ local items = {
         weight = 15,
         stack = false,
         description = 'Recovered bullet casing in evidence bag'
+    },
+
+    ['security_camera'] = {
+        label = 'Security Camera',
+        weight = 350,
+        stack = false,
+        description = 'Deployable CCTV camera for dispatch live grid',
+        client = {
+            export = 'cad-system.useSecurityCamera'
+        }
     }
 }
 

@@ -4,6 +4,7 @@ import { cadState } from '~/stores/cadStore';
 import { viewerActions } from '~/stores/viewerStore';
 import type { Note } from '~/stores/cadStore';
 import type { FileItem } from '../FileExplorer.types';
+import { Button, Modal, Select } from '~/components/ui';
 
 function NoteReadonlyViewer(props: { note: Note; onClose: () => void }) {
   const noteTypes: Record<string, { label: string; icon: string; color: string }> = {
@@ -18,7 +19,7 @@ function NoteReadonlyViewer(props: { note: Note; onClose: () => void }) {
   };
 
   return (
-    <div class="modal-overlay" onClick={props.onClose}>
+        <Modal.Root onClose={props.onClose} useContentWrapper={false}>
       <div class="modal-content notepad-viewer" onClick={(e) => e.stopPropagation()}>
         <div class="modal-header">
           <h2>=== NOTEPAD ===</h2>
@@ -47,10 +48,10 @@ function NoteReadonlyViewer(props: { note: Note; onClose: () => void }) {
         </div>
 
         <div class="modal-footer">
-          <button class="btn" onClick={props.onClose}>[CLOSE]</button>
+          <Button.Root class="btn" onClick={props.onClose}>[CLOSE]</Button.Root>
         </div>
       </div>
-    </div>
+    </Modal.Root>
   );
 }
 
@@ -185,7 +186,7 @@ export function NotesFileManager() {
   };
 
   return (
-    <div class="modal-overlay" onClick={closeModal}>
+        <Modal.Root onClose={closeModal} useContentWrapper={false}>
       <div class="modal-content notes-file-manager" onClick={(e) => e.stopPropagation()}>
         <div class="modal-header">
           <h2>=== NOTES FILE MANAGER ===</h2>
@@ -194,7 +195,7 @@ export function NotesFileManager() {
 
         <div class="notes-toolbar">
           <div class="notes-toolbar-left">
-            <select 
+            <Select.Root 
               class="dos-select"
               value={currentCaseId()}
               onChange={(e) => {
@@ -208,7 +209,7 @@ export function NotesFileManager() {
               {Object.values(cadState.cases).map(c => (
                 <option value={c.caseId}>{c.caseId} - {c.title}</option>
               ))}
-            </select>
+            </Select.Root>
 
             <Show when={currentCaseId()}>
               <div class="notes-stats">
@@ -218,14 +219,14 @@ export function NotesFileManager() {
           </div>
 
           <Show when={currentCaseId()}>
-            <button 
+            <Button.Root 
               class="btn btn-primary back-to-case-btn"
               onClick={() => {
                 terminalActions.setActiveModal('CASE_MANAGER', { caseId: currentCaseId() });
               }}
             >
               [← BACK TO CASE]
-            </button>
+            </Button.Root>
           </Show>
         </div>
 
@@ -282,7 +283,7 @@ export function NotesFileManager() {
         </Show>
 
         <div class="modal-footer">
-          <button class="btn" onClick={closeModal}>[CLOSE]</button>
+          <Button.Root class="btn" onClick={closeModal}>[CLOSE]</Button.Root>
         </div>
       </div>
       
@@ -292,6 +293,6 @@ export function NotesFileManager() {
           onClose={() => setViewingNote(null)} 
         />
       )}
-    </div>
+    </Modal.Root>
   );
 }

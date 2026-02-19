@@ -2,6 +2,7 @@
 import { createSignal, createMemo, For, Show, onMount } from 'solid-js';
 import { terminalActions } from '~/stores/terminalStore';
 import { fleetState, fleetActions, type VehicleType, type VehicleStatus } from '~/stores/fleetStore';
+import { Button, Modal, Tabs } from '~/components/ui';
 
 export function FleetManager() {
   const [selectedVehicle, setSelectedVehicle] = createSignal<string | null>(null);
@@ -66,27 +67,24 @@ export function FleetManager() {
   };
   
   return (
-    <div class="modal-overlay" onClick={closeModal}>
+    <Modal.Root onClose={closeModal} useContentWrapper={false}>
       <div class="modal-content fleet-manager" onClick={e => e.stopPropagation()}>
-        <div class="modal-header">
-          <h2>🚓 PANEL DE FLOTA</h2>
-          <button class="close-btn" onClick={closeModal}>×</button>
-        </div>
+        <Modal.Header>
+          <Modal.Title>🚓 PANEL DE FLOTA</Modal.Title>
+          <Modal.Close label='X' />
+        </Modal.Header>
         
-        <div class="detail-tabs">
-          <button 
-            class={`tab ${activeTab() === 'list' ? 'active' : ''}`}
-            onClick={() => setActiveTab('list')}
-          >
-            📋 Lista
-          </button>
-          <button 
-            class={`tab ${activeTab() === 'map' ? 'active' : ''}`}
-            onClick={() => setActiveTab('map')}
-          >
-            🗺️ Mapa
-          </button>
-        </div>
+        <Tabs.Root
+          value={activeTab()}
+          onValueChange={(value) => setActiveTab(value as 'list' | 'map')}
+          bracketed={false}
+          uppercase={false}
+        >
+          <Tabs.List>
+            <Tabs.Trigger value='list' label='📋 Lista' />
+            <Tabs.Trigger value='map' label='🗺️ Mapa' />
+          </Tabs.List>
+        </Tabs.Root>
         
         <div class="fleet-stats">
           <div class="stat-item">
@@ -244,9 +242,9 @@ export function FleetManager() {
               return (
                 <div class="vehicle-detail-modal">
                   <div class="detail-content">
-                    <button class="btn btn-small" onClick={() => setSelectedVehicle(null)}>
+                    <Button.Root class="btn btn-small" onClick={() => setSelectedVehicle(null)}>
                       ✕ Cerrar
-                    </button>
+                    </Button.Root>
                     
                     <div class="detail-header">
                       <div class="detail-icon">{getVehicleIcon(vehicle.vehicleType)}</div>
@@ -304,7 +302,7 @@ export function FleetManager() {
                     
                     <div class="detail-actions">
                       <Show when={vehicle.status === 'AVAILABLE'}>
-                        <button 
+                        <Button.Root 
                           class="btn btn-success"
                           onClick={() => {
                             fleetActions.assignVehicle(vehicle.unitId, 'OFF_001', 'Demo Officer', 'B-001');
@@ -312,10 +310,10 @@ export function FleetManager() {
                           }}
                         >
                           ✓ Asignar
-                        </button>
+                        </Button.Root>
                       </Show>
                       <Show when={vehicle.status === 'IN_USE'}>
-                        <button 
+                        <Button.Root 
                           class="btn btn-warning"
                           onClick={() => {
                             fleetActions.returnVehicle(vehicle.unitId);
@@ -323,10 +321,10 @@ export function FleetManager() {
                           }}
                         >
                           ↩ Devolver
-                        </button>
+                        </Button.Root>
                       </Show>
                       <Show when={vehicle.damage > 0}>
-                        <button 
+                        <Button.Root 
                           class="btn btn-primary"
                           onClick={() => {
                             fleetActions.completeMaintenance(vehicle.unitId);
@@ -334,7 +332,7 @@ export function FleetManager() {
                           }}
                         >
                           🔧 Reparar
-                        </button>
+                        </Button.Root>
                       </Show>
                     </div>
                   </div>
@@ -344,6 +342,6 @@ export function FleetManager() {
           </Show>
         </div>
       </div>
-    </div>
+    </Modal.Root>
   );
 }

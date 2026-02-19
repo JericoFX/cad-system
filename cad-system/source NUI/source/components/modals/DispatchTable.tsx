@@ -1,13 +1,44 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js';
 import { terminalActions } from '~/stores/terminalStore';
-import { cadActions, cadState, type DispatchCall, type DispatchUnit } from '~/stores/cadStore';
+import {
+  cadActions,
+  cadState,
+  type DispatchCall,
+  type DispatchUnit,
+  type SecurityCamera,
+} from '~/stores/cadStore';
 import { radioActions } from '~/stores/radioStore';
 import { fetchNui } from '~/utils/fetchNui';
-import { useDispatchEvents } from '~/hooks/useNui';
+import { useNui } from '~/hooks/useNui';
+import { Button, Modal } from '~/components/ui';
 
 type DispatchGuardError = {
   ok: false;
   error: string;
+};
+
+type CameraListResponse = {
+  ok: boolean;
+  cameras?: SecurityCamera[];
+  error?: string;
+};
+
+type CameraWatchResponse = {
+  ok: boolean;
+  camera?: SecurityCamera;
+  error?: string;
+};
+
+type CameraStatusResponse = {
+  ok: boolean;
+  camera?: SecurityCamera;
+  error?: string;
+};
+
+type CameraRemoveResponse = {
+  ok: boolean;
+  cameraId?: string;
+  error?: string;
 };
 
 type SlaLevel = 'ok' | 'warning' | 'breach';
@@ -90,12 +121,18 @@ const isDispatchCall = (value: unknown): value is DispatchCall => {
   return typeof (value as Record<string, unknown>).callId === 'string';
 };
 
-const normalizeDispatchRecord = <T,>(value: unknown): Record<string, T> => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return {};
+const cameraArrayToRecord = (items: SecurityCamera[]): Record<string, SecurityCamera> => {
+  const out: Record<string, SecurityCamera> = {};
+  for (let i = 0; i < items.length; i += 1) {
+    const camera = items[i];
+    if (!camera || !camera.cameraId) {
+      continue;
+    }
+
+    out[camera.cameraId] = camera;
   }
 
-  return value as Record<string, T>;
+  return out;
 };
 
 const clampNumber = (value: unknown, fallback: number, min: number, max: number): number => {
@@ -222,7 +259,6 @@ const getThresholdForPriority = (thresholds: PriorityThresholdMap, priority: num
 
 export function DispatchTable() {
   const [selectedCallId, setSelectedCallId] = createSignal<string | null>(null);
-  const [loading, setLoading] = createSignal(false);
   const [dispatchSettings, setDispatchSettings] = createSignal<DispatchSettings>(DEFAULT_DISPATCH_SETTINGS);
   const [nowMs, setNowMs] = createSignal(Date.now());
   const [searchQuery, setSearchQuery] = createSignal('');
@@ -230,6 +266,8 @@ export function DispatchTable() {
   const [priorityFilter, setPriorityFilter] = createSignal<'ALL' | '1' | '2' | '3'>('ALL');
   const [unitTypeFilter, setUnitTypeFilter] = createSignal<'ALL' | 'PATROL' | 'EMS' | 'SUPERVISOR'>('ALL');
   const [creatingCall, setCreatingCall] = createSignal(false);
+  const [cameraLoading, setCameraLoading] = createSignal(false);
+  const [watchingCameraId, setWatchingCameraId] = createSignal<string | null>(null);
   const [callForm, setCallForm] = createSignal({
     title: '',
     type: 'GENERAL',
@@ -240,27 +278,16 @@ export function DispatchTable() {
 
   const callTypeOptions = createMemo(() => dispatchSettings().callTypeOptions);
 
-  // Real-time event listeners - replaces polling
-  useDispatchEvents({
-    onCallCreated: (data) => {
-      // Data already added to store by handler, just log
-      console.log('[DispatchTable] Call created:', data.call.callId);
-    },
-    onCallUpdated: (data) => {
-      console.log('[DispatchTable] Call updated:', data.callId);
-    },
-    onCallClosed: (data) => {
-      console.log('[DispatchTable] Call closed:', data.callId);
-      if (selectedCallId() === data.callId) {
-        setSelectedCallId(null);
-      }
-    },
-    onCallAssigned: (data) => {
-      console.log('[DispatchTable] Unit assigned:', data.unitId, 'to', data.callId);
-    },
-    onUnitStatusChanged: (data) => {
-      console.log('[DispatchTable] Unit status:', data.unitId, '->', data.newStatus);
-    },
+  useNui('camera:viewStarted', (data) => {
+    if (!data || !data.camera || !data.camera.cameraId) {
+      return;
+    }
+
+    setWatchingCameraId(data.camera.cameraId);
+  });
+
+  useNui('camera:viewStopped', () => {
+    setWatchingCameraId(null);
   });
 
   const allCalls = createMemo(() =>
@@ -281,6 +308,25 @@ export function DispatchTable() {
   );
 
   const allUnits = createMemo(() => Object.values(cadState.dispatchUnits));
+
+  const cameraGrid = createMemo(() =>
+    Object.values(cadState.securityCameras).sort((a, b) => {
+      if (a.cameraNumber !== b.cameraNumber) {
+        return a.cameraNumber - b.cameraNumber;
+      }
+
+      return a.cameraId.localeCompare(b.cameraId);
+    })
+  );
+
+  const activeWatchedCamera = createMemo(() => {
+    const cameraId = watchingCameraId();
+    if (!cameraId) {
+      return null;
+    }
+
+    return cadState.securityCameras[cameraId] || null;
+  });
 
   const metrics = createMemo(() => {
     const calls = allCalls();
@@ -539,37 +585,144 @@ export function DispatchTable() {
     terminalActions.addLine(`Radio notice sent: ${msg}`, 'system');
   };
 
-  const closePanel = () => {
-    terminalActions.setActiveModal(null);
+  const formatCameraNumber = (cameraNumber: number) => String(cameraNumber || 0).padStart(4, '0');
+
+  const getMockCameraBackground = (camera: SecurityCamera | null) => {
+    if (camera) {
+      return `/cctv-mock.svg?cam=${camera.cameraNumber}`;
+    }
+
+    return '/cctv-mock.svg';
   };
 
-  const refreshData = async (silent = false) => {
-    setLoading(true);
+  const refreshCameraGrid = async (silent = false) => {
+    setCameraLoading(true);
+
     try {
-      const [unitsResponse, callsResponse] = await Promise.all([
-        fetchNui<Record<string, DispatchUnit> | DispatchGuardError>('cad:getDispatchUnits', {}),
-        fetchNui<Record<string, DispatchCall> | DispatchGuardError>('cad:getDispatchCalls', {}),
-      ]);
-
-      if (isGuardError(unitsResponse)) {
-        throw new Error(unitsResponse.error);
+      const response = await fetchNui<CameraListResponse>('cad:cameras:list', {});
+      if (!response || response.ok !== true) {
+        terminalActions.addLine(
+          `Failed to refresh CCTV grid: ${response?.error || 'unknown_error'}`,
+          'error'
+        );
+        return;
       }
 
-      if (isGuardError(callsResponse)) {
-        throw new Error(callsResponse.error);
-      }
-
-      cadActions.setDispatchUnits(normalizeDispatchRecord<DispatchUnit>(unitsResponse));
-      cadActions.setDispatchCalls(normalizeDispatchRecord<DispatchCall>(callsResponse));
+      const cameraList = Array.isArray(response.cameras) ? response.cameras : [];
+      cadActions.setSecurityCameras(cameraArrayToRecord(cameraList));
 
       if (!silent) {
-        terminalActions.addLine('Dispatch data refreshed', 'system');
+        terminalActions.addLine(`CCTV grid refreshed (${cameraList.length})`, 'system');
       }
     } catch (error) {
-      terminalActions.addLine(`Failed to refresh dispatch: ${String(error)}`, 'error');
+      terminalActions.addLine(`Failed to refresh CCTV grid: ${String(error)}`, 'error');
     } finally {
-      setLoading(false);
+      setCameraLoading(false);
     }
+  };
+
+  const watchCamera = async (cameraId: string) => {
+    try {
+      const response = await fetchNui<CameraWatchResponse>('cad:cameras:watch', { cameraId });
+      if (!response || response.ok !== true || !response.camera) {
+        terminalActions.addLine(
+          `Cannot open camera feed: ${response?.error || 'unknown_error'}`,
+          'error'
+        );
+        return;
+      }
+
+      setWatchingCameraId(response.camera.cameraId);
+      terminalActions.addLine(
+        `Viewing camera #${formatCameraNumber(response.camera.cameraNumber)} (${response.camera.label})`,
+        'system'
+      );
+    } catch (error) {
+      terminalActions.addLine(`Cannot open camera feed: ${String(error)}`, 'error');
+    }
+  };
+
+  const stopWatchingCamera = async (silent = false) => {
+    if (!watchingCameraId()) {
+      return;
+    }
+
+    try {
+      await fetchNui<{ ok: boolean; error?: string }>('cad:cameras:stopWatch', {});
+      if (!silent) {
+        terminalActions.addLine('Camera feed closed', 'system');
+      }
+    } catch (error) {
+      terminalActions.addLine(`Cannot close camera feed: ${String(error)}`, 'error');
+    } finally {
+      setWatchingCameraId(null);
+    }
+  };
+
+  const setCameraStatus = async (cameraId: string, status: 'ACTIVE' | 'DISABLED') => {
+    try {
+      const response = await fetchNui<CameraStatusResponse>('cad:cameras:setStatus', {
+        cameraId,
+        status,
+      });
+
+      if (!response || response.ok !== true || !response.camera) {
+        terminalActions.addLine(
+          `Cannot update camera status: ${response?.error || 'unknown_error'}`,
+          'error'
+        );
+        return;
+      }
+
+      cadActions.upsertSecurityCamera(response.camera);
+      terminalActions.addLine(
+        `Camera #${formatCameraNumber(response.camera.cameraNumber)} set to ${response.camera.status}`,
+        'system'
+      );
+
+      if (status === 'DISABLED' && watchingCameraId() === response.camera.cameraId) {
+        await stopWatchingCamera(true);
+      }
+    } catch (error) {
+      terminalActions.addLine(`Cannot update camera status: ${String(error)}`, 'error');
+    }
+  };
+
+  const removeCamera = async (camera: SecurityCamera) => {
+    const confirmed = window.confirm(
+      `Remove camera #${formatCameraNumber(camera.cameraNumber)} (${camera.label})?`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const response = await fetchNui<CameraRemoveResponse>('cad:cameras:remove', {
+        cameraId: camera.cameraId,
+      });
+
+      if (!response || response.ok !== true || !response.cameraId) {
+        terminalActions.addLine(`Cannot remove camera: ${response?.error || 'unknown_error'}`, 'error');
+        return;
+      }
+
+      cadActions.removeSecurityCamera(response.cameraId);
+      terminalActions.addLine(
+        `Camera #${formatCameraNumber(camera.cameraNumber)} removed from grid`,
+        'system'
+      );
+
+      if (watchingCameraId() === response.cameraId) {
+        await stopWatchingCamera(true);
+      }
+    } catch (error) {
+      terminalActions.addLine(`Cannot remove camera: ${String(error)}`, 'error');
+    }
+  };
+
+  const closePanel = () => {
+    void stopWatchingCamera(true);
+    terminalActions.setActiveModal(null);
   };
 
   const loadDispatchSettings = async () => {
@@ -671,7 +824,6 @@ export function DispatchTable() {
       });
 
       terminalActions.addLine(`Call ${callId} closed`, 'system');
-      await refreshData(true);
     } catch (error) {
       terminalActions.addLine(`Failed closing call: ${String(error)}`, 'error');
     }
@@ -785,14 +937,30 @@ export function DispatchTable() {
     }
   });
 
+  createEffect(() => {
+    const cameraId = watchingCameraId();
+    if (!cameraId) {
+      return;
+    }
+
+    const camera = cadState.securityCameras[cameraId];
+    if (!camera || camera.status !== 'ACTIVE') {
+      void stopWatchingCamera(true);
+    }
+  });
+
   onMount(() => {
-    void refreshData(true);
+    void refreshCameraGrid(true);
+  });
+
+  onCleanup(() => {
+    void stopWatchingCamera(true);
   });
 
   createEffect(() => {
     const settings = dispatchSettings();
-    // Solo mantener el clock para timestamps, no hacer polling
-    // Los datos llegan en tiempo real via useDispatchEvents
+    // Solo reloj local para timestamps.
+    // Los datos llegan por estado publico de dispatch.
     const clockInterval = window.setInterval(() => {
       setNowMs(Date.now());
     }, settings.clockTickMs);
@@ -803,15 +971,38 @@ export function DispatchTable() {
   });
 
   return (
-    <div class="modal-overlay" onClick={closePanel}>
+        <Modal.Root onClose={closePanel} useContentWrapper={false}>
       <div class="modal-content dispatch-table-modal dispatch-v2-modal" onClick={(e) => e.stopPropagation()}>
         <div class="modal-header dispatch-v2-header">
           <h2>=== DISPATCH OPERATIONS CENTER ===</h2>
           <div class="dispatch-v2-header-actions">
-            <button class="btn" onClick={() => terminalActions.setActiveModal('MAP', { returnModal: 'DISPATCH_PANEL' })}>[MAP]</button>
+            <Button.Root class="btn" onClick={() => terminalActions.setActiveModal('MAP', { returnModal: 'DISPATCH_PANEL' })}>[MAP]</Button.Root>
             <button class="modal-close" onClick={closePanel}>[X]</button>
           </div>
         </div>
+
+        <Show when={watchingCameraId()}>
+          <div class="dispatch-cctv-crt-overlay">
+            <div
+              class="dispatch-cctv-mock-feed"
+              style={{
+                'background-image': `url(${getMockCameraBackground(activeWatchedCamera())})`,
+              }}
+            />
+            <div class="dispatch-cctv-crt-scanlines" />
+            <div class="dispatch-cctv-crt-label">CCTV LIVE FEED</div>
+            <Show when={activeWatchedCamera()}>
+              {(cameraAccessor) => {
+                const camera = cameraAccessor();
+                return (
+                  <div class="dispatch-cctv-crt-meta">
+                    CAM #{formatCameraNumber(camera.cameraNumber)} | {camera.street || 'Unknown street'}
+                  </div>
+                );
+              }}
+            </Show>
+          </div>
+        </Show>
 
         <div class="dispatch-v2-kpis">
           <div class="dispatch-v2-kpi pending">
@@ -901,7 +1092,63 @@ export function DispatchTable() {
           </section>
 
           <section class="dispatch-v2-column dispatch-v2-workspace">
-            <Show when={selectedCall()} fallback={<div class="empty-state">Select a call to manage</div>}>
+            <Show
+              when={selectedCall()}
+              fallback={
+                <>
+                  <div class="empty-state">Select a call to manage</div>
+                  <div class="dispatch-v2-section-title">CCTV GRID ({cameraGrid().length})</div>
+                  <div class="dispatch-cctv-toolbar">
+                    <Button.Root class="btn" onClick={() => void refreshCameraGrid()} disabled={cameraLoading()}>
+                      [{cameraLoading() ? 'REFRESHING...' : 'REFRESH CCTV'}]
+                    </Button.Root>
+                    <Show when={watchingCameraId()}>
+                      <Button.Root class="btn btn-warning" onClick={() => void stopWatchingCamera()}>
+                        [STOP VIEW]
+                      </Button.Root>
+                    </Show>
+                  </div>
+                  <div class="dispatch-cctv-grid">
+                    <For each={cameraGrid()}>
+                      {(camera) => (
+                        <div class={`dispatch-cctv-card ${watchingCameraId() === camera.cameraId ? 'is-viewing' : ''}`}>
+                          <div class="dispatch-cctv-card-header">
+                            <strong>CAM #{formatCameraNumber(camera.cameraNumber)}</strong>
+                            <span class={`dispatch-cctv-status status-${camera.status.toLowerCase()}`}>
+                              {camera.status}
+                            </span>
+                          </div>
+                          <div class="dispatch-cctv-card-title">{camera.label || `Camera ${formatCameraNumber(camera.cameraNumber)}`}</div>
+                          <div class="dispatch-cctv-card-meta">{camera.street || 'Unknown street'}</div>
+                          <div class="dispatch-cctv-card-meta">{camera.zone || 'No zone'}</div>
+                          <div class="dispatch-cctv-card-actions">
+                            <Button.Root
+                              class="btn btn-primary"
+                              disabled={camera.status !== 'ACTIVE'}
+                              onClick={() => void watchCamera(camera.cameraId)}
+                            >
+                              [VER]
+                            </Button.Root>
+                            <Button.Root
+                              class="btn"
+                              onClick={() => void setCameraStatus(camera.cameraId, camera.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE')}
+                            >
+                              [{camera.status === 'ACTIVE' ? 'DISABLE' : 'ENABLE'}]
+                            </Button.Root>
+                            <Button.Root class="btn btn-danger" onClick={() => void removeCamera(camera)}>
+                              [REMOVE]
+                            </Button.Root>
+                          </div>
+                        </div>
+                      )}
+                    </For>
+                    <Show when={cameraGrid().length === 0}>
+                      <div class="empty-state">No security cameras installed yet</div>
+                    </Show>
+                  </div>
+                </>
+              }
+            >
               {(callAccessor) => {
                 const call = callAccessor();
                 return (
@@ -933,21 +1180,21 @@ export function DispatchTable() {
                         <div class="dispatch-v2-call-description">{call.description}</div>
                       </Show>
                       <div class="dispatch-v2-incident-actions">
-                        <button class="btn" onClick={() => createCaseFromCall(call.callId)}>
+                        <Button.Root class="btn" onClick={() => createCaseFromCall(call.callId)}>
                           [{getCaseActionLabel(call.callId)}]
-                        </button>
+                        </Button.Root>
                         <Show when={Object.keys(call.assignedUnits).length > 0}>
-                          <button
+                          <Button.Root
                             class="btn"
                             onClick={() => notifyCallToChannels(call, Object.keys(call.assignedUnits), 'Case update')}
                           >
                             [NOTIFY UNITS]
-                          </button>
+                          </Button.Root>
                         </Show>
                         <Show when={call.status !== 'CLOSED'}>
-                          <button class="btn btn-danger" onClick={() => void closeCall(call.callId)}>
+                          <Button.Root class="btn btn-danger" onClick={() => void closeCall(call.callId)}>
                             [CLOSE CALL]
-                          </button>
+                          </Button.Root>
                         </Show>
                       </div>
                     </div>
@@ -961,9 +1208,9 @@ export function DispatchTable() {
                               <strong>{unit.unitId}</strong> {unit.name}
                               <div class="dispatch-v2-unit-sub">{unit.type} - {unit.status}</div>
                             </div>
-                            <button class="btn btn-warning" onClick={() => void unassignUnit(unit.unitId, call.callId)}>
+                            <Button.Root class="btn btn-warning" onClick={() => void unassignUnit(unit.unitId, call.callId)}>
                               [RELEASE]
-                            </button>
+                            </Button.Root>
                           </div>
                         )}
                       </For>
@@ -984,9 +1231,9 @@ export function DispatchTable() {
                                 <span> [{Math.floor(suggestion.distance)}m]</span>
                               </Show>
                             </div>
-                            <button class="btn btn-primary" onClick={() => void autoAssignBestUnit()} disabled={call.status === 'CLOSED'}>
+                            <Button.Root class="btn btn-primary" onClick={() => void autoAssignBestUnit()} disabled={call.status === 'CLOSED'}>
                               [AUTO ASSIGN BEST]
-                            </button>
+                            </Button.Root>
                           </div>
                         );
                       }}
@@ -999,18 +1246,73 @@ export function DispatchTable() {
                               <strong>{unit.unitId}</strong> {unit.name}
                               <div class="dispatch-v2-unit-sub">{unit.type}</div>
                             </div>
-                            <button
+                            <Button.Root
                               class="btn btn-primary"
                               onClick={() => void assignUnitToCall(unit.unitId, call.callId)}
                               disabled={call.status === 'CLOSED'}
                             >
                               [ASSIGN]
-                            </button>
+                            </Button.Root>
                           </div>
                         )}
                       </For>
                       <Show when={availableUnits().length === 0}>
                         <div class="empty-state">No available units with current type filter</div>
+                      </Show>
+                    </div>
+
+                    <div class="dispatch-v2-section-title">CCTV GRID ({cameraGrid().length})</div>
+                    <div class="dispatch-cctv-toolbar">
+                      <Button.Root class="btn" onClick={() => void refreshCameraGrid()} disabled={cameraLoading()}>
+                        [{cameraLoading() ? 'REFRESHING...' : 'REFRESH CCTV'}]
+                      </Button.Root>
+                      <Show when={watchingCameraId()}>
+                        <Button.Root class="btn btn-warning" onClick={() => void stopWatchingCamera()}>
+                          [STOP VIEW]
+                        </Button.Root>
+                      </Show>
+                    </div>
+                    <div class="dispatch-cctv-grid">
+                      <For each={cameraGrid()}>
+                        {(camera) => (
+                          <div class={`dispatch-cctv-card ${watchingCameraId() === camera.cameraId ? 'is-viewing' : ''}`}>
+                            <div class="dispatch-cctv-card-header">
+                              <strong>CAM #{formatCameraNumber(camera.cameraNumber)}</strong>
+                              <span class={`dispatch-cctv-status status-${camera.status.toLowerCase()}`}>
+                                {camera.status}
+                              </span>
+                            </div>
+                            <div class="dispatch-cctv-card-title">{camera.label || `Camera ${formatCameraNumber(camera.cameraNumber)}`}</div>
+                            <div class="dispatch-cctv-card-meta">{camera.street || 'Unknown street'}</div>
+                            <div class="dispatch-cctv-card-meta">{camera.zone || 'No zone'}</div>
+                            <div class="dispatch-cctv-card-actions">
+                              <Button.Root
+                                class="btn btn-primary"
+                                disabled={camera.status !== 'ACTIVE'}
+                                onClick={() => void watchCamera(camera.cameraId)}
+                              >
+                                [VER]
+                              </Button.Root>
+                              <Button.Root
+                                class="btn"
+                                onClick={() =>
+                                  void setCameraStatus(
+                                    camera.cameraId,
+                                    camera.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE'
+                                  )
+                                }
+                              >
+                                [{camera.status === 'ACTIVE' ? 'DISABLE' : 'ENABLE'}]
+                              </Button.Root>
+                              <Button.Root class="btn btn-danger" onClick={() => void removeCamera(camera)}>
+                                [REMOVE]
+                              </Button.Root>
+                            </div>
+                          </div>
+                        )}
+                      </For>
+                      <Show when={cameraGrid().length === 0}>
+                        <div class="empty-state">No security cameras installed yet</div>
                       </Show>
                     </div>
                   </>
@@ -1037,9 +1339,9 @@ export function DispatchTable() {
                         <span class="dispatch-v2-current-call">{unit.currentCall}</span>
                       </Show>
                       <Show when={unit.status === 'BUSY' && unit.currentCall}>
-                        <button class="btn btn-warning" onClick={() => void unassignUnit(unit.unitId, unit.currentCall)}>
+                        <Button.Root class="btn btn-warning" onClick={() => void unassignUnit(unit.unitId, unit.currentCall)}>
                           [RELEASE]
-                        </button>
+                        </Button.Root>
                       </Show>
                     </div>
                   </div>
@@ -1093,9 +1395,9 @@ export function DispatchTable() {
               value={callForm().description}
               onInput={(event) => setCallForm((prev) => ({ ...prev, description: event.currentTarget.value }))}
             />
-            <button class="btn btn-primary" onClick={() => void submitNewCall()} disabled={creatingCall()}>
+            <Button.Root class="btn btn-primary" onClick={() => void submitNewCall()} disabled={creatingCall()}>
               [{creatingCall() ? 'CREATING...' : 'CREATE CALL'}]
-            </button>
+            </Button.Root>
           </div>
         </div>
 
@@ -1103,9 +1405,9 @@ export function DispatchTable() {
           <span style={{ color: '#808080', 'font-size': '14px' }}>
             Profile {dispatchSettings().profileName.toUpperCase()} | Live sync every {Math.round(dispatchSettings().refreshIntervalMs / 1000)}s | Calls {allCalls().length} | Units {allUnits().length}
           </span>
-          <button class="btn" onClick={closePanel}>[CLOSE]</button>
+          <Button.Root class="btn" onClick={closePanel}>[CLOSE]</Button.Root>
         </div>
       </div>
-    </div>
+    </Modal.Root>
   );
 }

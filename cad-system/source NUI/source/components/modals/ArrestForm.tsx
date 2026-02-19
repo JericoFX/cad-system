@@ -1,6 +1,7 @@
 import { createSignal, Show } from 'solid-js';
 import { terminalActions } from '~/stores/terminalStore';
 import { cadActions } from '~/stores/cadStore';
+import { Button, Input, Modal } from '~/components/ui';
 
 export function ArrestForm() {
   const [citizenId, setCitizenId] = createSignal('');
@@ -66,7 +67,7 @@ export function ArrestForm() {
   };
 
   return (
-    <div class="modal-overlay" onClick={closeModal}>
+        <Modal.Root onClose={closeModal} useContentWrapper={false}>
       <div class="modal-content case-creator" onClick={(e) => e.stopPropagation()}>
         <Show 
           when={!showConfirm()} 
@@ -95,12 +96,12 @@ export function ArrestForm() {
                 </div>
                 
                 <div class="modal-footer" style={{ 'flex-direction': 'column', gap: '10px' }}>
-                  <button class="btn btn-primary" onClick={handleSubmit} disabled={isSubmitting()}>
+                  <Button.Root class="btn btn-primary" onClick={handleSubmit} disabled={isSubmitting()}>
                     {isSubmitting() ? '[REGISTERING...]' : '[CONFIRM ARREST]'}
-                  </button>
-                  <button class="btn" onClick={handleBack}>
+                  </Button.Root>
+                  <Button.Root class="btn" onClick={handleBack}>
                     [BACK]
-                  </button>
+                  </Button.Root>
                 </div>
               </div>
             </div>
@@ -114,7 +115,7 @@ export function ArrestForm() {
           <form onSubmit={handlePreview} class="dos-form">
             <div class="form-section">
               <label class="form-label">[CITIZEN ID]</label>
-              <input
+              <Input.Root
                 type="text"
                 class="dos-input"
                 value={citizenId()}
@@ -125,7 +126,7 @@ export function ArrestForm() {
 
             <div class="form-section">
               <label class="form-label">[PERSON NAME]</label>
-              <input
+              <Input.Root
                 type="text"
                 class="dos-input"
                 value={personName()}
@@ -136,7 +137,7 @@ export function ArrestForm() {
 
             <div class="form-section">
               <label class="form-label">[CHARGES]</label>
-              <input
+              <Input.Root
                 type="text"
                 class="dos-input"
                 value={charges()}
@@ -147,7 +148,7 @@ export function ArrestForm() {
 
             <div class="form-section">
               <label class="form-label">[SENTENCE]</label>
-              <input
+              <Input.Root
                 type="text"
                 class="dos-input"
                 value={sentence()}
@@ -158,7 +159,7 @@ export function ArrestForm() {
 
             <div class="form-section">
               <label class="form-label">[FINE AMOUNT]</label>
-              <input
+              <Input.Root
                 type="text"
                 class="dos-input"
                 value={fineAmount()}
@@ -169,7 +170,7 @@ export function ArrestForm() {
 
             <div class="form-section">
               <label class="form-label">[JAIL TIME (MONTHS)]</label>
-              <input
+              <Input.Root
                 type="text"
                 class="dos-input"
                 value={jailTime()}
@@ -179,20 +180,20 @@ export function ArrestForm() {
             </div>
 
             <div class="modal-footer">
-              <button 
+              <Button.Root 
                 type="submit" 
                 class="btn btn-primary"
                 disabled={!citizenId().trim() || !personName().trim() || !charges().trim()}
               >
                 [PREVIEW]
-              </button>
-              <button type="button" class="btn" onClick={closeModal}>
+              </Button.Root>
+              <Button.Root type="button" class="btn" onClick={closeModal}>
                 [CANCEL]
-              </button>
+              </Button.Root>
             </div>
           </form>
         </Show>
       </div>
-    </div>
+    </Modal.Root>
   );
 }

@@ -2,6 +2,7 @@ import { createSignal, Show, For } from 'solid-js';
 import { terminalActions, terminalState } from '~/stores/terminalStore';
 import { cadActions, cadState } from '~/stores/cadStore';
 import { userActions } from '~/stores/userStore';
+import { Button, Input, Modal, Select, Textarea } from '~/components/ui';
 
 interface ArrestData {
   citizenId: string;
@@ -201,7 +202,7 @@ export function ArrestWizard() {
   };
 
   return (
-    <div class="modal-overlay" onClick={closeModal}>
+        <Modal.Root onClose={closeModal} useContentWrapper={false}>
       <div class="modal-content arrest-wizard" onClick={(e) => e.stopPropagation()}>
         <div class="modal-header">
           <h2>=== ARREST BOOKING WIZARD ===</h2>
@@ -240,7 +241,7 @@ export function ArrestWizard() {
           <Show when={currentStep() === 1}>
             <div class="form-section">
               <label class="form-label">[CITIZEN ID] *</label>
-              <input
+              <Input.Root
                 type="text"
                 class="dos-input"
                 value={arrestData().citizenId}
@@ -250,7 +251,7 @@ export function ArrestWizard() {
             </div>
             <div class="form-section">
               <label class="form-label">[FULL NAME] *</label>
-              <input
+              <Input.Root
                 type="text"
                 class="dos-input"
                 value={arrestData().personName}
@@ -263,7 +264,7 @@ export function ArrestWizard() {
           <Show when={currentStep() === 2}>
             <div class="form-section">
               <label class="form-label">[SELECT CHARGE]</label>
-              <select
+              <Select.Root
                 class="dos-select"
                 value={selectedCharge()}
                 onChange={(e) => setSelectedCharge(e.currentTarget.value)}
@@ -276,24 +277,24 @@ export function ArrestWizard() {
                     </option>
                   )}
                 </For>
-              </select>
-              <button class="btn" onClick={addCharge} disabled={!selectedCharge()}>
+              </Select.Root>
+              <Button.Root class="btn" onClick={addCharge} disabled={!selectedCharge()}>
                 [ADD CHARGE]
-              </button>
+              </Button.Root>
             </div>
             <div class="form-section">
               <label class="form-label">[CUSTOM CHARGE]</label>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <input
+                <Input.Root
                   type="text"
                   class="dos-input"
                   value={customCharge()}
                   onInput={(e) => setCustomCharge(e.currentTarget.value)}
                   placeholder="Enter custom charge..."
                 />
-                <button class="btn" onClick={addCharge} disabled={!customCharge().trim()}>
+                <Button.Root class="btn" onClick={addCharge} disabled={!customCharge().trim()}>
                   [ADD]
-                </button>
+                </Button.Root>
               </div>
             </div>
             <div class="selected-items">
@@ -305,7 +306,7 @@ export function ArrestWizard() {
                 {(charge) => (
                   <div class="item-tag">
                     {charge}
-                    <button class="btn-remove" onClick={() => removeCharge(charge)}>✕</button>
+                    <Button.Root class="btn-remove" onClick={() => removeCharge(charge)}>✕</Button.Root>
                   </div>
                 )}
               </For>
@@ -316,16 +317,16 @@ export function ArrestWizard() {
             <div class="form-section">
               <label class="form-label">[SEIZED ITEMS]</label>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <input
+                <Input.Root
                   type="text"
                   class="dos-input"
                   value={newItem()}
                   onInput={(e) => setNewItem(e.currentTarget.value)}
                   placeholder="Describe item..."
                 />
-                <button class="btn" onClick={addSeizedItem} disabled={!newItem().trim()}>
+                <Button.Root class="btn" onClick={addSeizedItem} disabled={!newItem().trim()}>
                   [ADD ITEM]
-                </button>
+                </Button.Root>
               </div>
             </div>
             <div class="selected-items">
@@ -336,7 +337,7 @@ export function ArrestWizard() {
                 {(item) => (
                   <div class="item-tag">
                     {item}
-                    <button class="btn-remove" onClick={() => removeSeizedItem(item)}>✕</button>
+                    <Button.Root class="btn-remove" onClick={() => removeSeizedItem(item)}>✕</Button.Root>
                   </div>
                 )}
               </For>
@@ -365,7 +366,7 @@ export function ArrestWizard() {
             </div>
             <div class="form-section">
               <label class="form-label">[ADDITIONAL NOTES]</label>
-              <textarea
+              <Textarea.Root
                 class="dos-textarea"
                 value={arrestData().notes}
                 onInput={(e) => setArrestData({ ...arrestData(), notes: e.currentTarget.value })}
@@ -378,7 +379,7 @@ export function ArrestWizard() {
           <Show when={currentStep() === 5}>
             <div class="form-section">
               <label class="form-label">[TRANSPORT DESTINATION] *</label>
-              <select
+              <Select.Root
                 class="dos-select"
                 value={arrestData().transportDestination}
                 onChange={(e) => setArrestData({ ...arrestData(), transportDestination: e.currentTarget.value })}
@@ -388,11 +389,11 @@ export function ArrestWizard() {
                 <option value="Los Santos County Jail">Los Santos County Jail</option>
                 <option value="Pillbox Hospital">Pillbox Hospital (Medical Clearance)</option>
                 <option value="Juvenile Hall">Juvenile Hall</option>
-              </select>
+              </Select.Root>
             </div>
             <div class="form-section">
               <label class="form-label">[ESCORTING OFFICER] *</label>
-              <input
+              <Input.Root
                 type="text"
                 class="dos-input"
                 value={arrestData().escortingOfficer}
@@ -451,26 +452,26 @@ export function ArrestWizard() {
 
         <div class="wizard-footer">
           <Show when={currentStep() > 1}>
-            <button class="btn" onClick={prevStep}>
+            <Button.Root class="btn" onClick={prevStep}>
               [← PREVIOUS]
-            </button>
+            </Button.Root>
           </Show>
           
           <Show when={currentStep() < totalSteps} fallback={
-            <button class="btn btn-primary" onClick={submitArrest}>
+            <Button.Root class="btn btn-primary" onClick={submitArrest}>
               [SUBMIT BOOKING ✓]
-            </button>
+            </Button.Root>
           }>
-            <button class="btn btn-primary" onClick={nextStep}>
+            <Button.Root class="btn btn-primary" onClick={nextStep}>
               [NEXT →]
-            </button>
+            </Button.Root>
           </Show>
           
-          <button class="btn" onClick={closeModal}>
+          <Button.Root class="btn" onClick={closeModal}>
             [CANCEL]
-          </button>
+          </Button.Root>
         </div>
       </div>
-    </div>
+    </Modal.Root>
   );
 }

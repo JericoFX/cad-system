@@ -66,6 +66,11 @@ body {
   text-shadow: 0 0 2px rgba(192, 192, 192, 0.4);
 }
 
+.cad-app.vehicle-dock-shell {
+  background-color: transparent;
+  text-shadow: none;
+}
+
 /* CRT Effect overlay - only visible when CAD is open */
 .cad-app::before {
   content: ' ';
@@ -85,6 +90,10 @@ body {
     3px 100%;
   z-index: 1;
   pointer-events: none;
+}
+
+.cad-app.vehicle-dock-shell::before {
+  display: none;
 }
 
 .police-watermark {
@@ -2366,6 +2375,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  position: relative;
 }
 
 .dispatch-v2-header {
@@ -2736,6 +2746,147 @@ body {
   font-size: 12px;
 }
 
+.dispatch-cctv-toolbar {
+  margin: 10px 10px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dispatch-cctv-grid {
+  margin: 8px 10px 10px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.dispatch-cctv-card {
+  border: 1px solid var(--terminal-border);
+  background-color: rgba(0, 0, 0, 0.45);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dispatch-cctv-card.is-viewing {
+  border-color: var(--terminal-system);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 0, 0.25);
+}
+
+.dispatch-cctv-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.dispatch-cctv-card-title {
+  color: var(--terminal-fg-bright);
+  font-size: 12px;
+}
+
+.dispatch-cctv-card-meta {
+  color: var(--terminal-fg-dim);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.dispatch-cctv-card-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.dispatch-cctv-card-actions .btn {
+  width: 100%;
+}
+
+.dispatch-cctv-status {
+  border: 1px solid var(--terminal-border);
+  padding: 2px 6px;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.dispatch-cctv-status.status-active {
+  color: var(--terminal-success);
+  border-color: var(--terminal-success);
+}
+
+.dispatch-cctv-status.status-disabled {
+  color: var(--terminal-error);
+  border-color: var(--terminal-error);
+}
+
+.dispatch-cctv-crt-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 255, 255, 0.03) 0%,
+    rgba(0, 0, 0, 0.32) 80%
+  );
+  animation: dispatchCrtFlicker 2.2s linear infinite;
+}
+
+.dispatch-cctv-mock-feed {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.28;
+  filter: grayscale(0.3) contrast(1.08);
+}
+
+.dispatch-cctv-crt-scanlines {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.15),
+    rgba(0, 0, 0, 0.15) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+.dispatch-cctv-crt-label {
+  position: absolute;
+  top: 58px;
+  left: 24px;
+  color: var(--terminal-system-bright);
+  border: 1px solid var(--terminal-system);
+  background-color: rgba(0, 0, 0, 0.55);
+  padding: 3px 8px;
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+
+.dispatch-cctv-crt-meta {
+  position: absolute;
+  top: 58px;
+  right: 24px;
+  color: var(--terminal-fg-bright);
+  border: 1px solid var(--terminal-border);
+  background-color: rgba(0, 0, 0, 0.55);
+  padding: 3px 8px;
+  font-size: 11px;
+}
+
+@keyframes dispatchCrtFlicker {
+  0%,
+  100% {
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 .dispatch-v2-composer {
   border-top: 1px solid var(--terminal-border);
   background-color: rgba(0, 0, 0, 0.28);
@@ -2780,6 +2931,10 @@ body {
   .dispatch-v2-composer-grid .btn {
     grid-column: span 3;
   }
+
+  .dispatch-cctv-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 980px) {
@@ -2799,6 +2954,16 @@ body {
 
   .dispatch-v2-column {
     min-height: 320px;
+  }
+
+  .dispatch-cctv-card-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .dispatch-cctv-crt-meta {
+    top: 86px;
+    right: 12px;
+    left: 12px;
   }
 
   .dispatch-v2-composer-grid {

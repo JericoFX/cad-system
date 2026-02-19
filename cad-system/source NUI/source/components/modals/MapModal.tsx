@@ -4,6 +4,7 @@ import { cadState, cadActions } from '~/stores/cadStore';
 import { userState } from '~/stores/userStore';
 import type { MapMarker, MapRef } from '../Map.types';
 import type { DispatchCall } from '~/stores/cadStore';
+import { Button, Input, Modal } from '~/components/ui';
 
 type MapModalData = {
   returnModal?: string;
@@ -264,7 +265,7 @@ export function MapModal() {
   };
 
   return (
-    <div class='modal-overlay' onClick={closeModal}>
+        <Modal.Root onClose={closeModal} useContentWrapper={false}>
       <div class='modal-content map-modal' onClick={(e) => e.stopPropagation()}>
         <div class='modal-header'>
           <h2>=== TACTICAL MAP ===</h2>
@@ -398,7 +399,7 @@ export function MapModal() {
               </div>
             </Show>
             <div class='form-actions'>
-              <button
+              <Button.Root
                 class='btn btn-primary'
                 onClick={handleAssignUnit}
                 disabled={
@@ -406,8 +407,8 @@ export function MapModal() {
                 }
               >
                 [ASSIGN]
-              </button>
-              <button
+              </Button.Root>
+              <Button.Root
                 class='btn'
                 onClick={() => {
                   setShowAssignForm(false);
@@ -415,7 +416,7 @@ export function MapModal() {
                 }}
               >
                 [CANCEL]
-              </button>
+              </Button.Root>
             </div>
           </div>
         </Show>
@@ -436,7 +437,7 @@ export function MapModal() {
                 {clickCoords()![1].toFixed(1)}
               </div>
             </Show>
-            <input
+            <Input.Root
               type='text'
               class='dos-input'
               value={newCallTitle()}
@@ -464,14 +465,14 @@ export function MapModal() {
               </button>
             </div>
             <div class='form-actions'>
-              <button
+              <Button.Root
                 class='btn btn-primary'
                 onClick={handleCreateCall}
                 disabled={!clickCoords() || !newCallTitle().trim()}
               >
                 [CREATE]
-              </button>
-              <button
+              </Button.Root>
+              <Button.Root
                 class='btn'
                 onClick={() => {
                   setShowCreateForm(false);
@@ -479,7 +480,7 @@ export function MapModal() {
                 }}
               >
                 [CANCEL]
-              </button>
+              </Button.Root>
             </div>
           </div>
         </Show>
@@ -583,11 +584,11 @@ export function MapModal() {
           <span style={{ color: '#808080', 'font-size': '14px' }}>
             Total markers: {allMarkers().length}
           </span>
-          <button class='btn' onClick={closeModal}>
+          <Button.Root class='btn' onClick={closeModal}>
             [CLOSE]
-          </button>
+          </Button.Root>
         </div>
       </div>
-    </div>
+    </Modal.Root>
   );
 }

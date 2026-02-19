@@ -4,6 +4,7 @@ import { cadActions, cadState } from '~/stores/cadStore';
 import { fetchNui } from '~/utils/fetchNui';
 import { DosSelect } from '../DosSelect';
 import type { Case } from '~/stores/cadStore';
+import { Button, Input, Modal, Textarea } from '~/components/ui';
 
 export function CaseCreator() {
   const modalData = terminalState.modalData as {
@@ -147,7 +148,7 @@ export function CaseCreator() {
   };
 
   return (
-    <div class="modal-overlay" onClick={closeModal}>
+        <Modal.Root onClose={closeModal} useContentWrapper={false}>
       <div class="modal-content case-creator" onClick={(e) => e.stopPropagation()}>
         <Show 
           when={!createdCase()} 
@@ -182,15 +183,15 @@ export function CaseCreator() {
                 </div>
                 
                 <div class="modal-footer" style={{ 'flex-direction': 'column', gap: '10px' }}>
-                  <button class="btn btn-primary" onClick={handleAddEvidence}>
+                  <Button.Root class="btn btn-primary" onClick={handleAddEvidence}>
                     [ADD EVIDENCE]
-                  </button>
-                  <button class="btn" onClick={handleAddNote}>
+                  </Button.Root>
+                  <Button.Root class="btn" onClick={handleAddNote}>
                     [ADD NOTE]
-                  </button>
-                  <button class="btn" onClick={handleDone}>
+                  </Button.Root>
+                  <Button.Root class="btn" onClick={handleDone}>
                     [DONE - CLOSE]
-                  </button>
+                  </Button.Root>
                 </div>
               </div>
             </div>
@@ -261,7 +262,7 @@ export function CaseCreator() {
 
             <div class="form-section">
               <label class="form-label">[TITLE]</label>
-              <input
+              <Input.Root
                 type="text"
                 class="dos-input"
                 value={title()}
@@ -273,7 +274,7 @@ export function CaseCreator() {
 
             <div class="form-section">
               <label class="form-label">[DESCRIPTION]</label>
-              <textarea
+              <Textarea.Root
                 class="dos-textarea"
                 value={description()}
                 onInput={(e) => setDescription(e.currentTarget.value)}
@@ -293,25 +294,25 @@ export function CaseCreator() {
             </div>
 
             <div class="modal-footer">
-              <button 
+              <Button.Root 
                 type="submit" 
                 class="btn btn-primary" 
                 disabled={isSubmitting() || !title().trim() || !!getLinkedCase()}
               >
                 {isSubmitting() ? '[CREATING...]' : '[CREATE CASE]'}
-              </button>
+              </Button.Root>
               <Show when={getLinkedCase()}>
-                <button type="button" class="btn" onClick={openExistingLinkedCase}>
+                <Button.Root type="button" class="btn" onClick={openExistingLinkedCase}>
                   [OPEN EXISTING CASE]
-                </button>
+                </Button.Root>
               </Show>
-              <button type="button" class="btn" onClick={closeModal}>
+              <Button.Root type="button" class="btn" onClick={closeModal}>
                 [CANCEL]
-              </button>
+              </Button.Root>
             </div>
           </form>
         </Show>
       </div>
-    </div>
+    </Modal.Root>
   );
 }

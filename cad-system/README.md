@@ -1,12 +1,23 @@
 # CAD System
 
-FiveM CAD/MDT resource focused on fixed terminal roleplay (dispatch + police + EMS + forensics).
+CAD pensado para servidores FiveM con rol policial, EMS y forense desde una terminal fija en juego.
 
 Created by **JericoFX**  
 GitHub: https://github.com/JericoFX  
 License: **GNU GPL v3**
 
-This project started as a TUICSS MDT idea and evolved into a full in-world CAD terminal flow.
+## En pocas palabras
+
+Este CAD te ayuda a manejar el trabajo diario del servidor sin salir del flujo de rol:
+
+- Recibir y organizar llamadas de dispatch.
+- Abrir casos, agregar notas y dar seguimiento.
+- Buscar personas y vehiculos rapidamente.
+- Guardar evidencia (fotos, video, audio y pruebas forenses).
+- Apoyar trabajo conjunto entre policia, EMS y forense.
+- Gestionar multas y otros registros operativos.
+
+Todo esta pensado para que la operacion sea mas clara, rapida y ordenada dentro del servidor.
 
 ## What is included
 
@@ -16,6 +27,7 @@ This project started as a TUICSS MDT idea and evolved into a full in-world CAD t
 - Evidence staging + case attachment + evidence document viewer
 - Forensics (lab callbacks + world trace bagging by proximity)
 - EMS dashboard + blood request/analysis transfer
+- Toxicology window tracking from `ox_inventory` item use (stored in QBCore metadata)
 - Fines and ticket payment flow
 - Police dashboard tools + jail transfer log hook
 - News module
@@ -61,9 +73,11 @@ Main file: `config.lua`
 
 ```lua
 Framework = {
-    Preferred = 'auto' -- auto | qbox | qb-core | esx | standalone
+    Preferred = 'qb-core'
 }
 ```
+
+Only QBCore is supported.
 
 ### CAD access
 
@@ -77,6 +91,19 @@ UI = {
 
 Use `UI.AccessPoints` to define fixed terminal positions, allowed jobs, ID reader, and evidence container.
 
+### Callsign policy
+
+```lua
+Security = {
+    Callsign = {
+        RequireWhenEmpty = true,
+        RequireWhenPrefix = { 'B-' }
+    }
+}
+```
+
+`RequireWhenPrefix` controls which callsign prefixes force the callsign modal.
+
 ### Feature toggles
 
 ```lua
@@ -86,6 +113,26 @@ Features = {
     News = { Enabled = true, ShowInUI = true }
 }
 ```
+
+### Media upload (single server config)
+
+Define this in your `server.cfg`:
+
+```cfg
+set CAD_MEDIA_SERVICE fivemanage
+set CAD_MEDIA_API_KEY your_api_key_here
+set CAD_MEDIA_UPLOAD_URL ""
+```
+
+- `CAD_MEDIA_SERVICE`: `fivemanage` | `medal` | `discord` | `custom`
+- `CAD_MEDIA_API_KEY`: shared API key used by the selected service (when required)
+- `CAD_MEDIA_UPLOAD_URL`: required for `medal` and `custom` services
+
+Notes:
+
+- `screenshot-basic` is still the base capture layer for image grabs.
+- `fivemanage` works out of the box with default CAD endpoints.
+- `medal` needs an upload endpoint URL (your Medal-compatible pipeline).
 
 ### Dispatch quick setup
 
@@ -110,6 +157,31 @@ Forensics = {
     }
 }
 ```
+
+### Toxicology tracking (QBCore metadata)
+
+```lua
+Forensics = {
+    Toxicology = {
+        Enabled = true,
+        MetadataKey = 'cad_toxicology',
+        StateBagKey = 'cad_toxicology',
+        DefaultWindowMs = 1800000,
+        TrackedItems = {
+            weed_joint = { substance = 'THC', windowMs = 1800000, severity = 'LOW' },
+            cocaine_baggy = { substance = 'COCAINE', windowMs = 2700000, severity = 'HIGH' },
+        }
+    }
+}
+```
+
+How it works:
+
+- When a tracked item is used, CAD updates active toxicology windows in QBCore player metadata.
+- Current summary is also replicated to player statebag (`StateBagKey`) for real-time consumers.
+- During blood sample creation, CAD injects a frozen `toxicologySnapshot` into sample metadata.
+- When EMS transfers blood evidence to a case, that snapshot is stored in `evidence.data.analysis.toxicology`.
+- No extra CAD toxicology table is required.
 
 ### Forensic world trace setup
 
@@ -152,9 +224,45 @@ Add these to `ox_inventory/data/items.lua`:
     consume = 0,
     description = 'Sealed forensic blood sample for EMS lab processing'
 }
+
+['security_camera'] = {
+    label = 'Security Camera',
+    weight = 350,
+    stack = false,
+    close = true,
+    consume = 0,
+    description = 'Deployable CCTV camera for dispatch live grid',
+    client = {
+        export = 'cad-system.useSecurityCamera'
+    }
+}
 ```
 
 If your resource name is different, replace `cad-system` in the export string.
+
+### Security camera item (copy/paste block)
+
+If you only need the CCTV item, this is the exact block:
+
+```lua
+['security_camera'] = {
+    label = 'Security Camera',
+    weight = 350,
+    stack = false,
+    close = true,
+    consume = 0,
+    description = 'Deployable CCTV camera for dispatch live grid',
+    client = {
+        export = 'cad-system.useSecurityCamera'
+    }
+}
+```
+
+In Dispatch, each camera appears in the CCTV grid with:
+
+- `[VER]` to open feed
+- `[ENABLE]` / `[DISABLE]` to toggle status
+- `[REMOVE]` to delete camera
 
 ## ID Reader (terminal stash flow)
 
@@ -242,6 +350,8 @@ Schema auto-created by `server/database.lua`:
 - `cad_ems_alerts`
 - `cad_ems_blood_requests`
 
+Note: toxicology windows use QBCore metadata and blood evidence payload (no dedicated SQL table).
+
 ## Localization
 
 NUI supports JSON-based strings.
@@ -271,19 +381,29 @@ Includes simulated responses for:
 
 The CAD system supports integration with media capture services for screenshots, videos, and audio.
 
-### FiveMerr (Recommended)
+### Screenshot Basic (base)
 
-**Primary option** - Built by a friend with full API support for videos, audio, photos, and more.
+CAD image capture is built around `screenshot-basic` exports.
 
-- Website: https://fivemerr.com/
-- Features: Video upload, audio, photos, API access
+- Resource: https://github.com/citizenfx/screenshot-basic
+- Used by CAD for direct upload and server-side proxy capture flows
 
-### Medal (Alternative)
+### FiveManage
 
-Lagless screenshot and video capture with auto-clipping support.
+FiveManage is fully supported for image uploads.
 
-- GitHub: https://github.com/get-wrecked/fivem
-- CFX Forum: https://forum.cfx.re/t/free-medal-lagless-screenshots-event-auto-clipping/5355630
+- Docs (images): https://docs.fivemanage.com/guides/uploading-files/images
+- Main endpoint: `https://api.fivemanage.com/api/v3/file`
+- Base64 endpoint: `https://api.fivemanage.com/api/v3/file/base64`
+- Auth: `Authorization` header (or `?apiKey=` query)
+
+### MedalTV
+
+Medal can be integrated as the media upload target and also provides a drop-in replacement layer compatible with `screenshot-basic` style flows.
+
+- Resource: https://github.com/get-wrecked/fivem
+- Release thread: https://forum.cfx.re/t/free-medal-lagless-screenshots-event-auto-clipping/5355630
+- For CAD, set `CAD_MEDIA_SERVICE=medal` and configure `CAD_MEDIA_UPLOAD_URL` (+ key if needed)
 
 ## Vehicle Integration Testing Guide
 
@@ -351,6 +471,10 @@ When in vehicle CAD mode, radar automatically shows:
 - Blood transfer issues:
   - verify `cad_blood_sample` exists in `ox_inventory`
   - check `Forensics.BloodPostAnalysis` config
+- Toxicology not appearing in blood evidence:
+  - verify `Forensics.Toxicology.Enabled = true`
+  - verify used item names match `Forensics.Toxicology.TrackedItems`
+  - confirm your framework is QBCore and metadata updates are available
 - Forensic traces not visible:
   - verify job is allowed in `Forensics.WorldTraceVisibleJobs`
   - verify ingest source is allowed when `AllowAllIngestResources = false`

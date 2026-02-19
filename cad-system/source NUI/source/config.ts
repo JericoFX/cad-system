@@ -64,6 +64,7 @@ const configuredMode = parseMode(env.VITE_UI_MODE, 'dock');
 const dispatchFeature = parseBoolean(env.VITE_FEATURE_DISPATCH, true);
 const forensicsFeature = parseBoolean(env.VITE_FEATURE_FORENSICS, true);
 const newsFeature = parseBoolean(env.VITE_FEATURE_NEWS, true);
+const vehicleDockFeature = parseBoolean(env.VITE_FEATURE_VEHICLE_DOCK, true);
 
 export const CONFIG = {
   USE_MOCK_DATA: useMockData,
@@ -76,6 +77,7 @@ export const CONFIG = {
     DISPATCH: dispatchFeature,
     FORENSICS: forensicsFeature,
     NEWS: newsFeature,
+    VEHICLE_DOCK: vehicleDockFeature,
   },
 
   MOCK_USER: {

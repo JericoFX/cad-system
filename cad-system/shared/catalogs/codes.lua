@@ -1,9 +1,4 @@
---[[
-C.A.D. System
-Created by JericoFX
-GitHub: https://github.com/JericoFX
-License: GNU GPL v3
-]]
+
 
 CAD = CAD or {}
 CAD.Catalogs = CAD.Catalogs or {}
@@ -164,20 +159,7 @@ CAD.Catalogs.Codes = {
 }
 
 local function clone(value)
-    if CAD.DeepCopy then
-        return CAD.DeepCopy(value)
-    end
-
-    if type(value) ~= 'table' then
-        return value
-    end
-
-    local out = {}
-    for k, v in pairs(value) do
-        out[k] = clone(v)
-    end
-
-    return out
+    return CAD.DeepCopy(value)
 end
 
 function CAD.GetCodeCatalog()

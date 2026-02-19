@@ -29,6 +29,35 @@ interface OfficerPayload {
   grade?: number | string;
   isAdmin?: boolean;
   hasCallsign?: boolean;
+  callsignPolicy?: {
+    requireWhenEmpty?: boolean;
+    blockedPrefixes?: string[];
+  };
+}
+
+function needsCallsignSetup(
+  callsign: string | null,
+  policy?: { requireWhenEmpty?: boolean; blockedPrefixes?: string[] }
+): boolean {
+  const requireWhenEmpty = policy?.requireWhenEmpty !== false;
+  if (!callsign || !callsign.trim()) {
+    return requireWhenEmpty;
+  }
+
+  const normalized = callsign.toUpperCase().trim();
+  const blockedPrefixes =
+    Array.isArray(policy?.blockedPrefixes) && policy?.blockedPrefixes.length > 0
+      ? policy.blockedPrefixes
+      : ['B-'];
+
+  for (let i = 0; i < blockedPrefixes.length; i += 1) {
+    const prefix = String(blockedPrefixes[i] || '').toUpperCase().trim();
+    if (prefix && normalized.startsWith(prefix)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function mapJobToRole(payload: OfficerPayload): User['role'] {
@@ -90,7 +119,7 @@ export const userActions = {
 
     try {
       const officer = await fetchNui<OfficerPayload>('getPlayerData');
-      if (!officer) {
+      if (!officer || (officer as { ok?: boolean }).ok === false) {
         setUserState({
           currentUser: null,
           isAuthenticated: false,
@@ -102,7 +131,7 @@ export const userActions = {
       }
 
       const callsign = officer.callsign || null;
-      const needsCallsign = !callsign || callsign.startsWith('B-');
+      const needsCallsign = needsCallsignSetup(callsign, officer.callsignPolicy);
 
       setUserState({
         currentUser: mapOfficerToUser(officer),
@@ -156,14 +185,12 @@ export const userActions = {
     return roles.includes(userState.currentUser.role) || userState.currentUser.role === 'admin';
   },
 
-  // Callsign actions
   setCallsign: (callsign: string) => {
     setUserState({
       callsign,
       needsCallsign: false,
       callsignValidated: true,
     });
-    // Update badge in currentUser
     if (userState.currentUser) {
       setUserState('currentUser', 'badge', callsign);
     }

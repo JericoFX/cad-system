@@ -2,6 +2,7 @@
 import { createCommand, requireCaseLoaded } from '../commandBuilder';
 import { cadActions, cadState, type Evidence } from '~/stores/cadStore';
 import { userActions } from '~/stores/userStore';
+import { featureState } from '~/stores/featureStore';
 
 const EVIDENCE_TYPES = ['PHOTO_URL', 'VIDEO_URL', 'DOCUMENT', 'PHYSICAL', 'DIGITAL'] as const;
 type EvidenceType = typeof EVIDENCE_TYPES[number];
@@ -147,5 +148,21 @@ export function registerEvidenceCommands() {
         ])
       );
     }
+  });
+
+  createCommand({
+    name: 'forensics',
+    aliases: ['forensic', 'lab'],
+    description: 'Open forensic collection panel',
+    usage: 'forensics',
+    handler: async ({ terminal }) => {
+      if (!featureState.forensics.enabled || !featureState.forensics.visible) {
+        terminal.print('Forensics module is disabled', 'error');
+        return;
+      }
+
+      terminal.print('Opening forensic collection...', 'system');
+      terminal.openModal('FORENSIC_COLLECTION');
+    },
   });
 }

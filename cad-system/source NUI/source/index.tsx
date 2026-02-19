@@ -6,14 +6,23 @@ import { userActions } from './stores/userStore';
 import { featureActions } from './stores/featureStore';
 import { codeCatalogActions } from './stores/codeCatalogStore';
 import { appActions } from './stores/appStore';
-import { terminalActions } from './stores/terminalStore';
+import { terminalActions, terminalState } from './stores/terminalStore';
+import { fetchNui } from './utils/fetchNui';
+import { UIProvider } from './components/ui';
 
 // Import NUI System
 import { initNuiSystem } from './hooks/useNui';
 
 const root = document.getElementById('root');
 if (root) {
-  render(() => <App />, root);
+  render(
+    () => (
+      <UIProvider>
+        <App />
+      </UIProvider>
+    ),
+    root
+  );
 } else {
   console.error('[APP] Root element not found!');
 }
@@ -21,8 +30,17 @@ if (root) {
 // Global Escape key handler to close CAD
 const handleGlobalKeyDown = (e: KeyboardEvent) => {
   if (e.key === 'Escape') {
+    if (terminalState.activeModal === 'VEHICLE_CAD' && terminalState.isInPoliceVehicle) {
+      void fetchNui('cad:vehicle:setOpen', { open: false }).catch(() => {});
+      terminalActions.closeVehicleCAD();
+      return;
+    }
+
+    if (terminalState.isInPoliceVehicle) {
+      return;
+    }
+
     // Check if any modal is open - if so, close modal first
-    const { terminalState } = require('./stores/terminalStore');
     if (terminalState.activeModal) {
       terminalActions.setActiveModal(null);
       return;

@@ -1,5 +1,6 @@
 import { Show, createSignal, onMount, onCleanup, createEffect } from 'solid-js';
 import { viewerState, viewerActions } from '~/stores/viewerStore';
+import { Button, Modal } from '~/components/ui';
 
 export function MediaPlayer() {
   const [isPlaying, setIsPlaying] = createSignal(false);
@@ -190,15 +191,15 @@ export function MediaPlayer() {
 
       {/* Controls */}
       <div class='media-controls'>
-        <button class='btn' onClick={() => seekRelative(-10)}>
+        <Button.Root class='btn' onClick={() => seekRelative(-10)}>
           {'[<<]'}
-        </button>
-        <button class='btn btn-primary' onClick={togglePlay}>
+        </Button.Root>
+        <Button.Root class='btn btn-primary' onClick={togglePlay}>
           {isPlaying() ? '[||]' : '[>]'}
-        </button>
-        <button class='btn' onClick={() => seekRelative(10)}>
+        </Button.Root>
+        <Button.Root class='btn' onClick={() => seekRelative(10)}>
           {'[>>]'}
-        </button>
+        </Button.Root>
         <button
           class={`btn ${isLooping() ? 'btn-primary' : ''}`}
           onClick={toggleLoop}
@@ -226,7 +227,7 @@ export function MediaPlayer() {
   );
 
   return (
-    <div class='modal-overlay' onClick={handleClose}>
+        <Modal.Root onClose={handleClose} useContentWrapper={false}>
       <Show
         when={viewerState.mediaType === 'video'}
         fallback={
@@ -283,9 +284,9 @@ export function MediaPlayer() {
             </div>
 
             <div class='modal-footer'>
-              <button class='btn' onClick={handleClose}>
+              <Button.Root class='btn' onClick={handleClose}>
                 [CLOSE]
-              </button>
+              </Button.Root>
             </div>
           </div>
         }
@@ -359,12 +360,12 @@ export function MediaPlayer() {
           </div>
 
           <div class='modal-footer'>
-            <button class='btn' onClick={handleClose}>
+            <Button.Root class='btn' onClick={handleClose}>
               [CLOSE]
-            </button>
+            </Button.Root>
           </div>
         </div>
       </Show>
-    </div>
+    </Modal.Root>
   );
 }

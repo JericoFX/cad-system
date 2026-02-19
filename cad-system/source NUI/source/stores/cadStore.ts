@@ -75,6 +75,23 @@ export interface DispatchCall {
   createdAt: string;
 }
 
+export interface SecurityCamera {
+  cameraId: string;
+  cameraNumber: number;
+  label: string;
+  street: string;
+  crossStreet: string;
+  zone: string;
+  coords: { x: number; y: number; z: number };
+  rotation: { x: number; y: number; z: number };
+  fov: number;
+  status: 'ACTIVE' | 'DISABLED';
+  installedBy: string;
+  installedByName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface RadioMarker {
   markerId: string;
   message: string;
@@ -237,6 +254,7 @@ interface CADState {
   caseEvidence: Record<string, Evidence[]>;
   dispatchUnits: Record<string, DispatchUnit>;
   dispatchCalls: Record<string, DispatchCall>;
+  securityCameras: Record<string, SecurityCamera>;
   currentCall: DispatchCall | null;
   notes: Note[];
   radioMarkers: Record<string, RadioMarker>;
@@ -264,6 +282,7 @@ const initialState: CADState = {
   caseEvidence: {},
   dispatchUnits: {},
   dispatchCalls: {},
+  securityCameras: {},
   currentCall: null,
   notes: [],
   
@@ -339,6 +358,15 @@ export const cadActions = {
     });
   },
   setCurrentCall: (call: DispatchCall | null) => setCADState('currentCall', call),
+
+  setSecurityCameras: (cameras: Record<string, SecurityCamera>) => setCADState('securityCameras', cameras),
+  upsertSecurityCamera: (camera: SecurityCamera) => setCADState('securityCameras', camera.cameraId, camera),
+  removeSecurityCamera: (cameraId: string) => {
+    setCADState('securityCameras', (prev) => {
+      const { [cameraId]: _, ...rest } = prev;
+      return rest;
+    });
+  },
   
   addCaseNote: (caseId: string, note: Note) => {
     setCADState('cases', caseId, 'notes', (prev) => [...(prev || []), note]);

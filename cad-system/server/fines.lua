@@ -1,9 +1,4 @@
---[[
-C.A.D. System
-Created by JericoFX
-GitHub: https://github.com/JericoFX
-License: GNU GPL v3
-]]
+
 
 CAD = CAD or {}
 CAD.Fines = CAD.Fines or {}
@@ -121,7 +116,6 @@ local function issueFine(payload, officer)
         CAD.Server.Notify(targetSource, ('New fine: $%s (%s)'):format(fine.amount, fine.fineCode), 'warning')
     end
 
-    -- Broadcast fine creation to police
     CAD.Server.BroadcastToJobs(
         {'police', 'sheriff'},
         'fineCreated',
@@ -186,7 +180,6 @@ local function payFine(source, fineId, method)
     fine.status = 'PAID'
     saveFineDb(fine)
 
-    -- Broadcast fine paid
     CAD.Server.BroadcastToJobs(
         {'police', 'sheriff'},
         'finePaid',

@@ -1,42 +1,29 @@
---[[
-C.A.D. System
-Created by JericoFX
-GitHub: https://github.com/JericoFX
-License: GNU GPL v3
-]]
 
--- CAD Client Functions
 
--- Get street name at coords
 function CAD.Client.GetStreetName(coords)
     local streetHash = GetStreetNameAtCoord(coords.x, coords.y, coords.z)
     return GetStreetNameFromHashKey(streetHash)
 end
 
--- Get zone name
 function CAD.Client.GetZoneName(coords)
     local zoneName = GetLabelText(GetNameOfZone(coords.x, coords.y, coords.z))
     return zoneName
 end
 
--- Format coords for display
 function CAD.Client.FormatCoords(coords)
     return string.format('%.2f, %.2f, %.2f', coords.x, coords.y, coords.z)
 end
 
--- Get direction from heading ((dont remember where i take this sorry!!))
 function CAD.Client.GetDirection(heading)
     local directions = { 'N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW' }
     local index = math.floor((heading + 22.5) / 45) % 8
     return directions[index + 1]
 end
 
--- Check if player is in vehicle
 function CAD.Client.IsInVehicle()
     return cache.vehicle ~= nil
 end
 
--- Get vehicle info
 function CAD.Client.GetVehicleInfo()
     if not cache.vehicle then return nil end
 
@@ -52,24 +39,20 @@ function CAD.Client.GetVehicleInfo()
     }
 end
 
--- Play animation
 function CAD.Client.PlayAnim(dict, anim, duration)
     lib.requestAnimDict(dict)
     TaskPlayAnim(cache.ped, dict, anim, 8.0, -8.0, duration, 0, 0, false, false, false)
     RemoveAnimDict(dict)
 end
 
--- Show help text
 function CAD.Client.ShowHelpText(text)
     lib.showTextUI(text)
 end
 
--- Hide help text
 function CAD.Client.HideHelpText()
     lib.hideTextUI()
 end
 
--- Create blip
 function CAD.Client.CreateBlip(coords, sprite, color, scale, label)
     local blip = AddBlipForCoord(coords.x, coords.y, coords.z)
     SetBlipSprite(blip, sprite)
@@ -82,14 +65,12 @@ function CAD.Client.CreateBlip(coords, sprite, color, scale, label)
     return blip
 end
 
--- Remove blip
 function CAD.Client.RemoveBlip(blip)
     if blip then
         RemoveBlip(blip)
     end
 end
 
--- Draw 3D text
 function CAD.Client.Draw3DText(coords, text)
     local onScreen, x, y = GetScreenCoordFromWorldCoord(coords.x, coords.y, coords.z)
     if onScreen then
@@ -107,25 +88,21 @@ function CAD.Client.Draw3DText(coords, text)
     end
 end
 
--- Raycast from camera
 function CAD.Client.RayCastGamePlayCamera(distance)
-    local cameraRotation = GetGameplayCamRot()
-    local cameraCoord = GetGameplayCamCoord()
-    local direction = CAD.Client.RotationToDirection(cameraRotation)
-    local destination = {
-        x = cameraCoord.x + direction.x * distance,
-        y = cameraCoord.y + direction.y * distance,
-        z = cameraCoord.z + direction.z * distance
-    }
+    if not (lib and lib.raycast and lib.raycast.fromCamera) then
+        return false, nil, nil
+    end
 
-    local rayHandle = StartShapeTestRay(cameraCoord.x, cameraCoord.y, cameraCoord.z, destination.x, destination.y,
-        destination.z, -1, cache.ped, 0)
-    local _, hit, hitCoords, _, entityHit = GetShapeTestResult(rayHandle)
+    local hit, entityHit, hitCoords = lib.raycast.fromCamera(511, 4, distance)
+    local hasHit = hit == true or hit == 1
 
-    return hit, hitCoords, entityHit
+    if not hasHit or type(hitCoords) ~= 'table' then
+        return false, nil, nil
+    end
+
+    return true, hitCoords, entityHit
 end
 
--- Convert rotation to direction vector
 function CAD.Client.RotationToDirection(rotation)
     local adjustedRotation = {
         x = math.rad(rotation.x),
@@ -140,7 +117,6 @@ function CAD.Client.RotationToDirection(rotation)
     return direction
 end
 
--- Check if coords are valid
 function CAD.Client.IsValidCoords(coords)
     return coords and coords.x and coords.y and coords.z and
         coords.x ~= 0 and coords.y ~= 0

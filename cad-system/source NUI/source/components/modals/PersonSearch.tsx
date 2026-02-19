@@ -2,6 +2,7 @@ import { createSignal, createMemo, For, Show, onMount } from 'solid-js';
 import { terminalActions, terminalState } from '~/stores/terminalStore';
 import { cadState, cadActions, type Person } from '~/stores/cadStore';
 import { fetchNui } from '~/utils/fetchNui';
+import { Button, Input, Modal, Tabs, Textarea } from '~/components/ui';
 
 export function PersonSearch() {
   const [searchQuery, setSearchQuery] = createSignal('');
@@ -181,7 +182,23 @@ export function PersonSearch() {
 
       const response = await fetchNui<{
         ok: boolean;
+        documentType?: 'PERSON' | 'VEHICLE';
         person?: Person;
+        vehicle?: {
+          plate: string;
+          model: string;
+          make: string;
+          year: number;
+          color: string;
+          ownerId: string;
+          ownerName: string;
+          vin: string;
+          registrationStatus: 'VALID' | 'EXPIRED' | 'SUSPENDED';
+          insuranceStatus: 'VALID' | 'EXPIRED' | 'NONE';
+          stolen: boolean;
+          flags: string[];
+          createdAt: string;
+        };
         source?: string;
         item?: { name?: string; slot?: number };
         error?: string;
@@ -189,8 +206,23 @@ export function PersonSearch() {
         terminalId: context.terminalId,
       });
 
-      if (!response?.ok || !response.person) {
+      if (!response?.ok) {
         terminalActions.addLine(`Failed to read ID: ${response?.error || 'unknown_error'}`, 'error');
+        return;
+      }
+
+      if (response.documentType === 'VEHICLE' && response.vehicle) {
+        cadActions.addVehicle(response.vehicle);
+        terminalActions.setActiveModal('VEHICLE_SEARCH', { plate: response.vehicle.plate });
+        terminalActions.addLine(
+          `✓ Vehicle document read: ${response.vehicle.plate} (${response.vehicle.model})`,
+          'output'
+        );
+        return;
+      }
+
+      if (!response.person) {
+        terminalActions.addLine('Reader document has no person data', 'error');
         return;
       }
 
@@ -209,7 +241,7 @@ export function PersonSearch() {
   };
 
   return (
-    <div class="modal-overlay" onClick={closeModal}>
+        <Modal.Root onClose={closeModal} useContentWrapper={false}>
       <div class="modal-content person-search" onClick={(e) => e.stopPropagation()}>
         <div class="modal-header">
           <h2>=== PERSON SEARCH (MDT) ===</h2>
@@ -218,7 +250,7 @@ export function PersonSearch() {
 
         <div class="search-toolbar">
           <div class="search-input-group">
-            <input
+            <Input.Root
               type="text"
               class="dos-input search-input"
               value={searchQuery()}
@@ -226,12 +258,12 @@ export function PersonSearch() {
               placeholder="Enter name, citizen ID, or SSN..."
               onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
             />
-            <button class="btn btn-primary" onClick={handleSearch}>
+            <Button.Root class="btn btn-primary" onClick={handleSearch}>
               [SEARCH]
-            </button>
-            <button class="btn" onClick={() => void readFromIdReader()}>
+            </Button.Root>
+            <Button.Root class="btn" onClick={() => void readFromIdReader()}>
               [READ FROM ID]
-            </button>
+            </Button.Root>
           </div>
           <Show when={searchResults().length > 0}>
             <div class="search-stats">
@@ -283,7 +315,7 @@ export function PersonSearch() {
               </div>
 
               <div class="person-actions">
-                <button 
+                <Button.Root 
                   class="btn btn-primary"
                   onClick={() => {
                     terminalActions.setActiveModal('CASE_CREATOR', { 
@@ -293,16 +325,16 @@ export function PersonSearch() {
                   }}
                 >
                   [CREATE CASE]
-                </button>
-                <button 
+                </Button.Root>
+                <Button.Root 
                   class="btn"
                   onClick={() => {
                     setActiveTab('notes');
                   }}
                 >
                   [ADD NOTE]
-                </button>
-                <button 
+                </Button.Root>
+                <Button.Root 
                   class="btn"
                   onClick={() => {
                     if (cadState.currentCase) {
@@ -316,8 +348,8 @@ export function PersonSearch() {
                   }}
                 >
                   [ADD EVIDENCE]
-                </button>
-                <button 
+                </Button.Root>
+                <Button.Root 
                   class="btn"
                   onClick={() => {
                     terminalActions.setActiveModal(null);
@@ -325,44 +357,24 @@ export function PersonSearch() {
                   }}
                 >
                   [SELECT PERSON]
-                </button>
-                <button class="btn" onClick={openBloodRequestModal}>
+                </Button.Root>
+                <Button.Root class="btn" onClick={openBloodRequestModal}>
                   [REQUEST BLOOD SAMPLE]
-                </button>
+                </Button.Root>
               </div>
 
-              <div class="detail-tabs">
-                <button 
-                  class={`tab ${activeTab() === 'info' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('info')}
-                >
-                  [INFO]
-                </button>
-                <button 
-                  class={`tab ${activeTab() === 'vehicles' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('vehicles')}
-                >
-                  [VEHICLES ({personVehicles().length})]
-                </button>
-                <button 
-                  class={`tab ${activeTab() === 'records' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('records')}
-                >
-                  [RECORDS ({personRecords().length})]
-                </button>
-                <button 
-                  class={`tab ${activeTab() === 'warrants' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('warrants')}
-                >
-                  [WARRANTS ({personWarrants().length})]
-                </button>
-                <button
-                  class={`tab ${activeTab() === 'notes' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('notes')}
-                >
-                  [NOTES ({personNotes().length})]
-                </button>
-              </div>
+              <Tabs.Root
+                value={activeTab()}
+                onValueChange={(value) => setActiveTab(value as 'info' | 'vehicles' | 'records' | 'warrants' | 'notes')}
+              >
+                <Tabs.List>
+                  <Tabs.Trigger value='info' label='INFO' />
+                  <Tabs.Trigger value='vehicles' label='VEHICLES' badge={personVehicles().length} />
+                  <Tabs.Trigger value='records' label='RECORDS' badge={personRecords().length} />
+                  <Tabs.Trigger value='warrants' label='WARRANTS' badge={personWarrants().length} />
+                  <Tabs.Trigger value='notes' label='NOTES' badge={personNotes().length} />
+                </Tabs.List>
+              </Tabs.Root>
 
               <div class="tab-content">
                 <Show when={activeTab() === 'info'}>
@@ -435,14 +447,14 @@ export function PersonSearch() {
                           </Show>
                         </div>
                         <div class="vehicle-actions">
-                          <button
+                          <Button.Root
                             class="btn-small"
                             onClick={() => {
                               terminalActions.setActiveModal('VEHICLE_SEARCH', { plate: vehicle.plate });
                             }}
                           >
                             [OPEN VEHICLE RECORD]
-                          </button>
+                          </Button.Root>
                         </div>
                       </div>
                     )}
@@ -493,14 +505,14 @@ export function PersonSearch() {
                 <Show when={activeTab() === 'notes'}>
                   <div class="records-list">
                     <div class="add-note-form">
-                      <textarea
+                      <Textarea.Root
                         class="dos-textarea"
                         rows={3}
                         value={newPersonNote()}
                         onInput={(e) => setNewPersonNote(e.currentTarget.value)}
                         placeholder="Write a quick note for this person..."
                       />
-                      <button class="btn btn-primary" onClick={addPersonNote}>[SAVE NOTE]</button>
+                      <Button.Root class="btn btn-primary" onClick={addPersonNote}>[SAVE NOTE]</Button.Root>
                     </div>
 
                     <Show when={personNotes().length === 0}>
@@ -527,12 +539,12 @@ export function PersonSearch() {
           <span style={{ color: '#808080' }}>
             MDT System v1.0
           </span>
-          <button class="btn" onClick={closeModal}>[CLOSE]</button>
+          <Button.Root class="btn" onClick={closeModal}>[CLOSE]</Button.Root>
         </div>
       </div>
 
       <Show when={showBloodRequestModal()}>
-        <div class="modal-overlay blood-request-modal" onClick={cancelBloodRequest}>
+                <Modal.Root onClose={cancelBloodRequest} useContentWrapper={false} overlayClass='blood-request-modal'>
           <div class="modal-content" onClick={(e) => e.stopPropagation()}>
             <div class="modal-header">
               <h3>=== REQUEST BLOOD SAMPLE ===</h3>
@@ -542,7 +554,7 @@ export function PersonSearch() {
               <p>Requesting blood sample from: <strong>{selectedPerson()?.firstName} {selectedPerson()?.lastName}</strong></p>
               <div class="form-group">
                 <label>Reason for request:</label>
-                <textarea
+                <Textarea.Root
                   class="dos-textarea"
                   rows={3}
                   value={bloodRequestReason()}
@@ -552,12 +564,12 @@ export function PersonSearch() {
               </div>
             </div>
             <div class="modal-footer">
-              <button class="btn" onClick={cancelBloodRequest}>[CANCEL]</button>
-              <button class="btn btn-primary" onClick={submitBloodRequest}>[SUBMIT REQUEST]</button>
+              <Button.Root class="btn" onClick={cancelBloodRequest}>[CANCEL]</Button.Root>
+              <Button.Root class="btn btn-primary" onClick={submitBloodRequest}>[SUBMIT REQUEST]</Button.Root>
             </div>
           </div>
-        </div>
+        </Modal.Root>
       </Show>
-    </div>
+    </Modal.Root>
   );
 }

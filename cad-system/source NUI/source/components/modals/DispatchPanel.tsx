@@ -4,7 +4,8 @@ import { cadState, cadActions } from '~/stores/cadStore';
 import { fetchNui } from '~/utils/fetchNui';
 import { Kanban } from '../Kanban';
 import type { KanbanColumn, KanbanItem } from '../Kanban.types';
-import type { DispatchUnit, DispatchCall } from '~/stores/cadStore';
+import type { DispatchCall } from '~/stores/cadStore';
+import { Button, Modal, Text } from '~/components/ui';
 
 function isDispatchCall(value: unknown): value is DispatchCall {
   if (!value || typeof value !== 'object') {
@@ -197,40 +198,26 @@ export function DispatchPanel() {
     terminalActions.setActiveModal(null);
   };
   
-  const refreshData = async () => {
-    try {
-      const [units, calls] = await Promise.all([
-        fetchNui('cad:getDispatchUnits', {}),
-        fetchNui('cad:getDispatchCalls', {}),
-      ]);
-      cadActions.setDispatchUnits(units as Record<string, DispatchUnit>);
-      cadActions.setDispatchCalls(calls as Record<string, DispatchCall>);
-    } catch (error) {
-      console.error('Failed to refresh dispatch data:', error);
-    }
-  };
-  
   return (
-    <div class="modal-overlay" onClick={closePanel}>
-      <div class="modal-content dispatch-panel" onClick={(e) => e.stopPropagation()}>
-        <div class="modal-header">
-          <h2>=== DISPATCH CONTROL PANEL ===</h2>
-          <button class="modal-close" onClick={closePanel}>[X]</button>
-        </div>
-        
-        <div style={{ padding: '16px', "border-bottom": '2px solid var(--terminal-border)' }}>
-          <div style={{ color: '#ffff00', "font-size": '14px', "margin-bottom": '8px' }}>
-            [INSTRUCTIONS]
-          </div>
-          <div style={{ color: '#c0c0c0', "font-size": '14px' }}>
-            Drag AVAILABLE UNITS to PENDING/ACTIVE CALLS to assign
-          </div>
-          <div style={{ color: '#c0c0c0', "font-size": '14px' }}>
-            Drag BUSY UNITS to AVAILABLE to unassign
-          </div>
-        </div>
-        
-        <div style={{ padding: '16px' }}>
+    <Modal.Root onClose={closePanel} contentClass='dispatch-panel'>
+      <Modal.Header>
+        <Modal.Title>=== DISPATCH CONTROL PANEL ===</Modal.Title>
+        <Modal.Close />
+      </Modal.Header>
+
+      <Modal.Body style={{ padding: '16px', 'border-bottom': '2px solid var(--terminal-border)' }}>
+        <Text.Root as='div' tone='system' style={{ 'font-size': '14px', 'margin-bottom': '8px' }}>
+          [INSTRUCTIONS]
+        </Text.Root>
+        <Text.Root as='div' tone='dim' style={{ 'font-size': '14px' }}>
+          Drag AVAILABLE UNITS to PENDING/ACTIVE CALLS to assign
+        </Text.Root>
+        <Text.Root as='div' tone='dim' style={{ 'font-size': '14px' }}>
+          Drag BUSY UNITS to AVAILABLE to unassign
+        </Text.Root>
+      </Modal.Body>
+
+      <Modal.Body style={{ padding: '16px' }}>
           <Kanban
             columns={columns}
             items={kanbanItems}
@@ -238,12 +225,11 @@ export function DispatchPanel() {
             onMove={handleMove}
             onReorder={handleReorder}
           />
-        </div>
-        
-        <div class="modal-footer">
-          <button class="btn" onClick={closePanel}>[CLOSE]</button>
-        </div>
-      </div>
-    </div>
+      </Modal.Body>
+
+      <Modal.Footer>
+        <Button.Root label='CLOSE' onClick={closePanel} />
+      </Modal.Footer>
+    </Modal.Root>
   );
 }

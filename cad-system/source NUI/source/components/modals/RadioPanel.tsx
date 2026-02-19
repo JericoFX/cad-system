@@ -4,9 +4,10 @@ import { terminalActions } from '~/stores/terminalStore';
 import { radioState, radioActions } from '~/stores/radioStore';
 import { cadState, cadActions } from '~/stores/cadStore';
 import { userActions } from '~/stores/userStore';
-import { playPTTStart, playPTTEnd, playRadioChatter } from '~/utils/sounds';
+import { playPTTStart, playPTTEnd } from '~/utils/sounds';
 import type { RadioMessage } from '~/stores/radioStore';
 import type { RadioMarker } from '~/stores/cadStore';
+import { Button, Input, Modal, Tabs } from '~/components/ui';
 
 export function RadioPanel() {
   const [activeTab, setActiveTab] = createSignal<'channels' | 'users' | 'messages' | 'chatter'>('channels');
@@ -138,39 +139,25 @@ export function RadioPanel() {
   };
   
   return (
-    <div class="modal-overlay" onClick={closeModal}>
-      <div class="modal-content radio-panel" onClick={e => e.stopPropagation()}>
-        <div class="modal-header">
-          <h2>📻 PANEL DE RADIO</h2>
-          <button class="close-btn" onClick={closeModal}>×</button>
-        </div>
-        
-        <div class="detail-tabs">
-          <button 
-            class={`tab ${activeTab() === 'channels' ? 'active' : ''}`}
-            onClick={() => setActiveTab('channels')}
-          >
-            📡 Canales
-          </button>
-          <button 
-            class={`tab ${activeTab() === 'users' ? 'active' : ''}`}
-            onClick={() => setActiveTab('users')}
-          >
-            👥 Usuarios
-          </button>
-          <button 
-            class={`tab ${activeTab() === 'messages' ? 'active' : ''}`}
-            onClick={() => setActiveTab('messages')}
-          >
-            💬 Mensajes
-          </button>
-          <button 
-            class={`tab ${activeTab() === 'chatter' ? 'active' : ''}`}
-            onClick={() => setActiveTab('chatter')}
-          >
-            📻 Chatter
-          </button>
-        </div>
+    <Modal.Root onClose={closeModal} contentClass='radio-panel'>
+      <Modal.Header>
+        <Modal.Title>📻 PANEL DE RADIO</Modal.Title>
+        <Modal.Close />
+      </Modal.Header>
+
+      <Tabs.Root
+        value={activeTab()}
+        onValueChange={(value) => setActiveTab(value as 'channels' | 'users' | 'messages' | 'chatter')}
+        bracketed={false}
+        uppercase={false}
+      >
+        <Tabs.List>
+          <Tabs.Trigger value='channels' label='📡 Canales' />
+          <Tabs.Trigger value='users' label='👥 Usuarios' />
+          <Tabs.Trigger value='messages' label='💬 Mensajes' />
+          <Tabs.Trigger value='chatter' label='📻 Chatter' />
+        </Tabs.List>
+      </Tabs.Root>
         
         <div class="modal-body">
           <Show when={activeTab() === 'channels'}>
@@ -204,18 +191,18 @@ export function RadioPanel() {
                 >
                   {radioState?.isMuted ? '🔇 Muteado' : '🔊 Sonido'}
                 </button>
-                <button 
+                <Button.Root 
                   class="btn btn-secondary"
                   onClick={() => radioActions.setVolume(Math.min(100, radioState.volume + 10))}
                 >
                   🔊 Vol + ({radioState.volume}%)
-                </button>
-                <button 
+                </Button.Root>
+                <Button.Root 
                   class="btn btn-secondary"
                   onClick={() => radioActions.setVolume(Math.max(0, radioState.volume - 10))}
                 >
                   🔉 Vol -
-                </button>
+                </Button.Root>
               </div>
               
               <div class="frequency-selector">
@@ -274,13 +261,13 @@ export function RadioPanel() {
                         👤 {radioActions.getUsersInChannel(channel.channelId).length}
                       </div>
                       <Show when={radioState?.currentChannel !== channel?.channelId}>
-                        <button 
+                        <Button.Root 
                           class="btn btn-small"
                           onClick={() => channel?.channelId && radioActions?.joinChannel?.(channel.channelId)}
                           disabled={!radioState?.currentUser}
                         >
                           Unirse
-                        </button>
+                        </Button.Root>
                       </Show>
                       <Show when={radioState?.currentChannel === channel?.channelId}>
                         <span class="badge">ACTUAL</span>
@@ -307,12 +294,12 @@ export function RadioPanel() {
                           👤 {radioActions.getUsersInChannel(channel.channelId).length}
                         </div>
                         <Show when={radioState.currentChannel !== channel.channelId}>
-                          <button 
+                          <Button.Root 
                             class="btn btn-small"
                             onClick={() => radioActions.joinChannel(channel.channelId, channel.password)}
                           >
                             Unirse
-                          </button>
+                          </Button.Root>
                         </Show>
                         <Show when={radioState.currentChannel === channel.channelId}>
                           <span class="badge">ACTUAL</span>
@@ -327,7 +314,7 @@ export function RadioPanel() {
                 <h3>CREAR CANAL TEMPORAL</h3>
               </div>
               <div class="create-channel-form">
-                <input
+                <Input.Root
                   type="text"
                   class="dos-input"
                   value={newChannelName()}
@@ -335,16 +322,16 @@ export function RadioPanel() {
                   placeholder="Nombre del canal"
                   maxlength={20}
                 />
-                <input
+                <Input.Root
                   type="password"
                   class="dos-input"
                   value={newChannelPassword()}
                   onInput={(e) => setNewChannelPassword(e.currentTarget.value)}
                   placeholder="Contraseña (opcional)"
                 />
-                <button class="btn btn-primary" onClick={createTempChannel}>
+                <Button.Root class="btn btn-primary" onClick={createTempChannel}>
                   ➕ Crear Canal
-                </button>
+                </Button.Root>
               </div>
             </div>
           </Show>
@@ -387,9 +374,9 @@ export function RadioPanel() {
             <div class="radio-section">
               <div class="section-header">
                 <h3>MENSAJES - {radioState.currentChannel || 'SELECCIONA UN CANAL'}</h3>
-                <button class="btn btn-small" onClick={viewMarkers}>
+                <Button.Root class="btn btn-small" onClick={viewMarkers}>
                   📌 Ver Marcadores
-                </button>
+                </Button.Root>
               </div>
               <Show when={radioState.currentChannel}>
                 <div class="messages-list">
@@ -400,13 +387,13 @@ export function RadioPanel() {
                           <strong>{msg.senderName}</strong>
                           <span>{msg.senderBadge}</span>
                           <small>{new Date(msg.timestamp).toLocaleTimeString()}</small>
-                          <button 
+                          <Button.Root 
                             class="btn-mark" 
                             onClick={() => markMessage(msg)}
                             title="Marcar mensaje importante"
                           >
                             📌
-                          </button>
+                          </Button.Root>
                         </div>
                         <div class="message-content">{msg.content}</div>
                       </div>
@@ -421,9 +408,9 @@ export function RadioPanel() {
                     placeholder="Escribir mensaje..."
                     onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
                   />
-                  <button class="btn btn-primary" onClick={sendMessage}>
+                  <Button.Root class="btn btn-primary" onClick={sendMessage}>
                     📤 Enviar
-                  </button>
+                  </Button.Root>
                 </div>
               </Show>
               <Show when={!radioState.currentChannel}>
@@ -443,9 +430,9 @@ export function RadioPanel() {
                   >
                     {radioState.chatterEnabled ? '⏸️ Pausar' : '▶️ Reanudar'}
                   </button>
-                  <button class="btn btn-small" onClick={() => radioActions.clearChatter()}>
+                  <Button.Root class="btn btn-small" onClick={() => radioActions.clearChatter()}>
                     🗑️ Limpiar
-                  </button>
+                  </Button.Root>
                 </div>
               </div>
               
@@ -482,7 +469,6 @@ export function RadioPanel() {
             </div>
           </Show>
         </div>
-      </div>
-    </div>
+    </Modal.Root>
   );
 }

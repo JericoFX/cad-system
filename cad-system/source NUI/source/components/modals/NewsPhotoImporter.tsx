@@ -1,6 +1,8 @@
 import { createSignal, createMemo, For, Show, onMount } from 'solid-js';
 import { terminalActions } from '~/stores/terminalStore';
 import { photoActions, photoState, type PhotoMetadata } from '~/stores/photoStore';
+import { fetchNui } from '~/utils/fetchNui';
+import { Button, Input, Modal, Tabs } from '~/components/ui';
 
 interface NewsPhotoImporterProps {
   onPhotosSelected: (photos: PhotoMetadata[]) => void;
@@ -9,19 +11,142 @@ interface NewsPhotoImporterProps {
 }
 
 export function NewsPhotoImporter(props: NewsPhotoImporterProps) {
-  const [activeTab, setActiveTab] = createSignal<'inventory' | 'released'>('inventory');
+  const [activeTab, setActiveTab] = createSignal<'inventory' | 'released' | 'locker'>('inventory');
   const [selectedPhotos, setSelectedPhotos] = createSignal<Set<string>>(new Set());
   const [isLoading, setIsLoading] = createSignal(true);
   const [searchQuery, setSearchQuery] = createSignal('');
+  const [lockerPhotos, setLockerPhotos] = createSignal<PhotoMetadata[]>([]);
+  const [previewPhoto, setPreviewPhoto] = createSignal<PhotoMetadata | null>(null);
+
+  const isImageUrl = (raw: string) => {
+    const value = raw.trim();
+    if (!value) {
+      return false;
+    }
+
+    const clean = value.split('?')[0].split('#')[0].toLowerCase();
+    return ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'].some(ext => clean.endsWith(ext));
+  };
+
+  const isImageEvidenceType = (evidenceType?: string) => {
+    const normalized = String(evidenceType || '').toUpperCase();
+    return normalized === 'PHOTO' || normalized === 'IMAGE';
+  };
+
+  const toLockerPhoto = (
+    slot: {
+      slot: number;
+      metadata?: {
+        data?: {
+          url?: string;
+          imageUrl?: string;
+          photoUrl?: string;
+          images?: string[];
+          description?: string;
+          takenBy?: string;
+          takenAt?: string;
+          location?: { x: number; y: number; z: number };
+        };
+        evidenceType?: string;
+        createdAt?: string;
+      };
+    }
+  ): PhotoMetadata[] => {
+    const data = slot.metadata?.data || {};
+    const evidenceType = slot.metadata?.evidenceType;
+    const urls = [
+      data.photoUrl,
+      data.imageUrl,
+      data.url,
+      ...(Array.isArray(data.images) ? data.images : []),
+    ].filter((url): url is string => typeof url === 'string' && url.trim().length > 0);
+
+    const uniqueUrls = Array.from(new Set(urls));
+    if (uniqueUrls.length === 0) {
+      return [];
+    }
+
+    const filteredUrls = uniqueUrls.filter(url => isImageUrl(url) || isImageEvidenceType(evidenceType));
+    if (filteredUrls.length === 0) {
+      return [];
+    }
+
+    return filteredUrls.map((url, index) => ({
+      photoId: `LOCKER_SLOT_${slot.slot}_${index + 1}`,
+      photoUrl: url,
+      job: 'reporter',
+      takenBy: data.takenBy || 'Evidence Locker',
+      takenByCitizenId: 'LOCKER',
+      takenAt: data.takenAt || slot.metadata?.createdAt || new Date().toISOString(),
+      location: data.location || { x: 0, y: 0, z: 0 },
+      description: data.description || `Locker slot ${slot.slot}`,
+      fov: {
+        hit: false,
+        distance: 0,
+      },
+      releasedToPress: isImageEvidenceType(evidenceType),
+    }));
+  };
 
   onMount(async () => {
     // Load both sources
     await Promise.all([
       photoActions.fetchInventoryPhotos(),
-      photoActions.fetchReleasedPhotos()
+      photoActions.fetchReleasedPhotos(),
+      loadLockerPhotos(),
     ]);
     setIsLoading(false);
   });
+
+  const loadLockerPhotos = async () => {
+    try {
+      const context = await fetchNui<{
+        ok: boolean;
+        terminalId?: string;
+        hasContainer?: boolean;
+      }>('cad:getComputerContext', {});
+
+      if (!context?.ok || !context.terminalId || !context.hasContainer) {
+        setLockerPhotos([]);
+        return;
+      }
+
+      const locker = await fetchNui<{
+        ok: boolean;
+        slots?: Array<{
+          slot: number;
+          itemName?: string;
+          label?: string;
+          metadata?: {
+            data?: {
+              url?: string;
+              imageUrl?: string;
+              photoUrl?: string;
+              images?: string[];
+              description?: string;
+              takenBy?: string;
+              takenAt?: string;
+              location?: { x: number; y: number; z: number };
+            };
+            evidenceType?: string;
+            createdAt?: string;
+          };
+        }>;
+      }>('cad:evidence:container:list', { terminalId: context.terminalId });
+
+      if (!locker?.ok || !Array.isArray(locker.slots)) {
+        setLockerPhotos([]);
+        return;
+      }
+
+      const items: PhotoMetadata[] = locker.slots.flatMap((slot) => toLockerPhoto(slot));
+
+      setLockerPhotos(items);
+    } catch {
+      setLockerPhotos([]);
+      terminalActions.addLine('Unable to load locker photos in this terminal', 'system');
+    }
+  };
 
   const inventoryPhotos = createMemo(() => {
     const query = searchQuery().toLowerCase();
@@ -40,6 +165,20 @@ export function NewsPhotoImporter(props: NewsPhotoImporterProps) {
   const releasedPhotos = createMemo(() => {
     const query = searchQuery().toLowerCase();
     return photoState.releasedPhotos.filter(photo => {
+      if (query) {
+        return (
+          photo.photoId.toLowerCase().includes(query) ||
+          photo.description?.toLowerCase().includes(query) ||
+          photo.takenBy?.toLowerCase().includes(query)
+        );
+      }
+      return true;
+    });
+  });
+
+  const lockerSourcePhotos = createMemo(() => {
+    const query = searchQuery().toLowerCase();
+    return lockerPhotos().filter(photo => {
       if (query) {
         return (
           photo.photoId.toLowerCase().includes(query) ||
@@ -70,11 +209,15 @@ export function NewsPhotoImporter(props: NewsPhotoImporterProps) {
   };
 
   const handleImport = () => {
+    const lookup: Record<string, PhotoMetadata> = {
+      ...photoState.photos,
+      ...Object.fromEntries(lockerPhotos().map((photo) => [photo.photoId, photo])),
+    };
     const photos: PhotoMetadata[] = [];
     
     // Get selected photos from both sources
     selectedPhotos().forEach(photoId => {
-      const photo = photoState.photos[photoId];
+      const photo = lookup[photoId];
       if (photo) {
         photos.push(photo);
       }
@@ -189,13 +332,25 @@ export function NewsPhotoImporter(props: NewsPhotoImporterProps) {
               ✓ SELECTED
             </div>
           </Show>
+
+          <div style={{ 'margin-top': '8px' }}>
+            <Button.Root
+              class="btn btn-small"
+              onClick={(event: MouseEvent) => {
+                event.stopPropagation();
+                setPreviewPhoto(photo);
+              }}
+            >
+              [VIEW]
+            </Button.Root>
+          </div>
         </div>
       </div>
     );
   };
 
   return (
-    <div class="modal-overlay" onClick={props.onCancel}>
+        <Modal.Root onClose={props.onCancel} useContentWrapper={false}>
       <div 
         class="modal-content news-photo-importer" 
         onClick={e => e.stopPropagation()}
@@ -211,7 +366,7 @@ export function NewsPhotoImporter(props: NewsPhotoImporterProps) {
         <div class="modal-body" style={{ padding: '20px', display: 'flex', 'flex-direction': 'column' }}>
           {/* Search */}
           <div style={{ 'margin-bottom': '15px' }}>
-            <input
+            <Input.Root
               type="text"
               class="dos-input"
               value={searchQuery()}
@@ -222,20 +377,18 @@ export function NewsPhotoImporter(props: NewsPhotoImporterProps) {
           </div>
 
           {/* Tabs */}
-          <div class="detail-tabs" style={{ 'margin-bottom': '15px' }}>
-            <button
-              class={`tab ${activeTab() === 'inventory' ? 'active' : ''}`}
-              onClick={() => setActiveTab('inventory')}
-            >
-              My Photos ({inventoryPhotos().length})
-            </button>
-            <button
-              class={`tab ${activeTab() === 'released' ? 'active' : ''}`}
-              onClick={() => setActiveTab('released')}
-            >
-              Released Evidence ({releasedPhotos().length})
-            </button>
-          </div>
+          <Tabs.Root
+            value={activeTab()}
+            onValueChange={(value) => setActiveTab(value as 'inventory' | 'released' | 'locker')}
+            bracketed={false}
+            uppercase={false}
+          >
+            <Tabs.List style={{ 'margin-bottom': '15px' }}>
+              <Tabs.Trigger value='inventory' label='My Photos' badge={inventoryPhotos().length} />
+              <Tabs.Trigger value='released' label='Released Evidence' badge={releasedPhotos().length} />
+              <Tabs.Trigger value='locker' label='Locker Import' badge={lockerSourcePhotos().length} />
+            </Tabs.List>
+          </Tabs.Root>
 
           {/* Photo List */}
           <div style={{ 
@@ -303,6 +456,22 @@ export function NewsPhotoImporter(props: NewsPhotoImporterProps) {
                 {photo => <PhotoCard {...photo} />}
               </For>
             </Show>
+
+            <Show when={!isLoading() && activeTab() === 'locker'}>
+              <Show when={lockerSourcePhotos().length === 0}>
+                <div class="empty-state" style={{
+                  display: 'flex',
+                  'align-items': 'center',
+                  'justify-content': 'center',
+                  height: '100%'
+                }}>
+                  No image evidence found in locker
+                </div>
+              </Show>
+              <For each={lockerSourcePhotos()}>
+                {photo => <PhotoCard {...photo} />}
+              </For>
+            </Show>
           </div>
 
           {/* Selection Info */}
@@ -318,13 +487,13 @@ export function NewsPhotoImporter(props: NewsPhotoImporterProps) {
             <span style={{ color: '#00ffff' }}>
               Selected: {selectedPhotos().size} / {props.maxPhotos || 10} max
             </span>
-            <button
+            <Button.Root
               class="btn btn-small"
               onClick={() => setSelectedPhotos(new Set())}
               disabled={selectedPhotos().size === 0}
             >
               Clear Selection
-            </button>
+            </Button.Root>
           </div>
 
           {/* Actions */}
@@ -334,14 +503,14 @@ export function NewsPhotoImporter(props: NewsPhotoImporterProps) {
             'justify-content': 'space-between',
             'align-items': 'center'
           }}>
-            <button 
+            <Button.Root 
               class="btn" 
               onClick={props.onCancel}
             >
               [CANCEL]
-            </button>
+            </Button.Root>
             
-            <button 
+            <Button.Root 
               class="btn btn-primary"
               onClick={handleImport}
               disabled={selectedPhotos().size === 0}
@@ -352,10 +521,52 @@ export function NewsPhotoImporter(props: NewsPhotoImporterProps) {
               }}
             >
               [IMPORT {selectedPhotos().size} PHOTO{selectedPhotos().size === 1 ? '' : 'S'}]
-            </button>
+            </Button.Root>
           </div>
         </div>
       </div>
-    </div>
+
+      <Show when={previewPhoto()}>
+        <Modal.Root onClose={() => setPreviewPhoto(null)} useContentWrapper={false}>
+          <div
+            class="modal-content"
+            onClick={(e) => e.stopPropagation()}
+            style={{ 'max-width': '900px', width: '90%' }}
+          >
+            <div class="modal-header">
+              <h2>[PHOTO PREVIEW]</h2>
+              <button class="modal-close" onClick={() => setPreviewPhoto(null)}>[X]</button>
+            </div>
+            <div class="modal-body" style={{ padding: '16px' }}>
+              <Show when={previewPhoto()}>
+                <img
+                  src={previewPhoto()!.photoUrl}
+                  alt={previewPhoto()!.photoId}
+                  style={{ width: '100%', 'max-height': '62vh', 'object-fit': 'contain', border: '1px solid var(--terminal-border-dim)' }}
+                />
+                <div style={{ 'margin-top': '10px', color: '#c0c0c0' }}>
+                  {previewPhoto()!.description || previewPhoto()!.photoId}
+                </div>
+              </Show>
+            </div>
+            <div class="modal-footer" style={{ display: 'flex', 'justify-content': 'space-between' }}>
+              <Button.Root class="btn" onClick={() => setPreviewPhoto(null)}>[CLOSE]</Button.Root>
+              <Button.Root
+                class="btn btn-primary"
+                onClick={() => {
+                  const photo = previewPhoto();
+                  if (photo) {
+                    togglePhotoSelection(photo.photoId);
+                  }
+                  setPreviewPhoto(null);
+                }}
+              >
+                [TOGGLE SELECT]
+              </Button.Root>
+            </div>
+          </div>
+        </Modal.Root>
+      </Show>
+    </Modal.Root>
   );
 }

@@ -4,6 +4,7 @@ import { cadState, cadActions } from '~/stores/cadStore';
 import { userActions } from '~/stores/userStore';
 import { DosSelect } from '../DosSelect';
 import type { Case, Note } from '~/stores/cadStore';
+import { Button, Modal, Select, Textarea } from '~/components/ui';
 
 export function NotesEditor() {
   const modalData = terminalState.modalData as { caseId?: string } | null;
@@ -94,7 +95,7 @@ export function NotesEditor() {
   };
 
   return (
-    <div class="modal-overlay" onClick={closeModal}>
+        <Modal.Root onClose={closeModal} useContentWrapper={false}>
       <div class="modal-content notes-editor" onClick={(e) => e.stopPropagation()}>
         <div class="modal-header">
           <h2>=== CASE NOTES ===</h2>
@@ -102,7 +103,7 @@ export function NotesEditor() {
         </div>
 
         <div class="notes-toolbar">
-          <select 
+          <Select.Root 
             class="dos-select"
             value={currentCase()?.caseId || ''}
             onChange={(e) => {
@@ -117,7 +118,7 @@ export function NotesEditor() {
             {Object.values(cadState.cases).map(c => (
               <option value={c.caseId}>{c.caseId} - {c.title}</option>
             ))}
-          </select>
+          </Select.Root>
 
           <Show when={currentCase()}>
             <div class="notes-stats">
@@ -181,12 +182,12 @@ export function NotesEditor() {
                     Author: {selectedNote()!.author}
                   </div>
                   <div class="note-view-actions">
-                    <button class="btn" onClick={() => startEdit(selectedNote()!)}>
+                    <Button.Root class="btn" onClick={() => startEdit(selectedNote()!)}>
                       [EDIT]
-                    </button>
-                    <button class="btn" onClick={() => handleDeleteNote(selectedNote()!.id)}>
+                    </Button.Root>
+                    <Button.Root class="btn" onClick={() => handleDeleteNote(selectedNote()!.id)}>
                       [DELETE]
-                    </button>
+                    </Button.Root>
                   </div>
                 </div>
               </Show>
@@ -204,7 +205,7 @@ export function NotesEditor() {
                   placeholder="Select note type..."
                 />
 
-                <textarea
+                <Textarea.Root
                   class="dos-textarea"
                   value={newNote()}
                   onInput={(e) => setNewNote(e.currentTarget.value)}
@@ -214,21 +215,21 @@ export function NotesEditor() {
 
                 <div class="form-actions">
                   <Show when={isEditing()}>
-                    <button class="btn btn-primary" onClick={handleUpdateNote}>
+                    <Button.Root class="btn btn-primary" onClick={handleUpdateNote}>
                       [UPDATE]
-                    </button>
-                    <button class="btn" onClick={cancelEdit}>
+                    </Button.Root>
+                    <Button.Root class="btn" onClick={cancelEdit}>
                       [CANCEL]
-                    </button>
+                    </Button.Root>
                   </Show>
                   <Show when={!isEditing()}>
-                    <button 
+                    <Button.Root 
                       class="btn btn-primary" 
                       onClick={handleAddNote}
                       disabled={!newNote().trim()}
                     >
                       [ADD NOTE]
-                    </button>
+                    </Button.Root>
                   </Show>
                 </div>
               </div>
@@ -237,9 +238,9 @@ export function NotesEditor() {
         </Show>
 
         <div class="modal-footer">
-          <button class="btn" onClick={closeModal}>[CLOSE]</button>
+          <Button.Root class="btn" onClick={closeModal}>[CLOSE]</Button.Root>
         </div>
       </div>
-    </div>
+    </Modal.Root>
   );
 }

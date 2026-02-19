@@ -13,6 +13,7 @@ import { cadState, cadActions } from '~/stores/cadStore';
 import { DosSelect } from '../DosSelect';
 import type { Fine, Person, Vehicle } from '~/stores/cadStore';
 import { fetchNui } from '~/utils/fetchNui';
+import { Button, Input, Modal } from '~/components/ui';
 
 interface FineManagerProps {
   initialTargetId?: string;
@@ -184,7 +185,7 @@ export const FineManager: Component<FineManagerProps> = (props) => {
   };
 
   return (
-    <div class="modal-overlay" onClick={closeModal}>
+        <Modal.Root onClose={closeModal} useContentWrapper={false}>
       <div class="modal-content fine-manager" onClick={(e) => e.stopPropagation()}>
         <div class="modal-header">
           <h2>=== EMITIR MULTA ===</h2>
@@ -212,7 +213,7 @@ export const FineManager: Component<FineManagerProps> = (props) => {
             <label class="form-label">
               {targetType() === 'PERSON' ? '[BUSCAR PERSONA]' : '[BUSCAR VEHÍCULO]'}
             </label>
-            <input
+            <Input.Root
               type="text"
               class="dos-input"
               placeholder={targetType() === 'PERSON' 
@@ -279,7 +280,7 @@ export const FineManager: Component<FineManagerProps> = (props) => {
                     ? `${(targetInfo() as Person).firstName} ${(targetInfo() as Person).lastName}`
                     : `${(targetInfo() as Vehicle).plate} - ${(targetInfo() as Vehicle).model}`
                 ) : targetId()}
-                <button 
+                <Button.Root 
                   class="btn-small"
                   style={{ 'margin-left': '10px' }}
                   onClick={() => {
@@ -288,7 +289,7 @@ export const FineManager: Component<FineManagerProps> = (props) => {
                   }}
                 >
                   [CAMBIAR]
-                </button>
+                </Button.Root>
               </div>
             </Show>
           </div>
@@ -370,19 +371,19 @@ export const FineManager: Component<FineManagerProps> = (props) => {
           </Show>
 
           <div class="modal-footer">
-            <button 
+            <Button.Root 
               class="btn btn-primary" 
               onClick={handleIssueFine}
               disabled={isSubmitting() || !targetId() || !selectedFine()}
             >
               {isSubmitting() ? '[PROCESANDO...]' : '[EMITIR MULTA]'}
-            </button>
-            <button class="btn" onClick={closeModal}>
+            </Button.Root>
+            <Button.Root class="btn" onClick={closeModal}>
               [CANCELAR]
-            </button>
+            </Button.Root>
           </div>
         </div>
       </div>
-    </div>
+    </Modal.Root>
   );
 };

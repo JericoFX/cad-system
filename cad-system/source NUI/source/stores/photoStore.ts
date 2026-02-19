@@ -85,6 +85,23 @@ const initialState: PhotoState = {
 
 export const [photoState, setPhotoState] = createStore<PhotoState>(initialState);
 
+function upsertPhotoMap(photo: PhotoMetadata) {
+  setPhotoState('photos', prev => ({
+    ...prev,
+    [photo.photoId]: photo,
+  }));
+}
+
+function prependUnique(list: PhotoMetadata[], photo: PhotoMetadata): PhotoMetadata[] {
+  const next = list.filter(item => item.photoId !== photo.photoId);
+  next.unshift(photo);
+  return next;
+}
+
+function removeFromList(list: PhotoMetadata[], photoId: string): PhotoMetadata[] {
+  return list.filter(item => item.photoId !== photoId);
+}
+
 export const photoActions = {
   // Set loading state
   setLoading(isLoading: boolean) {
@@ -104,6 +121,50 @@ export const photoActions = {
   // Set current photo
   setCurrentPhoto(photo: PhotoMetadata | null) {
     setPhotoState('currentPhoto', photo);
+  },
+
+  addCapturedPhoto(photo: PhotoMetadata) {
+    upsertPhotoMap(photo);
+
+    if (photo.job === 'police') {
+      setPhotoState('stagingPhotos', photos => prependUnique(photos, photo));
+      return;
+    }
+
+    setPhotoState('inventoryPhotos', photos => prependUnique(photos, photo));
+  },
+
+  setPhotoDescription(photoId: string, description: string) {
+    const existing = photoState.photos[photoId];
+    if (!existing) {
+      return;
+    }
+
+    const next = { ...existing, description };
+    upsertPhotoMap(next);
+    setPhotoState('stagingPhotos', photos =>
+      photos.map(photo => (photo.photoId === photoId ? { ...photo, description } : photo))
+    );
+    setPhotoState('inventoryPhotos', photos =>
+      photos.map(photo => (photo.photoId === photoId ? { ...photo, description } : photo))
+    );
+    setPhotoState('releasedPhotos', photos =>
+      photos.map(photo => (photo.photoId === photoId ? { ...photo, description } : photo))
+    );
+  },
+
+  removePhoto(photoId: string) {
+    setPhotoState('photos', prev => {
+      const next = { ...prev };
+      delete next[photoId];
+      return next;
+    });
+    setPhotoState('stagingPhotos', photos => removeFromList(photos, photoId));
+    setPhotoState('inventoryPhotos', photos => removeFromList(photos, photoId));
+    setPhotoState('releasedPhotos', photos => removeFromList(photos, photoId));
+    if (photoState.currentPhoto?.photoId === photoId) {
+      setPhotoState('currentPhoto', null);
+    }
   },
 
   // Fetch staging photos (for police)

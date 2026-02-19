@@ -1,9 +1,4 @@
---[[
-C.A.D. System
-Created by JericoFX
-GitHub: https://github.com/JericoFX
-License: GNU GPL v3
-]]
+
 
 CAD = CAD or {}
 CAD.EMS = CAD.EMS or {}
@@ -22,6 +17,65 @@ local BLOOD_REQUEST_STATUSES = {
 }
 
 local bloodSampleStashRegistered = false
+
+local function isBloodSampleVirtualEnabled()
+    local cfg = CAD.Config.Forensics and CAD.Config.Forensics.BloodSampleContainer or {}
+    if cfg.enabled == false then
+        return false
+    end
+
+    return CAD.VirtualContainer ~= nil
+end
+
+local function getBloodSampleContainerConfig()
+    local forensics = CAD.Config.Forensics or {}
+    local cfg = forensics.BloodSampleContainer or {}
+    local stashCfg = forensics.BloodSampleStash or {}
+    local fallbackKey = tostring(stashCfg.stashId or 'cad_ems_blood_lab')
+
+    local containerKey = tostring(cfg.containerKey or ('forensics:%s'):format(fallbackKey))
+    local slotCount = math.max(1, math.floor(tonumber(cfg.slots) or tonumber(stashCfg.slots) or 200))
+
+    return {
+        containerKey = containerKey,
+        slotCount = slotCount,
+    }
+end
+
+local function ensureBloodSampleContainer()
+    if not isBloodSampleVirtualEnabled() then
+        return nil, 'blood_sample_virtual_disabled'
+    end
+
+    local cfg = getBloodSampleContainerConfig()
+    local container, ensureErr = CAD.VirtualContainer.Ensure(cfg.containerKey, {
+        containerType = 'blood_lab',
+        endpointId = 'ems_blood_lab',
+        slotCount = cfg.slotCount,
+        readSlot = 1,
+        strictAllowedItems = false,
+    })
+
+    if not container then
+        return nil, ensureErr or 'blood_sample_container_not_ready'
+    end
+
+    return container
+end
+
+local function findContainerFreeSlot(container)
+    if not container then
+        return nil
+    end
+
+    for i = 1, tonumber(container.slotCount) or 0 do
+        if not container.slots[i] then
+            return i
+        end
+    end
+
+    return nil
+end
 
 local function getNowMs()
     return os.time() * 1000
@@ -62,6 +116,47 @@ local function getBloodReminderIntervalMs()
     return math.floor(intervalMs)
 end
 
+local function getBloodToxicologySnapshot(request)
+    local snapshot = {
+        testedAt = CAD.Server.ToIso(),
+        isPositive = false,
+        activeCount = 0,
+        substances = {},
+        source = 'QBCORE_METADATA',
+    }
+
+    local toxicology = CAD.Forensic and CAD.Forensic.Toxicology or nil
+    if type(toxicology) ~= 'table' or type(toxicology.GetSnapshotForCitizen) ~= 'function' then
+        snapshot.source = 'UNAVAILABLE'
+        return snapshot
+    end
+
+    local citizenId = CAD.Server.SanitizeString(request and request.citizenId, 64)
+    if citizenId == '' then
+        return snapshot
+    end
+
+    local resolved = toxicology.GetSnapshotForCitizen(citizenId)
+    if type(resolved) ~= 'table' then
+        return snapshot
+    end
+
+    if type(resolved.substances) ~= 'table' then
+        resolved.substances = {}
+    end
+
+    local activeCount = tonumber(resolved.activeCount)
+    if not activeCount then
+        activeCount = #resolved.substances
+    end
+
+    resolved.activeCount = activeCount
+    resolved.isPositive = activeCount > 0
+    resolved.testedAt = resolved.testedAt or snapshot.testedAt
+    resolved.source = resolved.source or snapshot.source
+    return resolved
+end
+
 local function caseExists(caseId)
     if not caseId or caseId == '' then
         return false
@@ -71,11 +166,7 @@ local function caseExists(caseId)
 end
 
 local function snapshotTable(input)
-    local snapshot = {}
-    for key, value in pairs(input) do
-        snapshot[key] = value
-    end
-    return snapshot
+    return CAD.DeepCopy(input)
 end
 
 local function restoreTable(target, snapshot)
@@ -271,14 +362,7 @@ local function ensureBloodSampleStash()
 end
 
 local function createBloodSampleItem(request, officer)
-    local ok, err = ensureBloodSampleStash()
-    if not ok then
-        return false, err
-    end
-
     local itemName = tostring(CAD.Config.Forensics and CAD.Config.Forensics.BloodSampleItemName or 'cad_blood_sample')
-    local stashId = tostring((CAD.Config.Forensics and CAD.Config.Forensics.BloodSampleStash and CAD.Config.Forensics.BloodSampleStash.stashId) or
-    'cad_ems_blood_lab')
     local metadata = {
         requestId = request.requestId,
         caseId = request.caseId,
@@ -289,7 +373,48 @@ local function createBloodSampleItem(request, officer)
         collectedByName = officer.name,
         collectedAt = CAD.Server.ToIso(),
         sealId = CAD.Server.GenerateId('SEAL'),
+        toxicologySnapshot = getBloodToxicologySnapshot(request),
     }
+
+    if isBloodSampleVirtualEnabled() then
+        local container, containerErr = ensureBloodSampleContainer()
+        if not container then
+            return false, containerErr or 'blood_sample_container_not_ready'
+        end
+
+        local freeSlot = findContainerFreeSlot(container)
+        if not freeSlot then
+            return false, 'blood_sample_container_full'
+        end
+
+        local setOk, setErr = CAD.VirtualContainer.SetSlot(container.containerKey, freeSlot, {
+            itemName = itemName,
+            label = 'Blood Sample',
+            count = 1,
+            metadata = metadata,
+            insertedBy = officer.identifier,
+            insertedAt = CAD.Server.ToIso(),
+        })
+
+        if not setOk then
+            return false, setErr or 'cannot_create_sample_item'
+        end
+
+        request.sampleStashId = container.containerKey
+        request.sampleItemName = itemName
+        request.sampleMetadata = metadata
+        request.sampleSlot = freeSlot
+
+        return true
+    end
+
+    local ok, err = ensureBloodSampleStash()
+    if not ok then
+        return false, err
+    end
+
+    local stashId = tostring((CAD.Config.Forensics and CAD.Config.Forensics.BloodSampleStash and CAD.Config.Forensics.BloodSampleStash.stashId) or
+    'cad_ems_blood_lab')
 
     local callOk, addOk, addResponse = pcall(function()
         return exports.ox_inventory:AddItem(stashId, itemName, 1, metadata)
@@ -318,6 +443,29 @@ end
 
 local function removeBloodSampleItem(request)
     if not request.sampleStashId or request.sampleStashId == '' then
+        return true
+    end
+
+    if CAD.VirtualContainer and CAD.VirtualContainer.Get(request.sampleStashId) then
+        if request.sampleSlot then
+            local clearOk, clearErr = CAD.VirtualContainer.ClearSlot(request.sampleStashId, tonumber(request.sampleSlot))
+            if not clearOk then
+                return false, clearErr or 'cannot_remove_sample_item'
+            end
+        else
+            local slotIndex, _ = CAD.VirtualContainer.GetFirstOccupied(request.sampleStashId)
+            if slotIndex then
+                local clearOk, clearErr = CAD.VirtualContainer.ClearSlot(request.sampleStashId, slotIndex)
+                if not clearOk then
+                    return false, clearErr or 'cannot_remove_sample_item'
+                end
+            end
+        end
+
+        request.sampleSlot = nil
+        request.sampleMetadata = nil
+        request.sampleItemName = nil
+        request.sampleStashId = nil
         return true
     end
 
@@ -411,6 +559,13 @@ local function appendBloodEvidenceToCase(request, officer, notes)
     end
 
     local nowIso = CAD.Server.ToIso()
+    local toxicologySnapshot = nil
+    if type(request.sampleMetadata) == 'table' and type(request.sampleMetadata.toxicologySnapshot) == 'table' then
+        toxicologySnapshot = CAD.DeepCopy(request.sampleMetadata.toxicologySnapshot)
+    else
+        toxicologySnapshot = getBloodToxicologySnapshot(request)
+    end
+
     local evidence = {
         evidenceId = CAD.Server.GenerateId('EVID'),
         caseId = request.caseId,
@@ -427,6 +582,7 @@ local function appendBloodEvidenceToCase(request, officer, notes)
                 completedAt = nowIso,
                 handledBy = officer.identifier,
                 notes = notes,
+                toxicology = toxicologySnapshot,
             },
             sample = {
                 sealId = request.sampleMetadata and request.sampleMetadata.sealId or nil,
@@ -579,7 +735,6 @@ local function createBloodRequest(payload, officer)
     end
     CAD.Server.NotifyJobs({ 'ambulance', 'ems' }, ('New blood sample request %s'):format(request.requestId), 'warning')
 
-    -- Broadcast blood request creation
     CAD.Server.BroadcastToJobs(
         {'ambulance', 'ems'},
         'emsBloodRequestCreated',
@@ -836,7 +991,6 @@ createAlert = function(title, description, severity, coords, createdBy)
 
     alerts[alert.alertId] = alert
 
-    -- Broadcast EMS alert
     CAD.Server.BroadcastToJobs(
         {'ambulance', 'ems', 'dispatch'},
         'emsAlertCreated',
@@ -1139,5 +1293,3 @@ lib.cron.new('* * * * *', function()
         CAD.Log('error', 'Blood post-analysis cron failure: %s', tostring(result))
     end
 end)
-
--- Database events handle periodic cleanup routines.

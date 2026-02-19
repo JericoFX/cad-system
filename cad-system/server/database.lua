@@ -1,9 +1,4 @@
---[[
-C.A.D. System
-Created by JericoFX
-GitHub: https://github.com/JericoFX
-License: GNU GPL v3
-]]
+
 
 CAD = CAD or {}
 CAD.Database = CAD.Database or {}
@@ -175,7 +170,60 @@ function CAD.Database.EnsureSchema()
     execute([[ALTER TABLE cad_ems_blood_requests ADD COLUMN IF NOT EXISTS last_reminder_ms BIGINT NULL]])
     execute([[ALTER TABLE cad_ems_blood_requests ADD COLUMN IF NOT EXISTS evidence_id VARCHAR(64) NULL]])
 
-    -- Officers table for callsign storage
+    execute([[
+        CREATE TABLE IF NOT EXISTS cad_virtual_container_slots (
+            id BIGINT AUTO_INCREMENT PRIMARY KEY,
+            container_key VARCHAR(128) NOT NULL,
+            container_type VARCHAR(32) NOT NULL,
+            endpoint_id VARCHAR(128) NULL,
+            slot_index INT NOT NULL,
+            item_name VARCHAR(64) NOT NULL,
+            item_label VARCHAR(128) NULL,
+            item_count INT NOT NULL DEFAULT 1,
+            metadata LONGTEXT NULL,
+            inserted_by VARCHAR(128) NULL,
+            inserted_at VARCHAR(32) NULL,
+            updated_at VARCHAR(32) NULL,
+            UNIQUE KEY uq_virtual_container_slot (container_key, slot_index),
+            KEY idx_virtual_container_key (container_key),
+            KEY idx_virtual_container_type (container_type)
+        )
+    ]])
+
+    execute([[
+        CREATE TABLE IF NOT EXISTS cad_entity_notes (
+            note_id VARCHAR(64) PRIMARY KEY,
+            entity_type VARCHAR(16) NOT NULL,
+            entity_id VARCHAR(128) NOT NULL,
+            author_identifier VARCHAR(128) NOT NULL,
+            author_name VARCHAR(128) NULL,
+            content TEXT NOT NULL,
+            is_important TINYINT NOT NULL DEFAULT 0,
+            created_at VARCHAR(32) NOT NULL,
+            INDEX idx_entity_notes_entity (entity_type, entity_id, created_at),
+            INDEX idx_entity_notes_important (entity_type, entity_id, is_important)
+        )
+    ]])
+
+    execute([[
+        CREATE TABLE IF NOT EXISTS cad_vehicle_stops (
+            stop_id VARCHAR(64) PRIMARY KEY,
+            officer_identifier VARCHAR(128) NOT NULL,
+            officer_name VARCHAR(128) NULL,
+            plate VARCHAR(32) NOT NULL,
+            vehicle_model VARCHAR(128) NULL,
+            owner_identifier VARCHAR(128) NULL,
+            owner_name VARCHAR(128) NULL,
+            risk_level VARCHAR(16) NOT NULL DEFAULT 'NONE',
+            risk_tags LONGTEXT NULL,
+            note_hint VARCHAR(255) NULL,
+            stop_source VARCHAR(32) NOT NULL DEFAULT 'QUICK_DOCK',
+            created_at VARCHAR(32) NOT NULL,
+            INDEX idx_vehicle_stops_officer (officer_identifier, created_at),
+            INDEX idx_vehicle_stops_plate (plate, created_at)
+        )
+    ]])
+
     execute([[
         CREATE TABLE IF NOT EXISTS cad_officers (
             identifier VARCHAR(128) PRIMARY KEY,
@@ -186,10 +234,40 @@ function CAD.Database.EnsureSchema()
         )
     ]])
 
+    execute([[
+        CREATE TABLE IF NOT EXISTS cad_security_cameras (
+            camera_id VARCHAR(64) PRIMARY KEY,
+            camera_number INT NOT NULL,
+            label VARCHAR(128) NOT NULL,
+            street VARCHAR(128) NULL,
+            cross_street VARCHAR(128) NULL,
+            zone_name VARCHAR(128) NULL,
+            coords LONGTEXT NOT NULL,
+            rotation LONGTEXT NOT NULL,
+            fov FLOAT NOT NULL DEFAULT 55,
+            status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
+            installed_by VARCHAR(128) NOT NULL,
+            installed_by_name VARCHAR(128) NULL,
+            created_at VARCHAR(32) NOT NULL,
+            updated_at VARCHAR(32) NOT NULL,
+            UNIQUE KEY uq_security_camera_number (camera_number),
+            KEY idx_security_camera_status (status),
+            KEY idx_security_camera_zone (zone_name)
+        )
+    ]])
+
+    execute([[
+        CREATE TABLE IF NOT EXISTS cad_news_articles (
+            article_id VARCHAR(64) PRIMARY KEY,
+            status VARCHAR(32) NOT NULL,
+            updated_at VARCHAR(32) NOT NULL,
+            payload LONGTEXT NOT NULL,
+            KEY idx_news_status_updated (status, updated_at)
+        )
+    ]])
 
     execute([[SET GLOBAL event_scheduler = ON]])
 
-    -- 1
     execute([[
         CREATE EVENT IF NOT EXISTS ev_cleanup_stale_evidence
         ON SCHEDULE EVERY 6 HOUR
@@ -199,7 +277,6 @@ function CAD.Database.EnsureSchema()
             AND STR_TO_DATE(attached_at, '%Y-%m-%dT%H:%i:%s') < DATE_SUB(NOW(), INTERVAL 24 HOUR)
     ]])
 
-    -- Event 2: Purge old closed dispatch calls
     execute([[
         CREATE EVENT IF NOT EXISTS ev_cleanup_closed_calls
         ON SCHEDULE EVERY 24 HOUR
@@ -209,7 +286,6 @@ function CAD.Database.EnsureSchema()
             AND STR_TO_DATE(created_at, '%Y-%m-%dT%H:%i:%s') < DATE_SUB(NOW(), INTERVAL 10 DAY)
     ]])
 
-    -- Event 3: Purge old closed cases and related records
     execute([[
         CREATE EVENT IF NOT EXISTS ev_cleanup_closed_cases
         ON SCHEDULE EVERY 24 HOUR
@@ -223,7 +299,6 @@ function CAD.Database.EnsureSchema()
             AND STR_TO_DATE(c.created_at, '%Y-%m-%dT%H:%i:%s') < DATE_SUB(NOW(), INTERVAL 10 DAY)
     ]])
 
-    -- Event 4: Purge old paid fines
     execute([[
         CREATE EVENT IF NOT EXISTS ev_cleanup_paid_fines
         ON SCHEDULE EVERY 24 HOUR
@@ -233,7 +308,6 @@ function CAD.Database.EnsureSchema()
             AND STR_TO_DATE(paid_at, '%Y-%m-%dT%H:%i:%s') < DATE_SUB(NOW(), INTERVAL 10 DAY)
     ]])
 
-    -- Event 5: Purge expired EMS alerts
     execute([[
         CREATE EVENT IF NOT EXISTS ev_cleanup_expired_alerts
         ON SCHEDULE EVERY 1 HOUR
@@ -243,7 +317,6 @@ function CAD.Database.EnsureSchema()
             AND STR_TO_DATE(created_at, '%Y-%m-%dT%H:%i:%s') < DATE_SUB(NOW(), INTERVAL 1 HOUR)
     ]])
 
-    -- Event 6: Purge old completed blood requests
     execute([[
         CREATE EVENT IF NOT EXISTS ev_cleanup_completed_blood_requests
         ON SCHEDULE EVERY 24 HOUR

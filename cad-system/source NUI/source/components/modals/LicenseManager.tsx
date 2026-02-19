@@ -2,6 +2,7 @@
 import { createSignal, createMemo, For, Show } from 'solid-js';
 import { terminalActions } from '~/stores/terminalStore';
 import { licenseActions, LICENSE_TYPES, type LicenseType } from '~/stores/licenseStore';
+import { Button, Modal } from '~/components/ui';
 
 export function LicenseManager() {
   const [searchQuery, setSearchQuery] = createSignal('');
@@ -64,7 +65,7 @@ export function LicenseManager() {
   };
   
   return (
-    <div class="modal-overlay" onClick={closeModal}>
+        <Modal.Root onClose={closeModal} useContentWrapper={false}>
       <div class="modal-content license-manager" onClick={e => e.stopPropagation()}>
         <div class="modal-header">
           <h2>🎫 VERIFICACIÓN DE LICENCIAS</h2>
@@ -81,15 +82,15 @@ export function LicenseManager() {
                 placeholder="Buscar por ID o nombre de ciudadano..."
                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
               />
-              <button class="btn btn-primary" onClick={handleSearch}>
+              <Button.Root class="btn btn-primary" onClick={handleSearch}>
                 🔍 Buscar
-              </button>
-              <button 
+              </Button.Root>
+              <Button.Root 
                 class="btn btn-secondary"
                 onClick={() => setShowIssueForm(!showIssueForm())}
               >
                 ➕ Emitir Licencia
-              </button>
+              </Button.Root>
             </div>
           </div>
           
@@ -139,9 +140,9 @@ export function LicenseManager() {
                   onInput={(e) => setIssueForm(prev => ({ ...prev, holderName: e.currentTarget.value }))}
                   placeholder="Nombre completo"
                 />
-                <button class="btn btn-success" onClick={issueLicense}>
+                <Button.Root class="btn btn-success" onClick={issueLicense}>
                   ✓ Emitir
-                </button>
+                </Button.Root>
               </div>
             </div>
           </Show>
@@ -174,9 +175,9 @@ export function LicenseManager() {
           
           <Show when={selectedHolder() && holderSummary()}>
             <div class="license-section">
-              <button class="btn btn-small" onClick={() => setSelectedHolder(null)}>
+              <Button.Root class="btn btn-small" onClick={() => setSelectedHolder(null)}>
                 ← Volver
-              </button>
+              </Button.Root>
               
               <h3>Licencias del Ciudadano</h3>
               
@@ -264,6 +265,6 @@ export function LicenseManager() {
           </Show>
         </div>
       </div>
-    </div>
+    </Modal.Root>
   );
 }

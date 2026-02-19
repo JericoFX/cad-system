@@ -13,7 +13,6 @@ export function initPoliceHandlers(): void {
   onNuiMessage<PoliceJailTransferLoggedData>('police:jailTransferLogged', async (data) => {
     console.log('[NUI] Jail transfer logged:', data.transfer.transferId);
     
-    const { cadActions } = await import('~/stores/cadStore');
     const { notificationActions } = await import('~/stores/notificationStore');
     
     // Add jail transfer record (would need to add to cadStore)

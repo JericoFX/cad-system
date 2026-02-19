@@ -4,6 +4,7 @@ import { cadState } from '~/stores/cadStore';
 import { emsState, emsActions, Patient, PatientCondition } from '~/stores/emsStore';
 import { notificationActions } from '~/stores/notificationStore';
 import { fetchNui } from '~/utils/fetchNui';
+import { Button, Input, Modal, Tabs, Textarea } from '~/components/ui';
 
 type BloodSampleStatus = 'PENDING' | 'ACKNOWLEDGED' | 'IN_PROGRESS' | 'COMPLETED' | 'DECLINED' | 'CANCELLED';
 
@@ -106,6 +107,7 @@ export function EMSDashboard() {
 
       const response = await fetchNui<{
         ok: boolean;
+        documentType?: 'PERSON' | 'VEHICLE';
         person?: {
           citizenid: string;
           firstName: string;
@@ -121,8 +123,18 @@ export function EMSDashboard() {
         terminalId: context.terminalId,
       });
 
-      if (!response?.ok || !response.person) {
+      if (!response?.ok) {
         terminalActions.addLine(`Failed to read ID: ${response?.error || 'unknown_error'}`, 'error');
+        return;
+      }
+
+      if (response.documentType === 'VEHICLE') {
+        terminalActions.addLine('Reader returned vehicle document. Insert person ID card for EMS intake.', 'error');
+        return;
+      }
+
+      if (!response.person) {
+        terminalActions.addLine('Reader document has no person data', 'error');
         return;
       }
 
@@ -499,12 +511,12 @@ export function EMSDashboard() {
   );
 
   return (
-    <div class="modal-overlay" onClick={closeModal}>
+    <Modal.Root onClose={closeModal} useContentWrapper={false}>
       <div class="modal-content ems-dashboard" onClick={(e: any) => e.stopPropagation()}>
-        <div class="modal-header">
-          <h2>=== EMS DASHBOARD ===</h2>
-          <button class="modal-close" onClick={closeModal}>[X]</button>
-        </div>
+        <Modal.Header>
+          <Modal.Title>=== EMS DASHBOARD ===</Modal.Title>
+          <Modal.Close />
+        </Modal.Header>
 
         <div class="triage-stats">
           <div class="stat-item critical">
@@ -525,56 +537,40 @@ export function EMSDashboard() {
           </div>
         </div>
 
-        <div class="detail-tabs">
-          <button 
-            class={`tab ${activeTab() === 'patients' ? 'active' : ''}`}
-            onClick={() => setActiveTab('patients')}
-          >
-            [PATIENTS ({activePatients().length})]
-          </button>
-          <button 
-            class={`tab ${activeTab() === 'treatment' ? 'active' : ''}`}
-            onClick={() => setActiveTab('treatment')}
-          >
-            [IN TREATMENT ({inTreatmentPatients().length})]
-          </button>
-          <button 
-            class={`tab ${activeTab() === 'admit' ? 'active' : ''}`}
-            onClick={() => setActiveTab('admit')}
-          >
-            [+ ADMIT]
-          </button>
-          <button 
-            class={`tab ${activeTab() === 'inventory' ? 'active' : ''}`}
-            onClick={() => setActiveTab('inventory')}
-          >
-            [INVENTORY]
-          </button>
-          <button
-            class={`tab ${activeTab() === 'blood' ? 'active' : ''}`}
-            onClick={() => setActiveTab('blood')}
-          >
-            [BLOOD REQUESTS ({bloodRequests().filter(r => r.status !== 'COMPLETED' && r.status !== 'DECLINED' && r.status !== 'CANCELLED').length})]
-          </button>
-        </div>
+        <Tabs.Root
+          value={activeTab()}
+          onValueChange={(value) => setActiveTab(value as 'patients' | 'treatment' | 'admit' | 'inventory' | 'blood')}
+        >
+          <Tabs.List>
+            <Tabs.Trigger value='patients' label='PATIENTS' badge={activePatients().length} />
+            <Tabs.Trigger value='treatment' label='IN TREATMENT' badge={inTreatmentPatients().length} />
+            <Tabs.Trigger value='admit' label='+ ADMIT' />
+            <Tabs.Trigger value='inventory' label='INVENTORY' />
+            <Tabs.Trigger
+              value='blood'
+              label='BLOOD REQUESTS'
+              badge={bloodRequests().filter(r => r.status !== 'COMPLETED' && r.status !== 'DECLINED' && r.status !== 'CANCELLED').length}
+            />
+          </Tabs.List>
+        </Tabs.Root>
 
         <Show when={activeTab() === 'patients'}>
           <div class="search-toolbar" style={{ 'margin-bottom': '10px', 'padding': '0 10px' }}>
             <div class="search-input-group">
-              <input
+              <Input.Root
                 type="text"
                 class="dos-input search-input"
                 value={patientSearchQuery()}
                 onInput={(e: any) => setPatientSearchQuery(e.currentTarget.value)}
                 placeholder="Search patients by name, ID, or complaint..."
               />
-              <button 
+              <Button.Root 
                 class="btn"
                 onClick={() => setShowPoliceCallModal(true)}
                 style={{ 'margin-left': 'auto' }}
               >
                 [CALL POLICE]
-              </button>
+              </Button.Root>
             </div>
             <Show when={patientSearchQuery()}>
               <div class="search-stats">
@@ -654,12 +650,12 @@ export function EMSDashboard() {
                     <p><strong>Treatments:</strong> {patient.treatments.length}</p>
                   </div>
                   <div class="treatment-actions">
-                    <button 
+                    <Button.Root 
                       class="btn btn-success"
                       onClick={() => dischargePatient(patient)}
                     >
                       [DISCHARGE]
-                    </button>
+                    </Button.Root>
                   </div>
                 </div>
               )}
@@ -673,7 +669,7 @@ export function EMSDashboard() {
               <div class="form-section">
                 <label>Patient Name *</label>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <input
+                  <Input.Root
                     type="text"
                     class="dos-input"
                     style={{ flex: 1 }}
@@ -681,13 +677,13 @@ export function EMSDashboard() {
                     value={patientForm().name}
                     onInput={(e: any) => setPatientForm({ ...patientForm(), name: e.currentTarget.value })}
                   />
-                  <button 
+                  <Button.Root 
                     class="btn"
                     onClick={() => void readPatientIdFromReader()}
                     title="Read ID from card reader"
                   >
                     [READ ID]
-                  </button>
+                  </Button.Root>
                 </div>
               </div>
 
@@ -717,7 +713,7 @@ export function EMSDashboard() {
 
               <div class="form-section">
                 <label>Chief Complaint *</label>
-                <input
+                <Input.Root
                   type="text"
                   class="dos-input"
                   placeholder="Main reason for visit (e.g., chest pain, trauma)..."
@@ -728,7 +724,7 @@ export function EMSDashboard() {
 
               <div class="form-section">
                 <label>Symptoms (comma-separated)</label>
-                <input
+                <Input.Root
                   type="text"
                   class="dos-input"
                   placeholder="e.g., chest pain, dizziness, nausea"
@@ -740,28 +736,28 @@ export function EMSDashboard() {
               <div class="form-section">
                 <label>Vital Signs</label>
                 <div class="vitals-inputs">
-                  <input
+                  <Input.Root
                     type="text"
                     class="dos-input"
                     placeholder="BP (e.g., 120/80)"
                     value={patientForm().bp}
                     onInput={(e: any) => setPatientForm({ ...patientForm(), bp: e.currentTarget.value })}
                   />
-                  <input
+                  <Input.Root
                     type="text"
                     class="dos-input"
                     placeholder="HR (e.g., 75)"
                     value={patientForm().hr}
                     onInput={(e: any) => setPatientForm({ ...patientForm(), hr: e.currentTarget.value })}
                   />
-                  <input
+                  <Input.Root
                     type="text"
                     class="dos-input"
                     placeholder="Temp (e.g., 98.6)"
                     value={patientForm().temp}
                     onInput={(e: any) => setPatientForm({ ...patientForm(), temp: e.currentTarget.value })}
                   />
-                  <input
+                  <Input.Root
                     type="text"
                     class="dos-input"
                     placeholder="O2% (e.g., 98)"
@@ -773,7 +769,7 @@ export function EMSDashboard() {
 
               <div class="form-section">
                 <label>Allergies (comma-separated)</label>
-                <input
+                <Input.Root
                   type="text"
                   class="dos-input"
                   placeholder="e.g., penicillin, latex"
@@ -784,7 +780,7 @@ export function EMSDashboard() {
 
               <div class="form-section">
                 <label>Current Medications</label>
-                <input
+                <Input.Root
                   type="text"
                   class="dos-input"
                   placeholder="List current medications..."
@@ -794,15 +790,15 @@ export function EMSDashboard() {
               </div>
 
               <div class="form-actions">
-                <button class="btn btn-primary" onClick={handleAdmitPatient}>
+                <Button.Root class="btn btn-primary" onClick={handleAdmitPatient}>
                   [ADMIT PATIENT]
-                </button>
-                <button 
+                </Button.Root>
+                <Button.Root 
                   class="btn"
                   onClick={() => setActiveTab('patients')}
                 >
                   [CANCEL]
-                </button>
+                </Button.Root>
               </div>
             </div>
           </Show>
@@ -824,19 +820,19 @@ export function EMSDashboard() {
                     </div>
                     <div class="inventory-category">{item.category} • Used today: {item.usedToday}</div>
                     <div class="inventory-actions">
-                      <button 
+                      <Button.Root 
                         class="btn-small"
                         onClick={() => useInventoryItem(item.itemId)}
                         disabled={item.quantity <= 0}
                       >
                         [USE]
-                      </button>
-                      <button 
+                      </Button.Root>
+                      <Button.Root 
                         class="btn-small btn-primary"
                         onClick={() => restockItem(item.itemId)}
                       >
                         [RESTOCK]
-                      </button>
+                      </Button.Root>
                     </div>
                   </div>
                 )}
@@ -912,24 +908,24 @@ export function EMSDashboard() {
                     </Show>
                     <div class="inventory-actions">
                       <Show when={request.status === 'PENDING'}>
-                        <button class="btn-small" onClick={() => openBloodUpdateModal(request, 'ACKNOWLEDGED')}>
+                        <Button.Root class="btn-small" onClick={() => openBloodUpdateModal(request, 'ACKNOWLEDGED')}>
                           [ACK]
-                        </button>
+                        </Button.Root>
                       </Show>
                       <Show when={request.status === 'PENDING' || request.status === 'ACKNOWLEDGED'}>
-                        <button class="btn-small" onClick={() => openBloodUpdateModal(request, 'IN_PROGRESS')}>
+                        <Button.Root class="btn-small" onClick={() => openBloodUpdateModal(request, 'IN_PROGRESS')}>
                           [START ANALYSIS]
-                        </button>
+                        </Button.Root>
                       </Show>
                       <Show when={request.status === 'IN_PROGRESS' && request.analysisReady}>
-                        <button class="btn-small btn-primary" onClick={() => openBloodUpdateModal(request, 'COMPLETED')}>
+                        <Button.Root class="btn-small btn-primary" onClick={() => openBloodUpdateModal(request, 'COMPLETED')}>
                           [SEND TO POLICE]
-                        </button>
+                        </Button.Root>
                       </Show>
                       <Show when={request.status === 'PENDING' || request.status === 'ACKNOWLEDGED' || request.status === 'IN_PROGRESS'}>
-                        <button class="btn-small" onClick={() => openBloodUpdateModal(request, 'DECLINED')}>
+                        <Button.Root class="btn-small" onClick={() => openBloodUpdateModal(request, 'DECLINED')}>
                           [DECLINE]
-                        </button>
+                        </Button.Root>
                       </Show>
                     </div>
                   </div>
@@ -940,7 +936,7 @@ export function EMSDashboard() {
         </div>
 
         <Show when={bloodUpdateModalOpen() && pendingBloodUpdate()}>
-          <div class="modal-overlay" onClick={cancelBloodUpdateModal}>
+                    <Modal.Root onClose={cancelBloodUpdateModal} useContentWrapper={false}>
             <div class="modal-content" onClick={(e) => e.stopPropagation()}>
               <div class="modal-header">
                 <h3>=== BLOOD REQUEST UPDATE ===</h3>
@@ -955,7 +951,7 @@ export function EMSDashboard() {
                 </p>
                 <div class="form-group">
                   <label>Update notes (optional):</label>
-                  <textarea
+                  <Textarea.Root
                     class="dos-textarea"
                     rows={3}
                     value={bloodUpdateNotes()}
@@ -965,17 +961,17 @@ export function EMSDashboard() {
                 </div>
               </div>
               <div class="modal-footer">
-                <button class="btn" onClick={cancelBloodUpdateModal}>[CANCEL]</button>
-                <button class="btn btn-primary" onClick={() => void submitBloodUpdateModal()}>
+                <Button.Root class="btn" onClick={cancelBloodUpdateModal}>[CANCEL]</Button.Root>
+                <Button.Root class="btn btn-primary" onClick={() => void submitBloodUpdateModal()}>
                   [APPLY UPDATE]
-                </button>
+                </Button.Root>
               </div>
             </div>
-          </div>
+          </Modal.Root>
         </Show>
 
         <Show when={showPoliceCallModal()}>
-          <div class="modal-overlay" onClick={() => setShowPoliceCallModal(false)}>
+                    <Modal.Root onClose={() => setShowPoliceCallModal(false)} useContentWrapper={false}>
             <div class="modal-content" onClick={(e) => e.stopPropagation()}>
               <div class="modal-header">
                 <h3>=== REQUEST POLICE ASSISTANCE ===</h3>
@@ -1010,7 +1006,7 @@ export function EMSDashboard() {
                 </div>
                 <div class="form-group">
                   <label>Reason for assistance:</label>
-                  <textarea
+                  <Textarea.Root
                     class="dos-textarea"
                     rows={4}
                     value={policeCallReason()}
@@ -1020,13 +1016,13 @@ export function EMSDashboard() {
                 </div>
               </div>
               <div class="modal-footer">
-                <button class="btn" onClick={() => setShowPoliceCallModal(false)}>[CANCEL]</button>
-                <button class="btn btn-primary" onClick={() => void submitPoliceCall()}>
+                <Button.Root class="btn" onClick={() => setShowPoliceCallModal(false)}>[CANCEL]</Button.Root>
+                <Button.Root class="btn btn-primary" onClick={() => void submitPoliceCall()}>
                   [CALL POLICE]
-                </button>
+                </Button.Root>
               </div>
             </div>
-          </div>
+          </Modal.Root>
         </Show>
 
         <Show when={selectedPatient() && activeTab() !== 'admit'}>
@@ -1121,36 +1117,36 @@ export function EMSDashboard() {
               </div>
 
               <div class="patient-detail-actions">
-                <button 
+                <Button.Root 
                   class="btn btn-primary"
                   onClick={() => handleHandoff(selectedPatient()!)}
                   title="Send medical report to active case"
                 >
                   [HANDOFF TO CASE]
-                </button>
+                </Button.Root>
                 
                 <Show when={selectedPatient()!.status === 'TRIAGE' || selectedPatient()!.status === 'ADMITTED'}>
-                  <button 
+                  <Button.Root 
                     class="btn"
                     onClick={() => startTreatment(selectedPatient()!)}
                   >
                     [START TREATMENT]
-                  </button>
+                  </Button.Root>
                 </Show>
                 <Show when={selectedPatient()!.status === 'IN_TREATMENT'}>
-                  <button 
+                  <Button.Root 
                     class="btn btn-success"
                     onClick={() => dischargePatient(selectedPatient()!)}
                   >
                     [DISCHARGE PATIENT]
-                  </button>
+                  </Button.Root>
                 </Show>
-                <button 
+                <Button.Root 
                   class="btn"
                   onClick={() => setSelectedPatient(null)}
                 >
                   [CLOSE]
-                </button>
+                </Button.Root>
               </div>
             </div>
           </div>
@@ -1160,9 +1156,9 @@ export function EMSDashboard() {
           <span style={{ color: '#808080' }}>
             EMS Dashboard v2.0 | {Object.keys(emsState.units).length} Units Available
           </span>
-          <button class="btn" onClick={closeModal}>[CLOSE]</button>
+          <Button.Root class="btn" onClick={closeModal}>[CLOSE]</Button.Root>
         </div>
       </div>
-    </div>
+    </Modal.Root>
   );
 }

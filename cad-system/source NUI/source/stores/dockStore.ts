@@ -96,6 +96,16 @@ const DEFAULT_DOCK_ITEMS: DockItem[] = [
     roles: ['police', 'dispatch', 'admin', 'ems'],
   },
   {
+    id: 'forensics',
+    name: 'Forensics',
+    icon: '🔬',
+    command: 'forensics',
+    modal: 'FORENSIC_COLLECTION',
+    tooltip: 'Forensic Collection',
+    category: 'evidence',
+    roles: ['police', 'ems', 'admin'],
+  },
+  {
     id: 'notes',
     name: 'Notes',
     icon: '📝',

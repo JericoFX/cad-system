@@ -1,6 +1,7 @@
 import { createSignal, For, Show, createMemo } from 'solid-js';
 import { terminalActions } from '~/stores/terminalStore';
 import { cadState, cadActions } from '~/stores/cadStore';
+import { Button, Modal } from '~/components/ui';
 
 export function RadioMarkers() {
   const [filter, setFilter] = createSignal<'all' | 'linked' | 'unlinked'>('all');
@@ -41,7 +42,7 @@ export function RadioMarkers() {
   };
 
   return (
-    <div class="modal-overlay" onClick={closeModal}>
+        <Modal.Root onClose={closeModal} useContentWrapper={false}>
       <div class="modal-content radio-markers" onClick={(e) => e.stopPropagation()}>
         <div class="modal-header">
           <h2>=== RADIO TRANSCRIPT MARKERS ===</h2>
@@ -106,30 +107,30 @@ export function RadioMarkers() {
                 <Show when={selectedMarker() === marker.markerId}>
                   <div class="marker-actions">
                     <Show when={!marker.linkedCaseId}>
-                      <button 
+                      <Button.Root 
                         class="btn btn-primary"
                         onClick={() => linkToCurrentCase(marker.markerId)}
                         disabled={!cadState.currentCase}
                       >
                         {cadState.currentCase ? `[LINK TO ${cadState.currentCase.caseId}]` : '[NO ACTIVE CASE]'}
-                      </button>
+                      </Button.Root>
                     </Show>
                     
                     <Show when={marker.linkedCaseId}>
-                      <button 
+                      <Button.Root 
                         class="btn"
                         onClick={() => terminalActions.setActiveModal('NOTES', { caseId: marker.linkedCaseId })}
                       >
                         [VIEW CASE]
-                      </button>
+                      </Button.Root>
                     </Show>
                     
-                    <button 
+                    <Button.Root 
                       class="btn btn-danger"
                       onClick={() => deleteMarker(marker.markerId)}
                     >
                       [DELETE]
-                    </button>
+                    </Button.Root>
                   </div>
                 </Show>
               </div>
@@ -141,9 +142,9 @@ export function RadioMarkers() {
           <span style={{ color: '#808080' }}>
             Total: {cadActions.getAllMarkers().length} markers
           </span>
-          <button class="btn" onClick={closeModal}>[CLOSE]</button>
+          <Button.Root class="btn" onClick={closeModal}>[CLOSE]</Button.Root>
         </div>
       </div>
-    </div>
+    </Modal.Root>
   );
 }

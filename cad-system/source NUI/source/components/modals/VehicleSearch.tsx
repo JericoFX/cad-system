@@ -1,6 +1,7 @@
 import { createSignal, createMemo, For, Show, onMount } from 'solid-js';
 import { terminalActions, terminalState } from '~/stores/terminalStore';
 import { cadState, cadActions, type Vehicle } from '~/stores/cadStore';
+import { Button, Input, Modal, Tabs, Textarea } from '~/components/ui';
 
 export function VehicleSearch() {
   const [searchQuery, setSearchQuery] = createSignal('');
@@ -98,7 +99,7 @@ export function VehicleSearch() {
   });
 
   return (
-    <div class="modal-overlay" onClick={closeModal}>
+        <Modal.Root onClose={closeModal} useContentWrapper={false}>
       <div class="modal-content vehicle-search" onClick={(e) => e.stopPropagation()}>
         <div class="modal-header">
           <h2>=== VEHICLE SEARCH (DMV) ===</h2>
@@ -107,7 +108,7 @@ export function VehicleSearch() {
 
         <div class="search-toolbar">
           <div class="search-input-group">
-            <input
+            <Input.Root
               type="text"
               class="dos-input search-input"
               value={searchQuery()}
@@ -163,26 +164,16 @@ export function VehicleSearch() {
                 </div>
               </div>
 
-              <div class="detail-tabs">
-                <button 
-                  class={`tab ${activeTab() === 'info' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('info')}
-                >
-                  [VEHICLE INFO]
-                </button>
-                <button 
-                  class={`tab ${activeTab() === 'owner' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('owner')}
-                >
-                  [OWNER INFO]
-                </button>
-                <button
-                  class={`tab ${activeTab() === 'notes' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('notes')}
-                >
-                  [NOTES ({vehicleNotes().length})]
-                </button>
-              </div>
+              <Tabs.Root
+                value={activeTab()}
+                onValueChange={(value) => setActiveTab(value as 'info' | 'owner' | 'notes')}
+              >
+                <Tabs.List>
+                  <Tabs.Trigger value='info' label='VEHICLE INFO' />
+                  <Tabs.Trigger value='owner' label='OWNER INFO' />
+                  <Tabs.Trigger value='notes' label='NOTES' badge={vehicleNotes().length} />
+                </Tabs.List>
+              </Tabs.Root>
 
               <div class="tab-content">
                 <Show when={activeTab() === 'info'}>
@@ -247,7 +238,7 @@ export function VehicleSearch() {
                     <div class="owner-name">{selectedVehicle()!.ownerName}</div>
                     <div class="owner-id">Citizen ID: {selectedVehicle()!.ownerId}</div>
                     <div class="owner-actions">
-                      <button 
+                      <Button.Root 
                         class="btn btn-primary"
                         onClick={() => {
                           terminalActions.setActiveModal('PERSON_SNAPSHOT', {
@@ -256,8 +247,8 @@ export function VehicleSearch() {
                         }}
                       >
                         [VIEW OWNER RECORD]
-                      </button>
-                      <button
+                      </Button.Root>
+                      <Button.Root
                         class="btn"
                         onClick={() => {
                           terminalActions.setActiveModal('BOLO_MANAGER', {
@@ -268,8 +259,8 @@ export function VehicleSearch() {
                         }}
                       >
                         [CREATE OWNER BOLO]
-                      </button>
-                      <button
+                      </Button.Root>
+                      <Button.Root
                         class="btn"
                         onClick={() => {
                           terminalActions.setActiveModal('POLICE_DASHBOARD', {
@@ -281,7 +272,7 @@ export function VehicleSearch() {
                         }}
                       >
                         [ISSUE WARRANT]
-                      </button>
+                      </Button.Root>
                     </div>
                   </div>
                 </Show>
@@ -289,14 +280,14 @@ export function VehicleSearch() {
                 <Show when={activeTab() === 'notes'}>
                   <div class="records-list">
                     <div class="add-note-form">
-                      <textarea
+                      <Textarea.Root
                         class="dos-textarea"
                         rows={3}
                         value={newVehicleNote()}
                         onInput={(e) => setNewVehicleNote(e.currentTarget.value)}
                         placeholder="Write a quick note for this vehicle..."
                       />
-                      <button class="btn btn-primary" onClick={addVehicleNote}>[SAVE NOTE]</button>
+                      <Button.Root class="btn btn-primary" onClick={addVehicleNote}>[SAVE NOTE]</Button.Root>
                     </div>
 
                     <Show when={vehicleNotes().length === 0}>
@@ -323,9 +314,9 @@ export function VehicleSearch() {
           <span style={{ color: '#808080' }}>
             DMV System v1.0
           </span>
-          <button class="btn" onClick={closeModal}>[CLOSE]</button>
+          <Button.Root class="btn" onClick={closeModal}>[CLOSE]</Button.Root>
         </div>
       </div>
-    </div>
+    </Modal.Root>
   );
 }

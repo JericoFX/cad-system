@@ -1,14 +1,142 @@
---[[
-C.A.D. System
-Created by JericoFX
-GitHub: https://github.com/JericoFX
-License: GNU GPL v3
-]]
+
 
 CAD = CAD or {}
 CAD.Evidence = CAD.Evidence or {}
 
 local staging = CAD.State.Evidence.Staging
+
+local function evidenceVirtualEnabled()
+    local cfg = CAD.Config.Evidence or {}
+    return cfg.UseVirtualContainer ~= false and CAD.VirtualContainer ~= nil
+end
+
+local function getTerminalById(terminalId)
+    local points = CAD.Config.UI.AccessPoints or {}
+    for i = 1, #points do
+        local point = points[i]
+        if point.id == terminalId then
+            return point
+        end
+    end
+
+    return nil
+end
+
+local function hasTerminalAccess(officer, terminal)
+    if not terminal.jobs or #terminal.jobs == 0 then
+        return true
+    end
+
+    if officer.isAdmin then
+        return true
+    end
+
+    for i = 1, #terminal.jobs do
+        if terminal.jobs[i] == officer.job then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function normalizeContainerConfig(terminal)
+    local container = terminal.evidenceContainer
+    if type(container) ~= 'table' or container.enabled ~= true then
+        return nil
+    end
+
+    local global = CAD.Config.Evidence or {}
+    local slots = tonumber(container.slots) or tonumber(global.VirtualContainerSlotCount) or 200
+
+    return {
+        slots = math.max(1, math.floor(slots)),
+        label = tostring(container.label or ('Evidence Locker - %s'):format(terminal.label or terminal.id or 'Terminal')),
+    }
+end
+
+local function resolveContainerContext(payload, officer)
+    local terminalId = CAD.Server.SanitizeString(payload and payload.terminalId, 64)
+    if terminalId == '' then
+        return nil, nil, nil, {
+            ok = false,
+            error = 'terminal_id_required',
+        }
+    end
+
+    local terminal = getTerminalById(terminalId)
+    if not terminal then
+        return nil, nil, nil, {
+            ok = false,
+            error = 'terminal_not_found',
+        }
+    end
+
+    local containerConfig = normalizeContainerConfig(terminal)
+    if not containerConfig then
+        return nil, nil, nil, {
+            ok = false,
+            error = 'container_not_enabled',
+        }
+    end
+
+    if not hasTerminalAccess(officer, terminal) then
+        return nil, nil, nil, {
+            ok = false,
+            error = 'forbidden',
+        }
+    end
+
+    return terminalId, terminal, containerConfig, nil
+end
+
+local function getContainerKey(terminalId)
+    return ('terminal:%s:evidence'):format(terminalId)
+end
+
+local function ensureVirtualEvidenceContainer(terminalId, containerConfig)
+    local containerKey = getContainerKey(terminalId)
+    local container, ensureErr = CAD.VirtualContainer.Ensure(containerKey, {
+        containerType = 'evidence',
+        endpointId = terminalId,
+        slotCount = containerConfig.slots,
+        readSlot = 1,
+        strictAllowedItems = false,
+    })
+
+    if not container then
+        return nil, ensureErr or 'container_not_ready'
+    end
+
+    return container
+end
+
+local function findFreeContainerSlot(container)
+    for i = 1, container.slotCount do
+        if not container.slots[i] then
+            return i
+        end
+    end
+
+    return nil
+end
+
+local function getContainerSlot(container, requestedSlot)
+    local target = math.floor(tonumber(requestedSlot) or 0)
+    if target > 0 then
+        local entry = container.slots[target]
+        if entry and entry.itemName then
+            return target, entry
+        end
+    end
+
+    local slotIndex, entry = CAD.VirtualContainer.GetFirstOccupied(container.containerKey)
+    if slotIndex and entry then
+        return slotIndex, entry
+    end
+
+    return nil, nil
+end
 
 local function getOfficerStaging(source)
     staging[source] = staging[source] or {}
@@ -52,6 +180,10 @@ local function appendCaseEvidence(caseId, evidence)
         return false, 'db_write_failed'
     end
 
+    if CAD.Cases and type(CAD.Cases.PublishPublicState) == 'function' then
+        CAD.Cases.PublishPublicState(false)
+    end
+
     return true
 end
 
@@ -73,7 +205,6 @@ lib.callback.register('cad:addEvidenceToStaging', CAD.Auth.WithGuard('default', 
 
     bucket[#bucket + 1] = record
 
-    -- Broadcast evidence staged (notify the officer's UI only)
     CAD.Server.BroadcastToPlayer(source, 'evidenceStaged', {
         stagingId = stagingId,
         evidenceType = record.evidenceType,
@@ -104,6 +235,212 @@ lib.callback.register('cad:removeFromStaging', CAD.Auth.WithGuard('default', fun
     end
 
     return false
+end))
+
+lib.callback.register('cad:evidence:container:list', CAD.Auth.WithGuard('default', function(_, payload, officer)
+    if not evidenceVirtualEnabled() then
+        return {
+            ok = false,
+            error = 'virtual_container_disabled',
+        }
+    end
+
+    local terminalId, _, containerConfig, errorResponse = resolveContainerContext(payload, officer)
+    if errorResponse then
+        return errorResponse
+    end
+
+    local container, containerErr = ensureVirtualEvidenceContainer(terminalId, containerConfig)
+    if not container then
+        return {
+            ok = false,
+            error = containerErr or 'container_not_ready',
+        }
+    end
+
+    return {
+        ok = true,
+        terminalId = terminalId,
+        containerKey = container.containerKey,
+        slotCount = container.slotCount,
+        slots = CAD.VirtualContainer.List(container.containerKey),
+    }
+end))
+
+lib.callback.register('cad:evidence:container:store', CAD.Auth.WithGuard('heavy', function(source, payload, officer)
+    if not evidenceVirtualEnabled() then
+        return {
+            ok = false,
+            error = 'virtual_container_disabled',
+        }
+    end
+
+    payload = type(payload) == 'table' and payload or {}
+    local stagingId = CAD.Server.SanitizeString(payload.stagingId, 64)
+    if stagingId == '' then
+        return {
+            ok = false,
+            error = 'staging_id_required',
+        }
+    end
+
+    local terminalId, _, containerConfig, errorResponse = resolveContainerContext(payload, officer)
+    if errorResponse then
+        return errorResponse
+    end
+
+    local container, containerErr = ensureVirtualEvidenceContainer(terminalId, containerConfig)
+    if not container then
+        return {
+            ok = false,
+            error = containerErr or 'container_not_ready',
+        }
+    end
+
+    local bucket = getOfficerStaging(source)
+    local selected = nil
+    local selectedIndex = nil
+    for i = 1, #bucket do
+        if tostring(bucket[i].stagingId) == stagingId then
+            selected = bucket[i]
+            selectedIndex = i
+            break
+        end
+    end
+
+    if not selected then
+        return {
+            ok = false,
+            error = 'staging_not_found',
+        }
+    end
+
+    local targetSlot = math.floor(tonumber(payload.slot) or 0)
+    if targetSlot > 0 then
+        if targetSlot > container.slotCount then
+            return {
+                ok = false,
+                error = 'slot_out_of_bounds',
+            }
+        end
+        if container.slots[targetSlot] then
+            return {
+                ok = false,
+                error = 'slot_occupied',
+                slot = targetSlot,
+            }
+        end
+    else
+        targetSlot = findFreeContainerSlot(container)
+        if not targetSlot then
+            return {
+                ok = false,
+                error = 'container_full',
+            }
+        end
+    end
+
+    local metadata = {
+        stagingId = selected.stagingId,
+        evidenceType = selected.evidenceType,
+        data = selected.data,
+        createdAt = selected.createdAt,
+        storedAt = CAD.Server.ToIso(),
+        storedBy = officer.identifier,
+    }
+
+    local setOk, setErr = CAD.VirtualContainer.SetSlot(container.containerKey, targetSlot, {
+        itemName = 'cad_evidence_record',
+        label = ('%s Evidence'):format(tostring(selected.evidenceType or 'UNKNOWN')),
+        count = 1,
+        metadata = metadata,
+        insertedBy = officer.identifier,
+        insertedAt = CAD.Server.ToIso(),
+    })
+
+    if not setOk then
+        return {
+            ok = false,
+            error = setErr or 'container_write_failed',
+        }
+    end
+
+    table.remove(bucket, selectedIndex)
+
+    return {
+        ok = true,
+        terminalId = terminalId,
+        containerKey = container.containerKey,
+        slot = targetSlot,
+        stagingId = stagingId,
+    }
+end))
+
+lib.callback.register('cad:evidence:container:pull', CAD.Auth.WithGuard('heavy', function(source, payload, officer)
+    if not evidenceVirtualEnabled() then
+        return {
+            ok = false,
+            error = 'virtual_container_disabled',
+        }
+    end
+
+    payload = type(payload) == 'table' and payload or {}
+
+    local terminalId, _, containerConfig, errorResponse = resolveContainerContext(payload, officer)
+    if errorResponse then
+        return errorResponse
+    end
+
+    local container, containerErr = ensureVirtualEvidenceContainer(terminalId, containerConfig)
+    if not container then
+        return {
+            ok = false,
+            error = containerErr or 'container_not_ready',
+        }
+    end
+
+    local bucket = getOfficerStaging(source)
+    if #bucket >= CAD.Config.Evidence.MaxStagingPerOfficer then
+        return {
+            ok = false,
+            error = 'staging_limit_reached',
+        }
+    end
+
+    local targetSlot, slotData = getContainerSlot(container, payload.slot)
+    if not slotData then
+        return {
+            ok = false,
+            error = 'container_empty',
+        }
+    end
+
+    local metadata = type(slotData.metadata) == 'table' and slotData.metadata or {}
+    local staged = {
+        stagingId = CAD.Server.GenerateId('STAGE'),
+        evidenceType = tostring(metadata.evidenceType or 'PHYSICAL'):upper(),
+        data = type(metadata.data) == 'table' and metadata.data or {},
+        createdAt = tostring(metadata.createdAt or CAD.Server.ToIso()),
+    }
+
+    bucket[#bucket + 1] = staged
+
+    local clearOk, clearErr = CAD.VirtualContainer.ClearSlot(container.containerKey, targetSlot)
+    if not clearOk then
+        table.remove(bucket, #bucket)
+        return {
+            ok = false,
+            error = clearErr or 'container_clear_failed',
+        }
+    end
+
+    return {
+        ok = true,
+        terminalId = terminalId,
+        containerKey = container.containerKey,
+        slot = targetSlot,
+        staging = staged,
+    }
 end))
 
 lib.callback.register('cad:attachEvidence', CAD.Auth.WithGuard('heavy', function(source, payload, officer)
@@ -160,18 +497,6 @@ lib.callback.register('cad:attachEvidence', CAD.Auth.WithGuard('heavy', function
 
     table.remove(bucket, selectedIndex)
 
-    -- Broadcast evidence attached to case
-    CAD.Server.BroadcastToJobs(
-        {'police', 'sheriff', 'dispatch'},
-        'caseEvidenceAttached',
-        {
-            caseId = caseId,
-            evidenceId = evidence.evidenceId,
-            attachedBy = officer.identifier,
-            attachedAt = evidence.attachedAt
-        }
-    )
-
     return evidence
 end))
 
@@ -184,7 +509,6 @@ lib.callback.register('cad:getCaseEvidence', CAD.Auth.WithGuard('default', funct
     return caseObj.evidence or {}
 end))
 
--- Debug callback to create evidence item from image URL
 lib.callback.register('cad:debug:createEvidenceItem', CAD.Auth.WithGuard('default', function(source, data)
     if not CAD.Config.Debug then
         return { ok = false, error = 'debug_disabled' }

@@ -1,45 +1,45 @@
---[[
-CAD Forensic - Blood Evidence System
-Generates blood decals from damage events during active crimes
-]]
-
 CAD = CAD or {}
 CAD.Forensic = CAD.Forensic or {}
-CAD.Forensic.Blood = {}
+CAD.Forensic.Blood = CAD.Forensic.Blood or {}
 
-local function getGroundZ(x, y)
-    local z = 0.0
-    local groundFound = false
+local lastEmitAt = 0
+
+local function getGroundZ(x, y, fallbackZ)
     for i = 0, 1000, 10 do
-        z = i
-        groundFound = IsPointOnGround(x, y, z)
-        if groundFound then break end
-    end
-    return z
-end
-
-local function isCrimeContext(victimPed)
-    local victimId = NetworkGetPlayerIndexFromPed(victimPed)
-    if not victimId or victimId == -1 then return false end
-
-    -- Check if victim is involved in active dispatch call
-    local calls = CAD.State.Dispatch.Calls or {}
-    for _, call in ipairs(calls) do
-        if call.status == 'ACTIVE' and call.subjects then
-            for _, subject in ipairs(call.subjects) do
-                if subject.id == GetPlayerServerId(victimId) then
-                    return true
-                end
-            end
+        local ok, groundZ = GetGroundZFor_3dCoord(x, y, i + 0.0, false)
+        if ok then
+            return groundZ
         end
     end
 
-    -- Check if victim is wanted
-    local officerData = CAD.Auth.GetOfficerData(PlayerId())
-    if officerData and officerData.wantedList then
-        for _, wanted in ipairs(officerData.wantedList) do
-            if wanted.citizenId == GetPlayerServerId(victimId) then
+    return fallbackZ
+end
+
+local function getPlayerServerIdFromPed(ped)
+    local playerIndex = NetworkGetPlayerIndexFromPed(ped)
+    if not playerIndex or playerIndex == -1 then
+        return 0
+    end
+
+    local source = GetPlayerServerId(playerIndex)
+    return source and source > 0 and source or 0
+end
+
+local function isCrimeContext(victimPed)
+    local victimSource = getPlayerServerIdFromPed(victimPed)
+    local calls = CAD.State.Dispatch.Calls or {}
+
+    for i = 1, #calls do
+        local call = calls[i]
+        if call.status == 'ACTIVE' then
+            if victimSource == 0 or type(call.subjects) ~= 'table' then
                 return true
+            end
+
+            for j = 1, #call.subjects do
+                if call.subjects[j].id == victimSource then
+                    return true
+                end
             end
         end
     end
@@ -47,75 +47,49 @@ local function isCrimeContext(victimPed)
     return false
 end
 
-local function createBloodDecal(coords, bloodType)
-    local decalType = CAD.EvidenceTypes.GetType('blood').visualization.decalType
-    local decal = AddDecal(
-        decalType,
-        coords.x, coords.y, coords.z,
-        0.0, 0.0, -1.0,
-        0.0, 0.0, 0.0,
-        1.0, 1.0, 0.0,
-        255, 0, 0, 200,
-        false, false, false, 0.0
-    )
-    
-    local evidence = {
-        id = 'BLOOD_' .. math.random(1000000),
-        type = 'blood',
-        coords = coords,
-        decal = decal,
-        bloodType = bloodType,
-        createdAt = os.time(),
-        quality = 100
-    }
+local function emitBloodEvidence(victimPed)
+    local now = GetGameTimer()
+    if now - lastEmitAt < 1000 then
+        return
+    end
 
-    CAD.Forensic.Blood.Evidence[evidence.id] = evidence
-    return evidence
-end
-
-local function handleBloodEvidence(damageEvent)
-    local victimPed = damageEvent:GetEntityAffected()
-    if not DoesEntityExist(victimPed) or not IsPedAPlayer(victimPed) then return end
-
-    local damage = damageEvent:GetDamageAmount()
-    local bloodConfig = CAD.EvidenceTypes.GetType('blood')
-    if damage < bloodConfig.generation.minDamage then return end
-
-    if not isCrimeContext(victimPed) then return end
+    lastEmitAt = now
 
     local coords = GetEntityCoords(victimPed)
-    coords.z = getGroundZ(coords.x, coords.y)
-
+    local z = getGroundZ(coords.x, coords.y, coords.z)
     local bloodType = CAD.EvidenceTypes.GetRandomBloodType()
-    createBloodDecal(coords, bloodType)
+    local ownerId = getPlayerServerIdFromPed(victimPed)
 
-    TriggerServerEvent('cad:forensic:sync', 'blood', NetworkGetPlayerIndexFromPed(victimPed), coords, bloodType)
+    TriggerServerEvent('cad:forensic:sync', 'blood', ownerId, vector3(coords.x, coords.y, z), bloodType)
 end
 
--- Initialize
-CAD.Forensic.Blood.Evidence = {}
-
 AddEventHandler('gameEventTriggered', function(name, args)
-    if name == 'CEventNetworkEntityDamage' and #args >= 1 then
-        local damageEvent = args[1]
-        handleBloodEvidence(damageEvent)
+    if name ~= 'CEventNetworkEntityDamage' then
+        return
     end
-end)
 
--- Cleanup expired evidence
-CreateThread(function()
-    while true do
-        local now = os.time()
-        for id, evidence in pairs(CAD.Forensic.Blood.Evidence) do
-            local age = now - evidence.createdAt
-            local config = CAD.EvidenceTypes.GetType('blood')
-            
-            -- Visibility decay
-            if age > config.decay.visibilityHalfLife then
-                RemoveDecal(evidence.decal)
-                CAD.Forensic.Blood.Evidence[id] = nil
-            end
-        end
-        Wait(5000)
+    if type(args) ~= 'table' or type(args[1]) ~= 'number' then
+        return
     end
+
+    local victimPed = args[1]
+    if not DoesEntityExist(victimPed) or not IsPedAPlayer(victimPed) then
+        return
+    end
+
+    local config = CAD.EvidenceTypes.GetType('blood')
+    if not config then
+        return
+    end
+
+    local chance = tonumber(config.generation and config.generation.chance) or 1.0
+    if chance < 1.0 and math.random() > chance then
+        return
+    end
+
+    if not isCrimeContext(victimPed) then
+        return
+    end
+
+    emitBloodEvidence(victimPed)
 end)

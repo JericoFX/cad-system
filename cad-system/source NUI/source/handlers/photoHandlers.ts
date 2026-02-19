@@ -4,6 +4,7 @@
  */
 
 import { onNuiMessage } from '~/utils/nuiRouter';
+import type { PhotoMetadata as StorePhotoMetadata } from '~/stores/photoStore';
 import type { 
   PhotoPreviewData,
   PhotoViewData,
@@ -11,25 +12,63 @@ import type {
   PhotoReleasedToPressData
 } from '~/types/nuiMessages';
 
+const recentlyHandledCapture = new Map<string, number>();
+
+function shouldHandleCapture(photoId: string): boolean {
+  const now = Date.now();
+  const last = recentlyHandledCapture.get(photoId) || 0;
+  recentlyHandledCapture.set(photoId, now);
+
+  for (const [key, timestamp] of recentlyHandledCapture.entries()) {
+    if (now - timestamp > 30000) {
+      recentlyHandledCapture.delete(key);
+    }
+  }
+
+  return (now - last) > 1000;
+}
+
+function normalizeCapturedPhoto(photo: PhotoCapturedData['photo']): StorePhotoMetadata {
+  return {
+    photoId: photo.photoId,
+    photoUrl: photo.photoUrl,
+    job: photo.job,
+    takenBy: photo.takenBy || 'Unknown',
+    takenByCitizenId: photo.takenByCitizenId || 'UNKNOWN',
+    takenAt: photo.takenAt || new Date().toISOString(),
+    location: photo.location || { x: 0, y: 0, z: 0 },
+    description: photo.description || '',
+    fov: photo.fov || {
+      hit: false,
+      distance: 0,
+    },
+    isEvidence: photo.isEvidence,
+    attachedCaseId: photo.attachedCaseId,
+  };
+}
+
 export function initPhotoHandlers(): void {
   // Photo preview (from camera capture)
   onNuiMessage<PhotoPreviewData>('photo:preview', async (data) => {
     console.log('[NUI] Photo preview');
-    
+
     const { photoActions } = await import('~/stores/photoStore');
-    const { terminalActions } = await import('~/stores/terminalStore');
-    
-    // Set preview data
-    photoActions.setPreviewData({
-      imageUrl: data.imageUrl,
-      isBase64: data.isBase64,
-      location: data.location,
-      fov: data.fov,
+    const { viewerActions } = await import('~/stores/viewerStore');
+
+    const previewPhoto = {
+      photoId: `PREVIEW_${Date.now()}`,
+      photoUrl: data.imageUrl,
       job: data.job,
-    });
-    
-    // Open photo preview modal
-    terminalActions.setActiveModal('PHOTO_PREVIEW');
+      takenBy: 'SYSTEM',
+      takenByCitizenId: 'SYSTEM',
+      takenAt: new Date().toISOString(),
+      location: data.location,
+      description: '',
+      fov: data.fov,
+    };
+
+    photoActions.setCurrentPhoto(previewPhoto);
+    viewerActions.openImage(data.imageUrl, `${data.job === 'police' ? 'Evidence' : 'Press'} Preview`);
   });
   
   // Photo view (from inventory item)
@@ -38,24 +77,37 @@ export function initPhotoHandlers(): void {
     
     const { viewerActions } = await import('~/stores/viewerStore');
     
-    // Open image viewer
-    viewerActions.open([data.url], data.metadata.description || 'Photo');
+    viewerActions.openImage(data.url, data.metadata.description || 'Photo');
   });
   
   // Photo captured
   onNuiMessage<PhotoCapturedData>('photo:captured', async (data) => {
     console.log('[NUI] Photo captured:', data.photo.photoId);
-    
+
     const { photoActions } = await import('~/stores/photoStore');
+    const { terminalActions } = await import('~/stores/terminalStore');
     const { notificationActions } = await import('~/stores/notificationStore');
-    
-    // Add photo to store
-    photoActions.addPhoto(data.photo);
-    
-    // Notification
+
+    const photo = normalizeCapturedPhoto(data.photo);
+    photoActions.addCapturedPhoto(photo);
+    photoActions.setCurrentPhoto(photo);
+
+    if (shouldHandleCapture(photo.photoId)) {
+      terminalActions.setActiveModal('PHOTO_PREVIEW', {
+        photoId: photo.photoId,
+        photoUrl: photo.photoUrl,
+        job: photo.job,
+        location: photo.location,
+        fov: photo.fov || {
+          hit: false,
+          distance: 0,
+        },
+      });
+    }
+
     notificationActions.notifySystem(
       'Photo Captured',
-      `Photo ${data.photo.photoId} saved`,
+      `Photo ${photo.photoId} saved`,
       'success'
     );
   });
@@ -64,17 +116,8 @@ export function initPhotoHandlers(): void {
   onNuiMessage<PhotoReleasedToPressData>('photo:releasedToPress', async (data) => {
     console.log('[NUI] Photo released to press:', data.photoId);
     
-    const { photoActions } = await import('~/stores/photoStore');
     const { notificationActions } = await import('~/stores/notificationStore');
-    
-    // Update photo status
-    photoActions.updatePhoto(data.photoId, {
-      releasedToPress: true,
-      releasedBy: data.releasedBy,
-      releasedAt: data.releasedAt,
-      releaseRestrictions: data.restrictions,
-    });
-    
+
     notificationActions.notifySystem(
       'Photo Released',
       `Photo ${data.photoId} released to press`,

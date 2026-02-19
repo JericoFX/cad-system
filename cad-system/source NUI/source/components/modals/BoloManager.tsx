@@ -3,6 +3,7 @@ import { terminalActions, terminalState } from '~/stores/terminalStore';
 import { cadState, cadActions } from '~/stores/cadStore';
 import { userActions } from '~/stores/userStore';
 import type { BOLO } from '~/stores/cadStore';
+import { Button, Input, Modal, Select, Tabs, Textarea } from '~/components/ui';
 
 export function BoloManager() {
   const [activeTab, setActiveTab] = createSignal<'all' | 'person' | 'vehicle'>('all');
@@ -107,7 +108,7 @@ export function BoloManager() {
   };
 
   return (
-    <div class="modal-overlay" onClick={closeModal}>
+        <Modal.Root onClose={closeModal} useContentWrapper={false}>
       <div class="modal-content bolo-manager" onClick={(e) => e.stopPropagation()}>
         <div class="modal-header">
           <h2>=== BOLO MANAGER ===</h2>
@@ -125,34 +126,24 @@ export function BoloManager() {
           </div>
         </div>
 
-        <div class="bolo-tabs">
-          <button 
-            class={`tab ${activeTab() === 'all' ? 'active' : ''}`}
-            onClick={() => setActiveTab('all')}
-          >
-            [ALL ({bolos().length})]
-          </button>
-          <button 
-            class={`tab ${activeTab() === 'person' ? 'active' : ''}`}
-            onClick={() => setActiveTab('person')}
-          >
-            [PERSONS ({bolos().filter(b => b.type === 'PERSON').length})]
-          </button>
-          <button 
-            class={`tab ${activeTab() === 'vehicle' ? 'active' : ''}`}
-            onClick={() => setActiveTab('vehicle')}
-          >
-            [VEHICLES ({bolos().filter(b => b.type === 'VEHICLE').length})]
-          </button>
-        </div>
+        <Tabs.Root
+          value={activeTab()}
+          onValueChange={(value) => setActiveTab(value as 'all' | 'person' | 'vehicle')}
+        >
+          <Tabs.List class='bolo-tabs'>
+            <Tabs.Trigger value='all' label='ALL' badge={bolos().length} />
+            <Tabs.Trigger value='person' label='PERSONS' badge={bolos().filter(b => b.type === 'PERSON').length} />
+            <Tabs.Trigger value='vehicle' label='VEHICLES' badge={bolos().filter(b => b.type === 'VEHICLE').length} />
+          </Tabs.List>
+        </Tabs.Root>
 
         <div class="bolo-actions">
-          <button 
+          <Button.Root 
             class="btn btn-primary"
             onClick={() => setShowCreateForm(!showCreateForm())}
           >
             {showCreateForm() ? '[CANCEL]' : '[+ CREATE BOLO]'}
-          </button>
+          </Button.Root>
         </div>
 
         <Show when={showCreateForm()}>
@@ -187,7 +178,7 @@ export function BoloManager() {
 
             <div class="form-section">
               <label class="form-label">[{boloType() === 'PERSON' ? 'CITIZEN ID' : 'LICENSE PLATE'}]</label>
-              <input
+              <Input.Root
                 type="text"
                 class="dos-input"
                 value={identifier()}
@@ -198,7 +189,7 @@ export function BoloManager() {
 
             <div class="form-section">
               <label class="form-label">[REASON]</label>
-              <textarea
+              <Textarea.Root
                 class="dos-textarea"
                 value={reason()}
                 onInput={(e) => setReason(e.currentTarget.value)}
@@ -209,7 +200,7 @@ export function BoloManager() {
 
             <div class="form-section">
               <label class="form-label">[PRIORITY]</label>
-              <select
+              <Select.Root
                 class="dos-select"
                 value={priority()}
                 onChange={(e) => setPriority(e.currentTarget.value as 'LOW' | 'MEDIUM' | 'HIGH')}
@@ -217,13 +208,13 @@ export function BoloManager() {
                 <option value="LOW">🔵 LOW</option>
                 <option value="MEDIUM">🟡 MEDIUM</option>
                 <option value="HIGH">🔴 HIGH</option>
-              </select>
+              </Select.Root>
             </div>
 
             <div class="form-actions">
-              <button class="btn btn-primary" onClick={createBOLO}>
+              <Button.Root class="btn btn-primary" onClick={createBOLO}>
                 [ISSUE BOLO]
-              </button>
+              </Button.Root>
             </div>
           </div>
         </Show>
@@ -262,10 +253,10 @@ export function BoloManager() {
 
                 <Show when={selectedBolo()?.boloId === bolo.boloId}>
                   <div class="bolo-actions-row">
-                    <button class="btn" onClick={() => removeBOLO(bolo.boloId)}>
+                    <Button.Root class="btn" onClick={() => removeBOLO(bolo.boloId)}>
                       [REMOVE BOLO]
-                    </button>
-                    <button 
+                    </Button.Root>
+                    <Button.Root 
                       class="btn btn-primary"
                       onClick={() => {
                         if (bolo.type === 'PERSON') {
@@ -279,9 +270,9 @@ export function BoloManager() {
                       }}
                     >
                       [SEARCH {bolo.type}]
-                    </button>
+                    </Button.Root>
                     <Show when={bolo.type === 'PERSON'}>
-                      <button 
+                      <Button.Root 
                         class="btn btn-primary"
                         style={{ 'background-color': '#ff0000', 'border-color': '#ff0000' }}
                         onClick={() => {
@@ -294,7 +285,7 @@ export function BoloManager() {
                         }}
                       >
                         [ARREST]
-                      </button>
+                      </Button.Root>
                     </Show>
                   </div>
                 </Show>
@@ -307,9 +298,9 @@ export function BoloManager() {
           <span style={{ color: '#808080' }}>
             Total Active: {bolos().length} BOLOs
           </span>
-          <button class="btn" onClick={closeModal}>[CLOSE]</button>
+          <Button.Root class="btn" onClick={closeModal}>[CLOSE]</Button.Root>
         </div>
       </div>
-    </div>
+    </Modal.Root>
   );
 }

@@ -1,12 +1,15 @@
 import { createSignal, Show, onMount } from 'solid-js';
 import { terminalActions } from '~/stores/terminalStore';
-import { photoActions, photoState, type PhotoMetadata } from '~/stores/photoStore';
+import { photoActions, type PhotoMetadata } from '~/stores/photoStore';
+import { fetchNui } from '~/utils/fetchNui';
+import { Button, Modal } from '~/components/ui';
 
 interface PhotoCapturePreviewProps {
   photoData: {
     photoId: string;
     photoUrl: string;
     job: 'police' | 'reporter';
+    description?: string;
     location: { x: number; y: number; z: number };
     fov: {
       hit: boolean;
@@ -25,7 +28,6 @@ export function PhotoCapturePreview(props: PhotoCapturePreviewProps) {
   const [imageError, setImageError] = createSignal(false);
 
   onMount(() => {
-    // Load current photo into state
     if (props.photoData) {
       const photo: PhotoMetadata = {
         photoId: props.photoData.photoId,
@@ -40,25 +42,32 @@ export function PhotoCapturePreview(props: PhotoCapturePreviewProps) {
         isEvidence: props.photoData.job === 'police',
       };
       photoActions.setCurrentPhoto(photo);
+      setDescription(props.photoData.description || '');
     }
   });
 
   const handleConfirm = async () => {
     setIsLoading(true);
-    
+
     try {
+      const nextDescription = description().trim();
+      await fetchNui('cad:photos:updateDescription', {
+        photoId: props.photoData.photoId,
+        description: nextDescription,
+      });
+
+      photoActions.setPhotoDescription(props.photoData.photoId, nextDescription);
+
       if (props.onConfirm) {
-        props.onConfirm(description());
+        props.onConfirm(nextDescription);
       }
-      
-      // Add description to photo if provided
-      if (description().trim()) {
-        // Note: This would require a server callback to update description
+
+      if (nextDescription) {
         terminalActions.addLine(`Photo ${props.photoData.photoId} saved with description`, 'output');
       } else {
         terminalActions.addLine(`Photo ${props.photoData.photoId} saved`, 'output');
       }
-      
+
       props.onClose();
     } catch (error) {
       terminalActions.addLine(`Failed to save photo: ${error}`, 'error');
@@ -67,10 +76,18 @@ export function PhotoCapturePreview(props: PhotoCapturePreviewProps) {
     }
   };
 
-  const handleCancel = () => {
-    // Request deletion of photo
-    terminalActions.addLine(`Photo ${props.photoData.photoId} discarded`, 'system');
-    props.onClose();
+  const handleCancel = async () => {
+    setIsLoading(true);
+    try {
+      await fetchNui('cad:photos:deletePhoto', { photoId: props.photoData.photoId });
+      photoActions.removePhoto(props.photoData.photoId);
+      terminalActions.addLine(`Photo ${props.photoData.photoId} discarded`, 'system');
+      props.onClose();
+    } catch (error) {
+      terminalActions.addLine(`Failed to discard photo: ${error}`, 'error');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const formatCoords = (coords: { x: number; y: number; z: number }) => {
@@ -100,7 +117,7 @@ export function PhotoCapturePreview(props: PhotoCapturePreviewProps) {
   };
 
   return (
-    <div class="modal-overlay" onClick={props.onClose}>
+        <Modal.Root onClose={props.onClose} useContentWrapper={false}>
       <div 
         class="modal-content photo-preview-modal" 
         onClick={e => e.stopPropagation()}
@@ -218,15 +235,15 @@ export function PhotoCapturePreview(props: PhotoCapturePreviewProps) {
             'justify-content': 'flex-end',
             gap: '10px'
           }}>
-            <button 
+            <Button.Root 
               class="btn" 
               onClick={handleCancel}
               disabled={isLoading()}
             >
               [DISCARD]
-            </button>
+            </Button.Root>
             
-            <button 
+            <Button.Root 
               class="btn btn-primary"
               onClick={handleConfirm}
               disabled={isLoading()}
@@ -236,10 +253,10 @@ export function PhotoCapturePreview(props: PhotoCapturePreviewProps) {
               }}
             >
               {isLoading() ? '[SAVING...]' : '[CONFIRM SAVE]'}
-            </button>
+            </Button.Root>
           </div>
         </div>
       </div>
-    </div>
+    </Modal.Root>
   );
 }

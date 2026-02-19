@@ -1,9 +1,4 @@
---[[
-C.A.D. System
-Created by JericoFX
-GitHub: https://github.com/JericoFX
-License: GNU GPL v3
-]]
+
 
 CAD.Police = CAD.Police or {}
 
@@ -147,7 +142,6 @@ lib.callback.register('cad:police:logJailTransfer', CAD.Auth.WithGuard('heavy', 
         'inform'
     )
 
-    -- Broadcast jail transfer
     CAD.Server.BroadcastToJobs(
         {'police', 'sheriff', 'dispatch'},
         'policeJailTransferLogged',
