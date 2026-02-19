@@ -17,6 +17,7 @@ import type {
   DispatchUnit,
   Evidence,
   Fine,
+  SecurityCamera,
   StagingEvidence,
 } from '../stores/cadStore';
 
@@ -59,6 +60,98 @@ const mockReaderDocument = {
       address: '101 Vinewood Blvd',
       bloodtype: 'O+',
     },
+  },
+};
+
+const mockReaderContainer: Record<number, typeof mockReaderDocument> = {
+  1: { ...mockReaderDocument },
+};
+
+const mockEvidenceLocker: Array<{
+  slot: number;
+  label: string;
+  itemName: string;
+  metadata: {
+    evidenceType?: string;
+    stagingId?: string;
+    data?: Record<string, unknown>;
+    createdAt?: string;
+  };
+}> = [];
+
+let mockVehicleTabletOpen = true;
+const mockEntityNotes: Array<{
+  id: string;
+  entityType: 'PERSON' | 'VEHICLE';
+  entityId: string;
+  author: string;
+  authorName: string;
+  content: string;
+  important: boolean;
+  timestamp: string;
+}> = [];
+
+const mockVehicleStops: Array<{
+  stopId: string;
+  plate: string;
+  vehicleModel: string;
+  ownerIdentifier?: string;
+  ownerName?: string;
+  riskLevel: 'NONE' | 'MEDIUM' | 'HIGH';
+  riskTags: string[];
+  noteHint?: string;
+  createdAt: string;
+  officer: string;
+}> = [];
+
+const mockSecurityCameras: Record<string, SecurityCamera> = {
+  CAM_MOCK_0001: {
+    cameraId: 'CAM_MOCK_0001',
+    cameraNumber: 1,
+    label: 'Camera 0001',
+    street: 'Mission Row',
+    crossStreet: 'Sinner St',
+    zone: 'Mission Row',
+    coords: { x: 439.12, y: -981.45, z: 33.9 },
+    rotation: { x: -12.0, y: 0.0, z: 145.0 },
+    fov: 55,
+    status: 'ACTIVE',
+    installedBy: 'OFFICER_101',
+    installedByName: 'Officer Mock',
+    createdAt: new Date(Date.now() - 86400000).toISOString(),
+    updatedAt: new Date(Date.now() - 86400000).toISOString(),
+  },
+  CAM_MOCK_0002: {
+    cameraId: 'CAM_MOCK_0002',
+    cameraNumber: 2,
+    label: 'Camera 0002',
+    street: 'Integrity Way',
+    crossStreet: 'Power St',
+    zone: 'Downtown',
+    coords: { x: 242.75, y: -1073.22, z: 35.0 },
+    rotation: { x: -8.0, y: 0.0, z: 90.0 },
+    fov: 60,
+    status: 'ACTIVE',
+    installedBy: 'OFFICER_102',
+    installedByName: 'Officer Mock 2',
+    createdAt: new Date(Date.now() - 43200000).toISOString(),
+    updatedAt: new Date(Date.now() - 43200000).toISOString(),
+  },
+  CAM_MOCK_0003: {
+    cameraId: 'CAM_MOCK_0003',
+    cameraNumber: 3,
+    label: 'Camera 0003',
+    street: 'Vespucci Blvd',
+    crossStreet: 'San Andreas Ave',
+    zone: 'Vespucci',
+    coords: { x: -1061.2, y: -851.4, z: 13.2 },
+    rotation: { x: -15.0, y: 0.0, z: 220.0 },
+    fov: 50,
+    status: 'DISABLED',
+    installedBy: 'OFFICER_103',
+    installedByName: 'Officer Mock 3',
+    createdAt: new Date(Date.now() - 21600000).toISOString(),
+    updatedAt: new Date(Date.now() - 10800000).toISOString(),
   },
 };
 
@@ -362,19 +455,23 @@ const mockHandlers: Record<string, (data: unknown) => unknown> = {
     };
   },
 
-  'cad:idreader:read': () => {
-    const info = mockReaderDocument.metadata.info;
+  'cad:idreader:read': (data: unknown) => {
+    const payload = asRecord(data);
+    const slot = typeof payload.slot === 'number' ? payload.slot : 1;
+    const item = mockReaderContainer[slot] || mockReaderContainer[1] || mockReaderDocument;
+    const info = item.metadata.info;
 
     return {
       ok: true,
       terminalId: mockReaderContext.terminalId,
-      stashId: 'cad_id_reader_mrpd_frontdesk',
+      containerKey: 'terminal:mrpd_frontdesk',
+      documentType: 'PERSON',
       item: {
-        name: mockReaderDocument.name,
-        slot: mockReaderDocument.slot,
+        name: item.name,
+        slot: slot,
       },
       source: 'qb-inventory-info',
-      metadata: mockReaderDocument.metadata,
+      metadata: item.metadata,
       person: {
         citizenid: info.citizenid,
         firstName: info.firstname,
@@ -390,6 +487,247 @@ const mockHandlers: Record<string, (data: unknown) => unknown> = {
         isDead: false,
       },
     };
+  },
+
+  'cad:idreader:listDocuments': () => ({
+    ok: true,
+    terminalId: mockReaderContext.terminalId,
+    containerKey: 'terminal:mrpd_frontdesk',
+    expectedSlot: 1,
+    documents: [
+      {
+        slot: 3,
+        name: 'id_card',
+        label: 'ID Card',
+        count: 1,
+        documentType: 'PERSON',
+      },
+    ],
+  }),
+
+  'cad:idreader:insert': (data: unknown) => {
+    const payload = asRecord(data);
+    const slot = typeof payload.slot === 'number' ? payload.slot : 1;
+    mockReaderContainer[slot] = { ...mockReaderDocument, slot };
+    return {
+      ok: true,
+      terminalId: mockReaderContext.terminalId,
+      containerKey: 'terminal:mrpd_frontdesk',
+      slot,
+      documentType: 'PERSON',
+      item: {
+        name: 'id_card',
+        label: 'ID Card',
+        sourceSlot: typeof payload.inventorySlot === 'number' ? payload.inventorySlot : 3,
+      },
+    };
+  },
+
+  'cad:idreader:eject': (data: unknown) => {
+    const payload = asRecord(data);
+    const slot = typeof payload.slot === 'number' ? payload.slot : 1;
+    const item = mockReaderContainer[slot] || mockReaderContainer[1];
+    if (!item) {
+      return { ok: false, error: 'no_document_in_reader' };
+    }
+
+    delete mockReaderContainer[slot];
+    return {
+      ok: true,
+      terminalId: mockReaderContext.terminalId,
+      containerKey: 'terminal:mrpd_frontdesk',
+      slot,
+      item: {
+        name: item.name,
+        label: 'ID Card',
+      },
+    };
+  },
+
+  'cad:idreader:getContainer': () => ({
+    ok: true,
+    terminalId: mockReaderContext.terminalId,
+    containerKey: 'terminal:mrpd_frontdesk',
+    slotCount: 5,
+    readSlot: 1,
+    slots: Object.entries(mockReaderContainer).map(([slot, value]) => ({
+      slot: Number(slot),
+      itemName: value.name,
+      label: 'ID Card',
+      metadata: value.metadata,
+    })),
+  }),
+
+  'cad:vehicle:getContext': () => ({
+    ok: true,
+    isInPoliceVehicle: true,
+    tabletOpen: mockVehicleTabletOpen,
+    vehicleSpeed: 36.8,
+  }),
+
+  'cad:vehicle:getReaderContext': () => ({
+    ok: true,
+    hasReader: true,
+    endpointType: 'vehicle',
+    endpointId: 'vehicle:9001',
+    vehicleNetId: 9001,
+  }),
+
+  'cad:vehicle:setOpen': (data: unknown) => {
+    const payload = asRecord(data);
+    mockVehicleTabletOpen = payload.open === true;
+    return {
+      ok: true,
+      tabletOpen: mockVehicleTabletOpen,
+    };
+  },
+
+  'cad:vehicle:scanFront': () => {
+    const sample = mockVehicles[Math.floor(Math.random() * mockVehicles.length)] || mockVehicles[0];
+    return {
+      ok: true,
+      plate: sample?.plate || 'TEST123',
+      model: sample?.model || 'Sultan',
+      distance: Math.floor((Math.random() * 32 + 8) * 10) / 10,
+      scannedAt: Date.now(),
+    };
+  },
+
+  'cad:vehicle:playAlert': () => ({
+    ok: true,
+  }),
+
+  'cad:lookup:searchVehicles': (data: unknown) => {
+    const payload = asRecord(data);
+    const query = typeof payload.query === 'string' ? payload.query.trim().toLowerCase() : '';
+    const rows = mockVehicles.filter((vehicle) => {
+      if (!query) return true;
+      return (
+        vehicle.plate.toLowerCase().includes(query) ||
+        vehicle.model.toLowerCase().includes(query) ||
+        vehicle.make.toLowerCase().includes(query) ||
+        vehicle.ownerId.toLowerCase().includes(query) ||
+        vehicle.ownerName.toLowerCase().includes(query)
+      );
+    });
+    return { ok: true, vehicles: rows.slice(0, 15) };
+  },
+
+  'cad:lookup:searchPersons': (data: unknown) => {
+    const payload = asRecord(data);
+    const query = typeof payload.query === 'string' ? payload.query.trim().toLowerCase() : '';
+    const rows = mockPersons.filter((person) => {
+      if (!query) return true;
+      return (
+        person.citizenid.toLowerCase().includes(query) ||
+        person.firstName.toLowerCase().includes(query) ||
+        person.lastName.toLowerCase().includes(query) ||
+        person.ssn.toLowerCase().includes(query)
+      );
+    });
+    return { ok: true, persons: rows.slice(0, 15) };
+  },
+
+  'cad:entityNotes:list': (data: unknown) => {
+    const payload = asRecord(data);
+    const entityType = payload.entityType === 'PERSON' ? 'PERSON' : 'VEHICLE';
+    const entityId = typeof payload.entityId === 'string' ? payload.entityId : '';
+    const notes = mockEntityNotes
+      .filter((note) => note.entityType === entityType && note.entityId === entityId)
+      .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+
+    return { ok: true, notes };
+  },
+
+  'cad:entityNotes:add': (data: unknown) => {
+    const payload = asRecord(data);
+    const entityType: 'PERSON' | 'VEHICLE' = payload.entityType === 'PERSON' ? 'PERSON' : 'VEHICLE';
+    const entityId = typeof payload.entityId === 'string' ? payload.entityId : '';
+    const content = typeof payload.content === 'string' ? payload.content.trim() : '';
+
+    if (!entityId || !content) {
+      return { ok: false, error: 'invalid_note_payload' };
+    }
+
+    const note = {
+      id: `NOTE_${Date.now()}`,
+      entityType,
+      entityId,
+      author: currentUser,
+      authorName: currentUser,
+      content,
+      important: payload.important === true,
+      timestamp: new Date().toISOString(),
+    };
+
+    mockEntityNotes.unshift(note);
+    return { ok: true, note };
+  },
+
+  'cad:vehicle:quickSummary': (data: unknown) => {
+    const payload = asRecord(data);
+    const plate = typeof payload.plate === 'string' ? payload.plate.trim().toUpperCase() : '';
+    const fallbackModel = typeof payload.model === 'string' ? payload.model : 'UNKNOWN';
+    const vehicle = mockVehicles.find((row) => row.plate.toUpperCase() === plate);
+
+    const vehicleNotes = mockEntityNotes.filter(
+      (note) => note.entityType === 'VEHICLE' && note.entityId.toUpperCase() === plate && note.important
+    );
+
+    const ownerId = vehicle?.ownerId || '';
+    const personNotes = mockEntityNotes.filter(
+      (note) => note.entityType === 'PERSON' && note.entityId === ownerId && note.important
+    );
+
+    const hasImportant = vehicleNotes.length + personNotes.length > 0;
+    const hasWarrant = [...vehicleNotes, ...personNotes].some((note) => note.content.toLowerCase().includes('warrant'));
+    const hasStolen = Boolean(vehicle?.stolen) || [...vehicleNotes, ...personNotes].some((note) => note.content.toLowerCase().includes('stolen'));
+
+    const riskLevel = hasStolen || hasWarrant ? 'HIGH' : hasImportant ? 'MEDIUM' : 'NONE';
+    const riskTags: string[] = [];
+    if (hasStolen) riskTags.push('STOLEN');
+    if (hasWarrant) riskTags.push('WARRANT');
+    if (hasImportant) riskTags.push('IMPORTANT_NOTE');
+
+    return {
+      ok: true,
+      plate,
+      model: vehicle?.model || fallbackModel,
+      ownerId: vehicle?.ownerId,
+      ownerName: vehicle?.ownerName,
+      riskLevel,
+      riskTags,
+      noteHint: vehicleNotes[0]?.content || personNotes[0]?.content,
+      vehicle,
+    };
+  },
+
+  'cad:vehicle:logStop': (data: unknown) => {
+    const payload = asRecord(data);
+    const stop = {
+      stopId: `STOP_${Date.now()}`,
+      plate: typeof payload.plate === 'string' ? payload.plate : 'UNKNOWN',
+      vehicleModel: typeof payload.model === 'string' ? payload.model : 'UNKNOWN',
+      ownerIdentifier: typeof payload.ownerId === 'string' ? payload.ownerId : undefined,
+      ownerName: typeof payload.ownerName === 'string' ? payload.ownerName : undefined,
+      riskLevel: (typeof payload.riskLevel === 'string' ? payload.riskLevel : 'NONE') as 'NONE' | 'MEDIUM' | 'HIGH',
+      riskTags: Array.isArray(payload.riskTags) ? (payload.riskTags as string[]) : [],
+      noteHint: typeof payload.noteHint === 'string' ? payload.noteHint : undefined,
+      createdAt: new Date().toISOString(),
+      officer: currentUser,
+    };
+
+    mockVehicleStops.unshift(stop);
+    return { ok: true, stopId: stop.stopId, createdAt: stop.createdAt };
+  },
+
+  'cad:vehicle:getRecentStops': (data: unknown) => {
+    const payload = asRecord(data);
+    const plate = typeof payload.plate === 'string' ? payload.plate.trim().toUpperCase() : '';
+    const rows = plate
+      ? mockVehicleStops.filter((stop) => stop.plate.toUpperCase() === plate)
+      : mockVehicleStops;
+    return { ok: true, stops: rows.slice(0, 8) };
   },
   
   'cad:addEvidenceToStaging': (data: unknown) => {
@@ -460,6 +798,106 @@ const mockHandlers: Record<string, (data: unknown) => unknown> = {
     const caseId = asString(data);
     return mockCaseEvidence[caseId] || [];
   },
+
+  'cad:evidence:container:list': () => {
+    return {
+      ok: true,
+      terminalId: mockReaderContext.terminalId,
+      containerKey: 'terminal:mrpd_frontdesk:evidence',
+      slotCount: 200,
+      slots: [...mockEvidenceLocker],
+    };
+  },
+
+  'cad:evidence:container:store': (data: unknown) => {
+    const payload = asRecord(data);
+    const stagingId = typeof payload.stagingId === 'string' ? payload.stagingId : '';
+    if (!stagingId) {
+      return { ok: false, error: 'staging_id_required' };
+    }
+
+    const stagingItem = mockStagingEvidence.find((item) => item.stagingId === stagingId);
+    if (!stagingItem) {
+      return { ok: false, error: 'staging_not_found' };
+    }
+
+    let targetSlot = typeof payload.slot === 'number' ? payload.slot : 0;
+    if (targetSlot <= 0) {
+      for (let i = 1; i <= 200; i++) {
+        if (!mockEvidenceLocker.find((entry) => entry.slot === i)) {
+          targetSlot = i;
+          break;
+        }
+      }
+    }
+
+    if (targetSlot <= 0) {
+      return { ok: false, error: 'container_full' };
+    }
+
+    if (mockEvidenceLocker.find((entry) => entry.slot === targetSlot)) {
+      return { ok: false, error: 'slot_occupied' };
+    }
+
+    mockEvidenceLocker.push({
+      slot: targetSlot,
+      label: `${stagingItem.evidenceType} Evidence`,
+      itemName: 'cad_evidence_record',
+      metadata: {
+        evidenceType: stagingItem.evidenceType,
+        stagingId: stagingItem.stagingId,
+        data: stagingItem.data,
+        createdAt: stagingItem.createdAt,
+      },
+    });
+
+    const index = mockStagingEvidence.findIndex((item) => item.stagingId === stagingId);
+    if (index > -1) {
+      mockStagingEvidence.splice(index, 1);
+    }
+    cadActions.removeStagingEvidence(stagingId);
+
+    return {
+      ok: true,
+      terminalId: mockReaderContext.terminalId,
+      containerKey: 'terminal:mrpd_frontdesk:evidence',
+      slot: targetSlot,
+      stagingId,
+    };
+  },
+
+  'cad:evidence:container:pull': (data: unknown) => {
+    const payload = asRecord(data);
+    const slot = typeof payload.slot === 'number' ? payload.slot : 0;
+    if (slot <= 0) {
+      return { ok: false, error: 'container_empty' };
+    }
+
+    const index = mockEvidenceLocker.findIndex((entry) => entry.slot === slot);
+    if (index === -1) {
+      return { ok: false, error: 'container_empty' };
+    }
+
+    const entry = mockEvidenceLocker[index];
+    const staging: StagingEvidence = {
+      stagingId: `STAGE_${Date.now().toString(36).toUpperCase()}`,
+      evidenceType: entry.metadata.evidenceType || 'PHYSICAL',
+      data: entry.metadata.data || {},
+      createdAt: entry.metadata.createdAt || new Date().toISOString(),
+    };
+
+    mockEvidenceLocker.splice(index, 1);
+    mockStagingEvidence.push(staging);
+    cadActions.addStagingEvidence(staging);
+
+    return {
+      ok: true,
+      terminalId: mockReaderContext.terminalId,
+      containerKey: 'terminal:mrpd_frontdesk:evidence',
+      slot,
+      staging,
+    };
+  },
   
   'cad:getDispatchSettings': () => {
     return {
@@ -527,6 +965,118 @@ const mockHandlers: Record<string, (data: unknown) => unknown> = {
 
     mockJailTransfers.unshift(transfer);
     return { ok: true, transfer };
+  },
+
+  'cad:cameras:getNextNumber': () => {
+    const cameraNumbers = Object.values(mockSecurityCameras).map((camera) => camera.cameraNumber || 0);
+    const highest = cameraNumbers.length > 0 ? Math.max(...cameraNumbers) : 0;
+    return {
+      ok: true,
+      nextNumber: highest + 1,
+    };
+  },
+
+  'cad:cameras:list': () => {
+    return {
+      ok: true,
+      cameras: Object.values(mockSecurityCameras).sort((a, b) => a.cameraNumber - b.cameraNumber),
+    };
+  },
+
+  'cad:cameras:get': (data: unknown) => {
+    const payload = asRecord(data);
+    const cameraId = typeof payload.cameraId === 'string' ? payload.cameraId : '';
+    const camera = mockSecurityCameras[cameraId];
+
+    if (!camera) {
+      return {
+        ok: false,
+        error: 'camera_not_found',
+      };
+    }
+
+    return {
+      ok: true,
+      camera,
+    };
+  },
+
+  'cad:cameras:watch': (data: unknown) => {
+    const payload = asRecord(data);
+    const cameraId = typeof payload.cameraId === 'string' ? payload.cameraId : '';
+    const camera = mockSecurityCameras[cameraId];
+
+    if (!camera) {
+      return {
+        ok: false,
+        error: 'camera_not_found',
+      };
+    }
+
+    if (camera.status !== 'ACTIVE') {
+      return {
+        ok: false,
+        error: 'camera_disabled',
+      };
+    }
+
+    return {
+      ok: true,
+      camera,
+    };
+  },
+
+  'cad:cameras:stopWatch': () => {
+    return {
+      ok: true,
+    };
+  },
+
+  'cad:cameras:setStatus': (data: unknown) => {
+    const payload = asRecord(data);
+    const cameraId = typeof payload.cameraId === 'string' ? payload.cameraId : '';
+    const status = typeof payload.status === 'string' ? payload.status.toUpperCase() : '';
+    const camera = mockSecurityCameras[cameraId];
+
+    if (!camera) {
+      return {
+        ok: false,
+        error: 'camera_not_found',
+      };
+    }
+
+    if (status !== 'ACTIVE' && status !== 'DISABLED') {
+      return {
+        ok: false,
+        error: 'invalid_status',
+      };
+    }
+
+    camera.status = status;
+    camera.updatedAt = new Date().toISOString();
+
+    return {
+      ok: true,
+      camera,
+    };
+  },
+
+  'cad:cameras:remove': (data: unknown) => {
+    const payload = asRecord(data);
+    const cameraId = typeof payload.cameraId === 'string' ? payload.cameraId : '';
+    if (!mockSecurityCameras[cameraId]) {
+      return {
+        ok: false,
+        error: 'camera_not_found',
+      };
+    }
+
+    delete mockSecurityCameras[cameraId];
+
+    return {
+      ok: true,
+      cameraId,
+    };
   },
 
   'cad:registerDispatchUnit': (data: unknown) => {

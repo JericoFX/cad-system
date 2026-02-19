@@ -1,6 +1,7 @@
 import { Show, createMemo } from 'solid-js';
 import { terminalActions, terminalState } from '~/stores/terminalStore';
 import { t } from '~/utils/i18n';
+import { Button, Modal } from '~/components/ui';
 
 type DocumentModalData = {
   title?: string;
@@ -105,7 +106,7 @@ export function EvidenceDocumentViewer() {
   };
 
   return (
-    <div class="modal-overlay" onClick={closeModal}>
+        <Modal.Root onClose={closeModal} useContentWrapper={false}>
       <div class="modal-content notepad-viewer" onClick={(event) => event.stopPropagation()}>
         <div class="modal-header">
           <h2>{t('evidence.documentTitle')}</h2>
@@ -165,9 +166,9 @@ export function EvidenceDocumentViewer() {
         </div>
 
         <div class="modal-footer">
-          <button class="btn" onClick={closeModal}>{t('evidence.close')}</button>
+          <Button.Root class="btn" onClick={closeModal}>{t('evidence.close')}</Button.Root>
         </div>
       </div>
-    </div>
+    </Modal.Root>
   );
 }

@@ -289,14 +289,19 @@ export const newsActions = {
     };
     
     setNewsState('articles', articleId, article);
+    this.emitNewsEvent('updated', articleId);
     return article;
   },
   
-  updateArticle(articleId: string, updates: Partial<NewsArticle>) {
+  updateArticle(articleId: string, updates: Partial<NewsArticle>, options?: { emitEvent?: boolean }) {
     setNewsState('articles', articleId, {
       ...updates,
       updatedAt: new Date().toISOString()
     });
+
+    if (options?.emitEvent !== false) {
+      this.emitNewsEvent('updated', articleId);
+    }
   },
   
   submitForApproval(articleId: string) {
@@ -324,7 +329,7 @@ export const newsActions = {
       status: 'PUBLISHED',
       publishedAt,
       expiresAt: nextExpiresAt,
-    });
+    }, { emitEvent: false });
 
     if (nextExpiresAt) {
       clearExpiration(articleId);
@@ -335,7 +340,7 @@ export const newsActions = {
   },
   
   expireArticle(articleId: string) {
-    this.updateArticle(articleId, { status: 'EXPIRED' });
+    this.updateArticle(articleId, { status: 'EXPIRED' }, { emitEvent: false });
     this.emitNewsEvent('expired', articleId);
   },
   
@@ -345,6 +350,7 @@ export const newsActions = {
   },
   
   deleteArticle(articleId: string) {
+    this.emitNewsEvent('deleted', articleId);
     clearExpiration(articleId);
     setNewsState('articles', articleId, undefined as any);
   },
@@ -382,6 +388,7 @@ export const newsActions = {
     if (typeof window !== 'undefined') {
       fetchNui(`cad:news:${event}`, {
         articleId,
+        article,
         headline: article.headline,
         category: article.category,
         priority: article.priority,
@@ -394,6 +401,41 @@ export const newsActions = {
     window.dispatchEvent(new CustomEvent(`news:${event}`, {
       detail: { articleId, article }
     }));
+  },
+
+  async loadFromServer() {
+    try {
+      const response = await fetchNui<{
+        ok: boolean;
+        articles?: NewsArticle[];
+      }>('cad:news:getArticles', {});
+
+      if (!response?.ok || !Array.isArray(response.articles)) {
+        return false;
+      }
+
+      const mapped: Record<string, NewsArticle> = {};
+      for (let i = 0; i < response.articles.length; i += 1) {
+        const article = response.articles[i];
+        if (!article || typeof article.articleId !== 'string' || article.articleId.trim() === '') {
+          continue;
+        }
+
+        mapped[article.articleId] = article;
+      }
+
+      setNewsState('articles', mapped);
+
+      Object.values(mapped).forEach((article) => {
+        if (article.status === 'PUBLISHED' && article.expiresAt) {
+          scheduleExpiration(article.articleId, article.expiresAt);
+        }
+      });
+
+      return true;
+    } catch {
+      return false;
+    }
   },
   
   getArticleByShareCode(code: string): NewsArticle | undefined {
@@ -582,12 +624,16 @@ export const newsActions = {
 };
 
 if (typeof window !== 'undefined') {
-  const saved = localStorage.getItem('cad_news');
-  if (saved) {
+  const loadFromLocalStorage = () => {
+    const saved = localStorage.getItem('cad_news');
+    if (!saved) {
+      return;
+    }
+
     try {
       const parsed = JSON.parse(saved);
       setNewsState('articles', parsed.articles || {});
-      
+
       const articles = parsed.articles as Record<string, NewsArticle>;
       Object.values(articles || {}).forEach((article) => {
         if (article.status === 'PUBLISHED' && article.expiresAt) {
@@ -597,7 +643,14 @@ if (typeof window !== 'undefined') {
     } catch (e) {
       console.error('[NewsStore] Failed to load saved news:', e);
     }
-  }
+  };
+
+  void (async () => {
+    const loaded = await newsActions.loadFromServer();
+    if (!loaded) {
+      loadFromLocalStorage();
+    }
+  })();
   
   setInterval(() => {
     localStorage.setItem('cad_news', JSON.stringify({

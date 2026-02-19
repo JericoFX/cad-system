@@ -2,6 +2,7 @@
 import { createSignal, createMemo, For, Show } from 'solid-js';
 import { terminalActions } from '~/stores/terminalStore';
 import { propertyState, propertyActions, type PropertyType } from '~/stores/propertyStore';
+import { Button, Modal, Tabs } from '~/components/ui';
 
 export function PropertyManager() {
   const [searchQuery, setSearchQuery] = createSignal('');
@@ -55,7 +56,7 @@ export function PropertyManager() {
   };
   
   return (
-    <div class="modal-overlay" onClick={closeModal}>
+        <Modal.Root onClose={closeModal} useContentWrapper={false}>
       <div class="modal-content property-manager" onClick={e => e.stopPropagation()}>
         <div class="modal-header">
           <h2>🏠 REGISTRO DE PROPIEDADES</h2>
@@ -64,26 +65,18 @@ export function PropertyManager() {
         
         <div class="modal-body">
           <div class="property-section">
-            <div class="search-tabs">
-              <button 
-                class={searchType() === 'address' ? 'active' : ''}
-                onClick={() => setSearchType('address')}
-              >
-                📍 Dirección
-              </button>
-              <button 
-                class={searchType() === 'owner' ? 'active' : ''}
-                onClick={() => setSearchType('owner')}
-              >
-                👤 Dueño
-              </button>
-              <button 
-                class={searchType() === 'nearby' ? 'active' : ''}
-                onClick={() => setSearchType('nearby')}
-              >
-                📍 Cercanas
-              </button>
-            </div>
+            <Tabs.Root
+              value={searchType()}
+              onValueChange={(value) => setSearchType(value as 'address' | 'owner' | 'nearby')}
+              bracketed={false}
+              uppercase={false}
+            >
+              <Tabs.List class='search-tabs'>
+                <Tabs.Trigger value='address' label='📍 Dirección' />
+                <Tabs.Trigger value='owner' label='👤 Dueño' />
+                <Tabs.Trigger value='nearby' label='📍 Cercanas' />
+              </Tabs.List>
+            </Tabs.Root>
             
             <Show when={searchType() !== 'nearby'}>
               <div class="search-box">
@@ -94,9 +87,9 @@ export function PropertyManager() {
                   placeholder={searchType() === 'address' ? 'Buscar por dirección...' : 'Buscar por dueño...'}
                   onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                 />
-                <button class="btn btn-primary" onClick={handleSearch}>
+                <Button.Root class="btn btn-primary" onClick={handleSearch}>
                   🔍 Buscar
-                </button>
+                </Button.Root>
               </div>
             </Show>
             
@@ -128,9 +121,9 @@ export function PropertyManager() {
                   value={propertyState.nearbyRadius}
                   onInput={(e) => propertyActions.setNearbyRadius(Number(e.currentTarget.value))}
                 />
-                <button class="btn btn-primary" onClick={handleSearch}>
+                <Button.Root class="btn btn-primary" onClick={handleSearch}>
                   🔍 Buscar
-                </button>
+                </Button.Root>
               </div>
             </Show>
           </div>
@@ -168,9 +161,9 @@ export function PropertyManager() {
               
               return (
                 <div class="property-section property-detail">
-                  <button class="btn btn-small" onClick={() => setSelectedProperty(null)}>
+                  <Button.Root class="btn btn-small" onClick={() => setSelectedProperty(null)}>
                     ← Volver
-                  </button>
+                  </Button.Root>
                   
                   <div class="detail-header">
                     <div class="detail-icon">{getPropertyIcon(property.type)}</div>
@@ -212,15 +205,15 @@ export function PropertyManager() {
                   </div>
                   
                   <div class="detail-actions">
-                    <button 
+                    <Button.Root 
                       class="btn btn-primary"
                       onClick={() => {
                         terminalActions.addLine(`Marcando ${property.address} en mapa...`, 'output');
                       }}
                     >
                       🗺️ Ver en Mapa
-                    </button>
-                    <button 
+                    </Button.Root>
+                    <Button.Root 
                       class="btn btn-secondary"
                       onClick={() => {
                         navigator.clipboard.writeText(property.address);
@@ -228,7 +221,7 @@ export function PropertyManager() {
                       }}
                     >
                       📋 Copiar Dirección
-                    </button>
+                    </Button.Root>
                   </div>
                 </div>
               );
@@ -236,6 +229,6 @@ export function PropertyManager() {
           </Show>
         </div>
       </div>
-    </div>
+    </Modal.Root>
   );
 }

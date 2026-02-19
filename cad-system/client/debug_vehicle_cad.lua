@@ -1,11 +1,5 @@
---[[
-DEBUG: Vehicle CAD Mock Data
-Temporary script for testing vehicle CAD integration
-]]
-
 CAD = CAD or {}
 
--- Mock police vehicle models
 local DEBUG_VEHICLES = {
     'debug_police',
     'debug_sheriff',
@@ -13,12 +7,10 @@ local DEBUG_VEHICLES = {
     'sheriff'
 }
 
--- Current mock state
 local isInPoliceVehicle = false
 local currentSpeed = 0
 local debugMode = true
 
--- Toggle vehicle CAD context
 local function toggleVehicleCAD()
     isInPoliceVehicle = not isInPoliceVehicle
     currentSpeed = isInPoliceVehicle and 35.0 or 0.0
@@ -43,14 +35,12 @@ local function toggleVehicleCAD()
     end
 end
 
--- Generate mock radar data
 local function generateMockRadarData()
     if not isInPoliceVehicle then return {} end
 
     local playerCoords = GetEntityCoords(PlayerPedId())
     local data = {}
 
-    -- Add normal vehicle
     table.insert(data, {
         id = 1,
         coords = {
@@ -62,7 +52,6 @@ local function generateMockRadarData()
         isWanted = false
     })
 
-    -- Add wanted vehicle (25% chance)
     if math.random(1, 4) == 1 then
         table.insert(data, {
             id = 2,
@@ -79,7 +68,6 @@ local function generateMockRadarData()
     return data
 end
 
--- Mock license scan
 local function mockLicenseScan()
     if not isInPoliceVehicle then
         lib.notify({
@@ -90,7 +78,7 @@ local function mockLicenseScan()
         return
     end
 
-    lib.progressBar({
+    local completed = CAD.Progress.Run({
         duration = 2000,
         label = 'Scanning license plate...',
         useWhileDead = false,
@@ -106,43 +94,36 @@ local function mockLicenseScan()
         }
     })
 
-    Wait(2000)
+    if not completed then
+        return
+    end
 
     local plate = string.format('CAD-%03d', math.random(100, 999))
     exports['cad-system']:searchVehicle(plate)
 end
 
--- Register debug commands
 if CAD.Config.Debug then
     RegisterCommand('vehiclecad', toggleVehicleCAD, false)
     RegisterKeyMapping('+debugVehicleCAD', 'Toggle Vehicle CAD', 'keyboard', 'f10')
     RegisterCommand('+debugVehicleCAD', toggleVehicleCAD, false)
 
     RegisterCommand('scanplate', mockLicenseScan, false)
-end
 
--- Mock vehicle context for testing
-CreateThread(function()
-    while true do
-        Wait(1000)
-        
-        -- Update speed (simulates driving)
-        if isInPoliceVehicle then
-            currentSpeed = math.min(currentSpeed + math.random(-5, 10), 90)
-            exports['cad-system']:setVehicleSpeed(currentSpeed)
-        end
-        
-        -- Simulate radar updates
-        if debugMode and isInPoliceVehicle then
-            local radarData = generateMockRadarData()
-            -- Would normally send to NUI, but for debug just log
-            -- In real implementation, this would trigger NUI update
-        end
-    end
-end)
+    CreateThread(function()
+        while true do
+            Wait(1000)
 
--- Debug notifications
-if CAD.Config.Debug then
+            if isInPoliceVehicle then
+                currentSpeed = math.min(currentSpeed + math.random(-5, 10), 90)
+                exports['cad-system']:setVehicleSpeed(currentSpeed)
+            end
+
+            if debugMode and isInPoliceVehicle then
+                local radarData = generateMockRadarData()
+            end
+        end
+    end)
+
     lib.notify({
         title = 'DEBUG',
         description = 'Vehicle CAD mock system loaded',

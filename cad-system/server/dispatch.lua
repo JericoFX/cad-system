@@ -1,19 +1,364 @@
---[[
-C.A.D. System
-Created by JericoFX
-GitHub: https://github.com/JericoFX
-License: GNU GPL v3
-]]
+
 
 CAD = CAD or {}
 CAD.Dispatch = CAD.Dispatch or {}
 
+---@class DispatchUnitRecord
+---@field unitId string
+---@field badge string
+---@field name string
+---@field status 'AVAILABLE'|'BUSY'|'OFF_DUTY'
+---@field type string
+---@field location? { x: number, y: number, z: number }
+---@field currentCall? string
+---@field updatedAt? string
+---@field updatedAtEpoch? integer
+
+---@class DispatchCallRecord
+---@field callId string
+---@field type string
+---@field priority integer
+---@field title string
+---@field description string
+---@field location string
+---@field coordinates? { x: number, y: number, z: number }
+---@field status 'PENDING'|'ACTIVE'|'CLOSED'
+---@field assignedUnits table<string, { assignedAt: string }>
+---@field createdAt string
+---@field closedAt? string
+---@field resolution? string
+
 local units = CAD.State.Dispatch.Units
 local calls = CAD.State.Dispatch.Calls
 local sourceToUnit = {}
+local saveCallDb
+local dispatchPublicRev = 0
+local dispatchPublicFingerprint = ''
+
+local dispatchPublicCfg = CAD.Config.Dispatch and CAD.Config.Dispatch.PublicState or {}
+local DISPATCH_PUBLIC_CELL_SIZE = math.max(50, tonumber(dispatchPublicCfg.CellSizeMeters) or 200)
+local DISPATCH_PUBLIC_CLOSED_TTL_MINUTES = math.max(1, tonumber(dispatchPublicCfg.ClosedRetentionMinutes) or 10)
+local DISPATCH_PUBLIC_MAX_CALLS = math.max(10, tonumber(dispatchPublicCfg.MaxCalls) or 250)
 
 local function isDispatchEnabled()
     return CAD.Config.Dispatch.Enabled ~= false and CAD.IsFeatureEnabled('Dispatch')
+end
+
+---@param unit DispatchUnitRecord
+local function touchUnit(unit)
+    local nowEpoch = os.time()
+    unit.updatedAtEpoch = nowEpoch
+    unit.updatedAt = CAD.Server.ToIso()
+end
+
+---@param value string|nil
+---@return integer|nil
+local function isoToEpoch(value)
+    if type(value) ~= 'string' then
+        return nil
+    end
+
+    local year, month, day, hour, minute, second = string.match(value, '^(%d+)%-(%d+)%-(%d+)T(%d+):(%d+):(%d+)Z$')
+    if not year then
+        return nil
+    end
+
+    local localEpoch = os.time({
+        year = tonumber(year),
+        month = tonumber(month),
+        day = tonumber(day),
+        hour = tonumber(hour),
+        min = tonumber(minute),
+        sec = tonumber(second),
+    })
+
+    if not localEpoch then
+        return nil
+    end
+
+    local utcOffset = os.difftime(os.time(), os.time(os.date('!*t')))
+    return localEpoch + utcOffset
+end
+
+---@param coords { x: number, y: number, z: number }|nil
+---@return table|nil
+local function quantizeCoords(coords)
+    if type(coords) ~= 'table' then
+        return nil
+    end
+
+    local x = tonumber(coords.x)
+    local y = tonumber(coords.y)
+    local z = tonumber(coords.z)
+    if not x or not y or not z then
+        return nil
+    end
+
+    local cellX = math.floor(x / DISPATCH_PUBLIC_CELL_SIZE)
+    local cellY = math.floor(y / DISPATCH_PUBLIC_CELL_SIZE)
+    local centerX = (cellX + 0.5) * DISPATCH_PUBLIC_CELL_SIZE
+    local centerY = (cellY + 0.5) * DISPATCH_PUBLIC_CELL_SIZE
+    local cellHash = ('%s:%s'):format(cellX, cellY)
+
+    return {
+        cellX = cellX,
+        cellY = cellY,
+        cellHash = cellHash,
+        center = {
+            x = centerX,
+            y = centerY,
+            z = z,
+        },
+    }
+end
+
+---@param unit DispatchUnitRecord
+---@return boolean
+local function isUnitStale(unit)
+    local staleSeconds = math.max(5, tonumber(CAD.Config.Dispatch.UnitStaleSeconds) or 300)
+    local updatedEpoch = tonumber(unit.updatedAtEpoch) or isoToEpoch(unit.updatedAt)
+    if not updatedEpoch then
+        return false
+    end
+
+    return (os.time() - updatedEpoch) > staleSeconds
+end
+
+---@param unit DispatchUnitRecord
+---@return table
+local function buildPublicUnit(unit)
+    local quantized = quantizeCoords(unit.location)
+    local zoneName = quantized and ('GRID %s'):format(quantized.cellHash) or 'UNKNOWN'
+
+    return {
+        unitId = unit.unitId,
+        badge = unit.badge,
+        name = unit.name,
+        status = unit.status,
+        type = unit.type,
+        currentCall = unit.currentCall,
+        location = quantized and quantized.center or nil,
+        zoneName = zoneName,
+        cellHash = quantized and quantized.cellHash or nil,
+        updatedAt = unit.updatedAt,
+    }
+end
+
+---@param call DispatchCallRecord
+---@return boolean
+local function shouldPublishCall(call)
+    if call.status ~= 'CLOSED' then
+        return true
+    end
+
+    local closedEpoch = isoToEpoch(call.closedAt) or isoToEpoch(call.createdAt)
+    if not closedEpoch then
+        return true
+    end
+
+    local ttlSeconds = DISPATCH_PUBLIC_CLOSED_TTL_MINUTES * 60
+    return (os.time() - closedEpoch) <= ttlSeconds
+end
+
+---@param call DispatchCallRecord
+---@return table
+local function buildPublicCall(call)
+    local quantized = quantizeCoords(call.coordinates)
+    local zoneName = CAD.Server.SanitizeString(call.location, 96)
+    if zoneName == '' then
+        zoneName = quantized and ('GRID %s'):format(quantized.cellHash) or 'UNKNOWN'
+    end
+
+    local publicTitle = ('%s INCIDENT'):format(tostring(call.type or 'GENERAL'):upper())
+    local locationLabel = zoneName
+    if quantized and quantized.cellHash then
+        locationLabel = ('%s [%s]'):format(zoneName, quantized.cellHash)
+    end
+
+    return {
+        callId = call.callId,
+        type = call.type,
+        priority = call.priority,
+        title = publicTitle,
+        description = '',
+        location = locationLabel,
+        coordinates = quantized and quantized.center or nil,
+        status = call.status,
+        assignedUnits = call.assignedUnits or {},
+        createdAt = call.createdAt,
+        closedAt = call.closedAt,
+        zoneName = zoneName,
+        cellHash = quantized and quantized.cellHash or nil,
+    }
+end
+
+---@return table
+local function buildDispatchPublicStateCore()
+    local publicUnits = {}
+    for unitId, unit in pairs(units) do
+        if type(unit) == 'table' and not isUnitStale(unit) then
+            publicUnits[unitId] = buildPublicUnit(unit)
+        end
+    end
+
+    local callRows = {}
+    for callId, call in pairs(calls) do
+        if type(call) == 'table' and shouldPublishCall(call) then
+            callRows[#callRows + 1] = {
+                callId = callId,
+                createdAt = tostring(call.createdAt or ''),
+                priority = tonumber(call.priority) or 99,
+            }
+        end
+    end
+
+    table.sort(callRows, function(a, b)
+        if a.priority ~= b.priority then
+            return a.priority < b.priority
+        end
+        if a.createdAt ~= b.createdAt then
+            return a.createdAt > b.createdAt
+        end
+        return a.callId < b.callId
+    end)
+
+    local publicCalls = {}
+    local limit = math.min(#callRows, DISPATCH_PUBLIC_MAX_CALLS)
+    for i = 1, limit do
+        local callId = callRows[i].callId
+        publicCalls[callId] = buildPublicCall(calls[callId])
+    end
+
+    return {
+        calls = publicCalls,
+        units = publicUnits,
+    }
+end
+
+---@param core table
+---@return string
+local function buildDispatchPublicFingerprint(core)
+    local lines = {}
+    lines[#lines + 1] = 'calls'
+
+    local callIds = {}
+    for callId in pairs(core.calls) do
+        callIds[#callIds + 1] = callId
+    end
+    table.sort(callIds)
+
+    for i = 1, #callIds do
+        local callId = callIds[i]
+        local call = core.calls[callId]
+        local unitIds = {}
+        for unitId in pairs(call.assignedUnits or {}) do
+            unitIds[#unitIds + 1] = unitId
+        end
+        table.sort(unitIds)
+
+        lines[#lines + 1] = table.concat({
+            call.callId,
+            tostring(call.status),
+            tostring(call.priority),
+            tostring(call.cellHash or ''),
+            tostring(call.closedAt or ''),
+            table.concat(unitIds, ','),
+        }, '|')
+    end
+
+    lines[#lines + 1] = 'units'
+    local unitIds = {}
+    for unitId in pairs(core.units) do
+        unitIds[#unitIds + 1] = unitId
+    end
+    table.sort(unitIds)
+
+    for i = 1, #unitIds do
+        local unitId = unitIds[i]
+        local unit = core.units[unitId]
+        lines[#lines + 1] = table.concat({
+            unit.unitId,
+            tostring(unit.status),
+            tostring(unit.currentCall or ''),
+            tostring(unit.cellHash or ''),
+        }, '|')
+    end
+
+    return table.concat(lines, '\n')
+end
+
+---@param force boolean|nil
+local function publishDispatchPublicState(force)
+    local core = buildDispatchPublicStateCore()
+    local fingerprint = buildDispatchPublicFingerprint(core)
+
+    if not force and fingerprint == dispatchPublicFingerprint then
+        return
+    end
+
+    dispatchPublicFingerprint = fingerprint
+    dispatchPublicRev = dispatchPublicRev + 1
+
+    GlobalState:set('cad_dispatch_public', {
+        rev = dispatchPublicRev,
+        generatedAt = CAD.Server.ToIso(),
+        calls = core.calls,
+        units = core.units,
+    }, true)
+end
+
+---@param unitId string
+---@param persistCalls boolean|nil
+local function releaseUnitFromCalls(unitId, persistCalls)
+    local changedCallIds = {}
+
+    for callId, call in pairs(calls) do
+        if type(call) == 'table' and call.assignedUnits and call.assignedUnits[unitId] then
+            call.assignedUnits[unitId] = nil
+
+            local hasAny = false
+            for _ in pairs(call.assignedUnits) do
+                hasAny = true
+                break
+            end
+
+            if not hasAny and call.status ~= 'CLOSED' then
+                call.status = 'PENDING'
+            end
+
+            changedCallIds[#changedCallIds + 1] = callId
+        end
+    end
+
+    if persistCalls == true then
+        for i = 1, #changedCallIds do
+            local call = calls[changedCallIds[i]]
+            if call then
+                saveCallDb(call)
+            end
+        end
+    end
+end
+
+---@param source number
+---@param persistCalls boolean|nil
+local function removeSourceUnit(source, persistCalls)
+    local unitId = sourceToUnit[source]
+    if not unitId then
+        return
+    end
+
+    sourceToUnit[source] = nil
+
+    local unit = units[unitId]
+    if not unit then
+        return
+    end
+
+    releaseUnitFromCalls(unitId, persistCalls)
+
+    units[unitId] = nil
+    CAD.State.EMS.Units[unitId] = nil
 end
 
 local function canUseDispatchControl(officer)
@@ -57,7 +402,7 @@ local function withDispatchGuard(bucket, handler)
     end)
 end
 
-local function saveCallDb(call)
+saveCallDb = function(call)
     local ok, err = pcall(function()
         MySQL.insert.await([[
             INSERT INTO cad_dispatch_calls (
@@ -130,6 +475,8 @@ lib.callback.register('cad:registerDispatchUnit', withDispatchGuard('default', f
         }
     end
 
+    touchUnit(unit)
+
     units[unitId] = unit
 
     if officer.job == 'ambulance' or officer.job == 'ems' then
@@ -140,9 +487,11 @@ lib.callback.register('cad:registerDispatchUnit', withDispatchGuard('default', f
             crew = { officer.identifier },
             location = unit.location,
             currentCall = unit.currentCall,
-            updatedAt = CAD.Server.ToIso(),
+            updatedAt = unit.updatedAt,
         }
     end
+
+    publishDispatchPublicState(false)
 
     return unit
 end))
@@ -196,11 +545,15 @@ lib.callback.register('cad:updateUnitStatus', withDispatchGuard('default', funct
         }
     end
 
+    touchUnit(unit)
+
     if CAD.State.EMS.Units[unitId] then
         CAD.State.EMS.Units[unitId].status = unit.status
         CAD.State.EMS.Units[unitId].location = unit.location
-        CAD.State.EMS.Units[unitId].updatedAt = CAD.Server.ToIso()
+        CAD.State.EMS.Units[unitId].updatedAt = unit.updatedAt
     end
+
+    publishDispatchPublicState(false)
 
     return unit
 end))
@@ -235,14 +588,9 @@ lib.callback.register('cad:createDispatchCall', withDispatchGuard('heavy', funct
     end
 
     calls[callId] = call
-    
-    -- Broadcast to all dispatch and police units
-    CAD.Server.BroadcastToJobs(
-        {'police', 'sheriff', 'dispatch'},
-        'dispatchCreated',
-        { call = call }
-    )
-    
+
+    publishDispatchPublicState(false)
+
     return call
 end))
 
@@ -284,11 +632,12 @@ lib.callback.register('cad:assignUnitToCall', withDispatchGuard('heavy', functio
     call.status = 'ACTIVE'
     unit.status = 'BUSY'
     unit.currentCall = call.callId
+    touchUnit(unit)
 
     if CAD.State.EMS.Units[payload.unitId] then
         CAD.State.EMS.Units[payload.unitId].status = 'EN_ROUTE'
         CAD.State.EMS.Units[payload.unitId].currentCall = call.callId
-        CAD.State.EMS.Units[payload.unitId].updatedAt = CAD.Server.ToIso()
+        CAD.State.EMS.Units[payload.unitId].updatedAt = unit.updatedAt
     end
 
     local saved, saveErr = saveCallDb(call)
@@ -300,10 +649,12 @@ lib.callback.register('cad:assignUnitToCall', withDispatchGuard('heavy', functio
         if CAD.State.EMS.Units[payload.unitId] then
             CAD.State.EMS.Units[payload.unitId].status = previousEmsStatus or previousUnitStatus
             CAD.State.EMS.Units[payload.unitId].currentCall = previousEmsCurrentCall or previousCurrentCall
-            CAD.State.EMS.Units[payload.unitId].updatedAt = CAD.Server.ToIso()
+            CAD.State.EMS.Units[payload.unitId].updatedAt = unit.updatedAt
         end
         return { ok = false, error = saveErr or 'db_write_failed' }
     end
+
+    publishDispatchPublicState(false)
 
     return call
 end))
@@ -331,6 +682,7 @@ lib.callback.register('cad:unassignUnitFromCall', withDispatchGuard('heavy', fun
     if unitIsResponding(unit) then
         unit.status = 'AVAILABLE'
     end
+    touchUnit(unit)
 
     local hasAny = false
     for _ in pairs(call.assignedUnits) do
@@ -344,7 +696,7 @@ lib.callback.register('cad:unassignUnitFromCall', withDispatchGuard('heavy', fun
     if CAD.State.EMS.Units[payload.unitId] then
         CAD.State.EMS.Units[payload.unitId].status = 'AVAILABLE'
         CAD.State.EMS.Units[payload.unitId].currentCall = nil
-        CAD.State.EMS.Units[payload.unitId].updatedAt = CAD.Server.ToIso()
+        CAD.State.EMS.Units[payload.unitId].updatedAt = unit.updatedAt
     end
 
     local saved, saveErr = saveCallDb(call)
@@ -356,10 +708,12 @@ lib.callback.register('cad:unassignUnitFromCall', withDispatchGuard('heavy', fun
         if CAD.State.EMS.Units[payload.unitId] then
             CAD.State.EMS.Units[payload.unitId].status = previousEmsStatus or previousUnitStatus
             CAD.State.EMS.Units[payload.unitId].currentCall = previousEmsCurrentCall or previousCurrentCall
-            CAD.State.EMS.Units[payload.unitId].updatedAt = CAD.Server.ToIso()
+            CAD.State.EMS.Units[payload.unitId].updatedAt = unit.updatedAt
         end
         return { ok = false, error = saveErr or 'db_write_failed' }
     end
+
+    publishDispatchPublicState(false)
 
     return call
 end))
@@ -370,6 +724,7 @@ local function closeCallInternal(call, payload)
     local previousUnits = {}
 
     call.status = 'CLOSED'
+    call.closedAt = CAD.Server.ToIso()
     call.resolution = payload.resolution or nil
 
     for unitId in pairs(call.assignedUnits) do
@@ -381,6 +736,7 @@ local function closeCallInternal(call, payload)
             }
             unit.currentCall = nil
             unit.status = 'AVAILABLE'
+            touchUnit(unit)
         end
         if CAD.State.EMS.Units[unitId] then
             local existing = previousUnits[unitId] or {}
@@ -389,7 +745,7 @@ local function closeCallInternal(call, payload)
             previousUnits[unitId] = existing
             CAD.State.EMS.Units[unitId].status = 'AVAILABLE'
             CAD.State.EMS.Units[unitId].currentCall = nil
-            CAD.State.EMS.Units[unitId].updatedAt = CAD.Server.ToIso()
+            CAD.State.EMS.Units[unitId].updatedAt = unit and unit.updatedAt or CAD.Server.ToIso()
         end
     end
 
@@ -402,11 +758,12 @@ local function closeCallInternal(call, payload)
             if unit then
                 unit.status = snapshot.status
                 unit.currentCall = snapshot.currentCall
+                touchUnit(unit)
             end
             if CAD.State.EMS.Units[unitId] then
                 CAD.State.EMS.Units[unitId].status = snapshot.emsStatus or snapshot.status
                 CAD.State.EMS.Units[unitId].currentCall = snapshot.emsCurrentCall or snapshot.currentCall
-                CAD.State.EMS.Units[unitId].updatedAt = CAD.Server.ToIso()
+                CAD.State.EMS.Units[unitId].updatedAt = unit and unit.updatedAt or CAD.Server.ToIso()
             end
         end
         return nil, saveErr or 'db_write_failed'
@@ -426,6 +783,8 @@ lib.callback.register('cad:closeDispatchCall', withDispatchGuard('heavy', functi
         return { ok = false, error = closeErr or 'db_write_failed' }
     end
 
+    publishDispatchPublicState(false)
+
     return closed
 end))
 
@@ -440,6 +799,8 @@ lib.callback.register('cad:closeCall', withDispatchGuard('heavy', function(sourc
         return { ok = false, error = closeErr or 'db_write_failed' }
     end
 
+    publishDispatchPublicState(false)
+
     return closed
 end))
 
@@ -450,6 +811,9 @@ lib.callback.register('cad:setOfficerStatus', withDispatchGuard('default', funct
     end
 
     units[unitId].status = normalizeUnitStatus(payload.statusCode or payload.status)
+    touchUnit(units[unitId])
+    publishDispatchPublicState(false)
+
     return {
         statusCode = units[unitId].status,
     }
@@ -548,11 +912,14 @@ RegisterNetEvent('cad:server:updatePosition', function(coords)
     end
 
     units[unitId].location = { x = x, y = y, z = z }
+    touchUnit(units[unitId])
 
     if CAD.State.EMS.Units[unitId] then
         CAD.State.EMS.Units[unitId].location = units[unitId].location
-        CAD.State.EMS.Units[unitId].updatedAt = CAD.Server.ToIso()
+        CAD.State.EMS.Units[unitId].updatedAt = units[unitId].updatedAt
     end
+
+    publishDispatchPublicState(false)
 end)
 
 local statusChangeLimits = {}
@@ -590,4 +957,50 @@ RegisterNetEvent('cad:server:statusChanged', function(statusCode)
     end
 
     units[unitId].status = normalized
+    touchUnit(units[unitId])
+
+    if CAD.State.EMS.Units[unitId] then
+        CAD.State.EMS.Units[unitId].status = normalized
+        CAD.State.EMS.Units[unitId].updatedAt = units[unitId].updatedAt
+    end
+
+    publishDispatchPublicState(false)
+end)
+
+AddEventHandler('playerDropped', function()
+    local source = source
+    removeSourceUnit(source, true)
+    publishDispatchPublicState(false)
+end)
+
+CreateThread(function()
+    Wait(500)
+    publishDispatchPublicState(true)
+    Wait(5000)
+    publishDispatchPublicState(true)
+
+    while true do
+        Wait(30000)
+
+        local didMutate = false
+        local staleSources = {}
+
+        for source, unitId in pairs(sourceToUnit) do
+            local unit = units[unitId]
+            if not unit or isUnitStale(unit) then
+                staleSources[#staleSources + 1] = source
+            end
+        end
+
+        for i = 1, #staleSources do
+            removeSourceUnit(staleSources[i], true)
+            didMutate = true
+        end
+
+        if didMutate then
+            publishDispatchPublicState(true)
+        else
+            publishDispatchPublicState(false)
+        end
+    end
 end)

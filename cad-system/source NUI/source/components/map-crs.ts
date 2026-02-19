@@ -29,7 +29,7 @@ export function latLngToGta(latLng: L.LatLng): { x: number; y: number } {
   };
 }
 
-export const GTA_MAP_URL = 'https://files.fivemerr.com/images/60c68fc9-1a7f-4e5a-800a-f760a74186ca.jpeg';
+export const GTA_MAP_URL = '/gta-map.jpeg';
 
 export const GTA_MAP_BOUNDS: L.LatLngBoundsExpression = [
   [-4000, -4000], // Southwest

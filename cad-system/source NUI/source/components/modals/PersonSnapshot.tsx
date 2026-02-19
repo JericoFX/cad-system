@@ -1,6 +1,7 @@
 import { createSignal, Show, For, createMemo } from 'solid-js';
 import { terminalActions, terminalState } from '~/stores/terminalStore';
 import { cadState, cadActions } from '~/stores/cadStore';
+import { Button, Modal, Tabs } from '~/components/ui';
 
 export function PersonSnapshot() {
   const modalData = terminalState.modalData as { citizenId?: string } | null;
@@ -90,7 +91,7 @@ export function PersonSnapshot() {
   };
 
   return (
-    <div class="modal-overlay" onClick={closeModal}>
+        <Modal.Root onClose={closeModal} useContentWrapper={false}>
       <div class="modal-content person-snapshot" onClick={(e) => e.stopPropagation()}>
         <Show 
           when={person()} 
@@ -152,14 +153,14 @@ export function PersonSnapshot() {
             </div>
             
             <div class="header-actions">
-              <button class="btn btn-primary" onClick={createCase}>
+              <Button.Root class="btn btn-primary" onClick={createCase}>
                 [CREATE CASE]
-              </button>
-              <button class="btn" onClick={createArrest}>
+              </Button.Root>
+              <Button.Root class="btn" onClick={createArrest}>
                 [ARREST]
-              </button>
+              </Button.Root>
               <Show when={cadState.currentCase}>
-                <button 
+                <Button.Root 
                   class="btn"
                   onClick={() => {
                     terminalActions.setActiveModal('NOTES', {
@@ -169,43 +170,23 @@ export function PersonSnapshot() {
                   }}
                 >
                   [ADD NOTE]
-                </button>
+                </Button.Root>
               </Show>
             </div>
           </div>
 
-          <div class="snapshot-tabs">
-            <button 
-              class={`tab ${activeTab() === 'overview' ? 'active' : ''}`}
-              onClick={() => setActiveTab('overview')}
-            >
-              [OVERVIEW]
-            </button>
-            <button 
-              class={`tab ${activeTab() === 'records' ? 'active' : ''}`}
-              onClick={() => setActiveTab('records')}
-            >
-              [RECORDS ({criminalRecords().length})]
-            </button>
-            <button 
-              class={`tab ${activeTab() === 'vehicles' ? 'active' : ''}`}
-              onClick={() => setActiveTab('vehicles')}
-            >
-              [VEHICLES ({vehicles().length})]
-            </button>
-            <button 
-              class={`tab ${activeTab() === 'cases' ? 'active' : ''}`}
-              onClick={() => setActiveTab('cases')}
-            >
-              [CASES ({activeCases().length})]
-            </button>
-            <button 
-              class={`tab ${activeTab() === 'medical' ? 'active' : ''}`}
-              onClick={() => setActiveTab('medical')}
-            >
-              [MEDICAL]
-            </button>
-          </div>
+          <Tabs.Root
+            value={activeTab()}
+            onValueChange={(value) => setActiveTab(value as 'overview' | 'records' | 'vehicles' | 'cases' | 'medical')}
+          >
+            <Tabs.List class='snapshot-tabs'>
+              <Tabs.Trigger value='overview' label='OVERVIEW' />
+              <Tabs.Trigger value='records' label='RECORDS' badge={criminalRecords().length} />
+              <Tabs.Trigger value='vehicles' label='VEHICLES' badge={vehicles().length} />
+              <Tabs.Trigger value='cases' label='CASES' badge={activeCases().length} />
+              <Tabs.Trigger value='medical' label='MEDICAL' />
+            </Tabs.List>
+          </Tabs.Root>
 
           <div class="snapshot-content">
             <Show when={activeTab() === 'overview'}>
@@ -369,10 +350,10 @@ export function PersonSnapshot() {
             <span style={{ color: '#808080' }}>
               Last Updated: {formatDate(person()!.lastUpdated)}
             </span>
-            <button class="btn" onClick={closeModal}>[CLOSE]</button>
+            <Button.Root class="btn" onClick={closeModal}>[CLOSE]</Button.Root>
           </div>
         </Show>
       </div>
-    </div>
+    </Modal.Root>
   );
 }

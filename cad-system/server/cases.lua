@@ -1,23 +1,193 @@
---[[
-C.A.D. System
-Created by JericoFX
-GitHub: https://github.com/JericoFX
-License: GNU GPL v3
-]]
+
 
 CAD = CAD or {}
 CAD.Cases = CAD.Cases or {}
 
+---@class CaseRecord
+---@field caseId string
+---@field caseType string
+---@field title string
+---@field description string
+---@field status string
+---@field priority integer
+---@field createdBy string
+---@field assignedTo string|nil
+---@field linkedCallId string|nil
+---@field linkedUnits string[]
+---@field personId string|nil
+---@field personName string|nil
+---@field createdAt string
+---@field updatedAt string
+---@field closedAt string|nil
+---@field notes table[]
+---@field evidence table[]
+---@field tasks table[]
+
 local cases = CAD.State.Cases
+local casesPublicRev = 0
+local casesPublicFingerprint = ''
+
+local casesPublicCfg = CAD.Config.Cases and CAD.Config.Cases.PublicState or {}
+local CASES_PUBLIC_CLOSED_TTL_MINUTES = math.max(1, tonumber(casesPublicCfg.ClosedRetentionMinutes) or 10)
+local CASES_PUBLIC_MAX_CASES = math.max(10, tonumber(casesPublicCfg.MaxCases) or 300)
 
 local function cloneTable(value)
-    if type(value) ~= 'table' then return value end
-    local out = {}
-    for k, v in pairs(value) do
-        out[k] = cloneTable(v)
+    return CAD.DeepCopy(value)
+end
+
+---@param value string|nil
+---@return integer|nil
+local function isoToEpoch(value)
+    if type(value) ~= 'string' then
+        return nil
     end
+
+    local year, month, day, hour, minute, second = string.match(value, '^(%d+)%-(%d+)%-(%d+)T(%d+):(%d+):(%d+)Z$')
+    if not year then
+        return nil
+    end
+
+    local localEpoch = os.time({
+        year = tonumber(year),
+        month = tonumber(month),
+        day = tonumber(day),
+        hour = tonumber(hour),
+        min = tonumber(minute),
+        sec = tonumber(second),
+    })
+
+    if not localEpoch then
+        return nil
+    end
+
+    local utcOffset = os.difftime(os.time(), os.time(os.date('!*t')))
+    return localEpoch + utcOffset
+end
+
+---@param caseObj CaseRecord
+---@return boolean
+local function shouldPublishCase(caseObj)
+    if caseObj.status ~= 'CLOSED' then
+        return true
+    end
+
+    local closedEpoch = isoToEpoch(caseObj.closedAt) or isoToEpoch(caseObj.updatedAt)
+    if not closedEpoch then
+        return true
+    end
+
+    local ttlSeconds = CASES_PUBLIC_CLOSED_TTL_MINUTES * 60
+    return (os.time() - closedEpoch) <= ttlSeconds
+end
+
+---@param caseObj CaseRecord
+---@return table
+local function caseToPublic(caseObj)
+    return {
+        caseId = caseObj.caseId,
+        caseType = caseObj.caseType,
+        title = ('%s CASE'):format(tostring(caseObj.caseType or 'GENERAL'):upper()),
+        description = '',
+        status = caseObj.status,
+        priority = caseObj.priority,
+        createdBy = 'SYSTEM',
+        assignedTo = nil,
+        linkedCallId = caseObj.linkedCallId,
+        linkedUnits = {},
+        personId = nil,
+        personName = nil,
+        createdAt = caseObj.createdAt,
+        updatedAt = caseObj.updatedAt,
+        notes = {},
+        evidence = {},
+        tasks = {},
+        notesCount = #(caseObj.notes or {}),
+        evidenceCount = #(caseObj.evidence or {}),
+        tasksCount = #(caseObj.tasks or {}),
+    }
+end
+
+---@return table
+local function buildCasesPublicCore()
+    local rows = {}
+    for caseId, caseObj in pairs(cases) do
+        if type(caseObj) == 'table' and shouldPublishCase(caseObj) then
+            rows[#rows + 1] = {
+                caseId = caseId,
+                updatedAt = tostring(caseObj.updatedAt or ''),
+                priority = tonumber(caseObj.priority) or 99,
+            }
+        end
+    end
+
+    table.sort(rows, function(a, b)
+        if a.priority ~= b.priority then
+            return a.priority < b.priority
+        end
+        if a.updatedAt ~= b.updatedAt then
+            return a.updatedAt > b.updatedAt
+        end
+        return a.caseId < b.caseId
+    end)
+
+    local out = {}
+    local limit = math.min(#rows, CASES_PUBLIC_MAX_CASES)
+    for i = 1, limit do
+        local caseId = rows[i].caseId
+        out[caseId] = caseToPublic(cases[caseId])
+    end
+
     return out
 end
+
+---@param core table<string, table>
+---@return string
+local function buildCasesPublicFingerprint(core)
+    local caseIds = {}
+    for caseId in pairs(core) do
+        caseIds[#caseIds + 1] = caseId
+    end
+    table.sort(caseIds)
+
+    local lines = {}
+    for i = 1, #caseIds do
+        local caseId = caseIds[i]
+        local caseObj = core[caseId]
+        lines[#lines + 1] = table.concat({
+            caseObj.caseId,
+            tostring(caseObj.caseType or ''),
+            tostring(caseObj.status or ''),
+            tostring(caseObj.priority or ''),
+            tostring(caseObj.updatedAt or ''),
+            tostring(caseObj.evidenceCount or 0),
+            tostring(caseObj.notesCount or 0),
+            tostring(caseObj.tasksCount or 0),
+        }, '|')
+    end
+
+    return table.concat(lines, '\n')
+end
+
+---@param force boolean|nil
+local function publishCasesPublicState(force)
+    local core = buildCasesPublicCore()
+    local fingerprint = buildCasesPublicFingerprint(core)
+
+    if not force and fingerprint == casesPublicFingerprint then
+        return
+    end
+
+    casesPublicFingerprint = fingerprint
+    casesPublicRev = casesPublicRev + 1
+
+    GlobalState:set('cad_cases_public', {
+        rev = casesPublicRev,
+        generatedAt = CAD.Server.ToIso(),
+        cases = core,
+    }, true)
+end
+
+CAD.Cases.PublishPublicState = publishCasesPublicState
 
 local function caseToClient(caseObj)
     return {
@@ -35,6 +205,7 @@ local function caseToClient(caseObj)
         personName = caseObj.personName,
         createdAt = caseObj.createdAt,
         updatedAt = caseObj.updatedAt,
+        closedAt = caseObj.closedAt,
         notes = cloneTable(caseObj.notes or {}),
         evidence = cloneTable(caseObj.evidence or {}),
         tasks = cloneTable(caseObj.tasks or {}),
@@ -97,7 +268,7 @@ local function saveCaseDb(caseObj)
 end
 
 lib.callback.register('cad:createCase', CAD.Auth.WithGuard('heavy', function(source, payload, officer)
-    -- Police, sheriff, dispatch, and EMS can create cases
+
     local job = tostring(officer.job or ''):lower()
     local allowedJobs = { police = true, sheriff = true, dispatch = true, ems = true, ambulance = true }
     if not allowedJobs[job] and not officer.isAdmin then
@@ -139,6 +310,7 @@ lib.callback.register('cad:createCase', CAD.Auth.WithGuard('heavy', function(sou
         personName = payload.personName or nil,
         createdAt = now,
         updatedAt = now,
+        closedAt = nil,
         notes = {},
         evidence = {},
         tasks = {},
@@ -151,12 +323,7 @@ lib.callback.register('cad:createCase', CAD.Auth.WithGuard('heavy', function(sou
 
     cases[caseId] = caseObj
 
-    -- Broadcast case creation to police and dispatch
-    CAD.Server.BroadcastToJobs(
-        {'police', 'sheriff', 'dispatch'},
-        'caseCreated',
-        { case = caseToClient(caseObj) }
-    )
+    publishCasesPublicState(false)
 
     return caseToClient(caseObj)
 end))
@@ -228,6 +395,12 @@ lib.callback.register('cad:updateCase', CAD.Auth.WithGuard('heavy', function(_, 
     if payload.tasks ~= nil and type(payload.tasks) == 'table' then caseObj.tasks = payload.tasks end
     if payload.notes ~= nil and type(payload.notes) == 'table' then caseObj.notes = payload.notes end
 
+    if caseObj.status == 'CLOSED' then
+        caseObj.closedAt = caseObj.closedAt or CAD.Server.ToIso()
+    else
+        caseObj.closedAt = nil
+    end
+
     caseObj.updatedAt = CAD.Server.ToIso()
     local saved, saveErr = saveCaseDb(caseObj)
     if not saved then
@@ -240,17 +413,7 @@ lib.callback.register('cad:updateCase', CAD.Auth.WithGuard('heavy', function(_, 
         return { ok = false, error = saveErr or 'db_write_failed' }
     end
 
-    -- Broadcast case update
-    CAD.Server.BroadcastToJobs(
-        {'police', 'sheriff', 'dispatch'},
-        'caseUpdated',
-        {
-            caseId = caseId,
-            changes = payload,
-            updatedBy = 'system',
-            updatedAt = caseObj.updatedAt
-        }
-    )
+    publishCasesPublicState(false)
 
     return caseToClient(caseObj)
 end))
@@ -268,42 +431,34 @@ lib.callback.register('cad:closeCase', CAD.Auth.WithGuard('heavy', function(_, p
 
     local previousStatus = caseObj.status
     local previousUpdatedAt = caseObj.updatedAt
+    local previousClosedAt = caseObj.closedAt
     caseObj.status = 'CLOSED'
     caseObj.updatedAt = CAD.Server.ToIso()
+    caseObj.closedAt = caseObj.updatedAt
     local saved, saveErr = saveCaseDb(caseObj)
     if not saved then
         caseObj.status = previousStatus
         caseObj.updatedAt = previousUpdatedAt
+        caseObj.closedAt = previousClosedAt
         return { ok = false, error = saveErr or 'db_write_failed' }
     end
 
-    -- Broadcast case closure
-    CAD.Server.BroadcastToJobs(
-        {'police', 'sheriff', 'dispatch'},
-        'caseClosed',
-        {
-            caseId = caseId,
-            closedBy = 'system',
-            closedAt = caseObj.updatedAt
-        }
-    )
+    publishCasesPublicState(false)
 
     return { ok = true, success = true, caseId = caseId }
 end))
 
--- Print case report callback
 lib.callback.register("cad:case:printReport", CAD.Auth.WithGuard("default", function(source, payload)
     local caseId = payload and payload.caseId
     if not caseId then
         return { ok = false, error = "case_id_required" }
     end
-    
+
     local officer = CAD.Auth.GetOfficer(source)
     if not officer then
         return { ok = false, error = "officer_not_found" }
     end
-    
-    -- Generate report content
+
     local reportContent = string.format([[
 === CASE REPORT ===
 Case ID: %s
@@ -322,7 +477,7 @@ Evidence: %d
 
 Printed by: %s
 Badge: %s
-]], 
+]],
         caseId,
         payload.caseType or "N/A",
         payload.priority or 1,
@@ -335,17 +490,15 @@ Badge: %s
         officer.name or "Unknown",
         officer.badge or "N/A"
     )
-    
-    -- Create paper item if ox_inventory available
+
     local itemId = nil
     if GetResourceState('ox_inventory') == 'started' and CAD.Config.Evidence and CAD.Config.Evidence.TicketItemName then
         local itemName = CAD.Config.Evidence.TicketItemName
-        
-        -- Validate item exists in ox_inventory
+
         local itemExists = pcall(function()
             return exports.ox_inventory:GetItem(source, itemName, nil, false)
         end)
-        
+
         if itemExists then
             local metadata = {
                 caseId = caseId,
@@ -354,11 +507,11 @@ Badge: %s
                 printedAt = CAD.Server.ToIso(),
                 description = string.format("Case %s Report", caseId)
             }
-            
+
             local success, result = pcall(function()
                 return exports.ox_inventory:AddItem(source, itemName, 1, metadata)
             end)
-            
+
             if success and result then
                 itemId = result
             else
@@ -368,10 +521,22 @@ Badge: %s
             CAD.Log('warn', 'Case report item %s does not exist in ox_inventory', itemName)
         end
     end
-    
-    return { 
-        ok = true, 
+
+    return {
+        ok = true,
         itemId = itemId,
         report = reportContent
     }
 end))
+
+CreateThread(function()
+    Wait(500)
+    publishCasesPublicState(true)
+    Wait(5000)
+    publishCasesPublicState(true)
+
+    while true do
+        Wait(30000)
+        publishCasesPublicState(false)
+    end
+end)

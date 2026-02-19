@@ -3,6 +3,7 @@ import { terminalActions, terminalState } from '~/stores/terminalStore';
 import { cadActions, cadState } from '~/stores/cadStore';
 import type { StagingEvidence, Evidence } from '~/stores/cadStore';
 import { fetchNui } from '~/utils/fetchNui';
+import { Button, Form, Input, Modal, Text, Textarea } from '~/components/ui';
 
 const sanitizeUrl = (url: string): { valid: boolean; sanitized: string; error?: string } => {
   let sanitized = url.trim();
@@ -279,12 +280,11 @@ export function EvidenceUploader() {
   };
 
   return (
-    <div class="modal-overlay" onClick={closeModal}>
-      <div 
-        class="modal-content evidence-uploader" 
-        onClick={(e) => e.stopPropagation()}
-        style={uploadSuccess() ? { 'border-color': '#00ff00', 'border-width': '3px', 'border-style': 'solid' } : {}}
-      >
+    <Modal.Root
+      onClose={closeModal}
+      contentClass='evidence-uploader'
+      contentStyle={uploadSuccess() ? { 'border-color': '#00ff00', 'border-width': '3px', 'border-style': 'solid' } : {}}
+    >
         <Show when={uploadSuccess()}>
           <div style={{ 
             position: 'absolute', 
@@ -301,19 +301,24 @@ export function EvidenceUploader() {
             ✓ EVIDENCE ADDED SUCCESSFULLY
           </div>
         </Show>
-        <div class="modal-header">
-          <h2>=== UPLOAD EVIDENCE ===</h2>
+        <Modal.Header>
+          <Modal.Title>=== UPLOAD EVIDENCE ===</Modal.Title>
           <Show when={targetCaseId()}>
-            <div class="target-case-indicator" style={{ color: '#00ff00', 'font-size': '12px', 'margin-top': '4px' }}>
+            <Text.Root
+              as='div'
+              class='target-case-indicator'
+              tone='success'
+              style={{ 'font-size': '12px', 'margin-top': '4px' }}
+            >
               Target Case: {targetCaseId()} (Will attach directly)
-            </div>
+            </Text.Root>
           </Show>
-          <button class="modal-close" onClick={closeModal}>[X]</button>
-        </div>
+          <Modal.Close />
+        </Modal.Header>
 
         <div class="upload-form">
           <div class="form-section">
-            <label class="form-label">[EVIDENCE TYPE]</label>
+            <Form.Label text='EVIDENCE TYPE' />
             <div class="type-selector">
               <For each={['PHOTO', 'VIDEO', 'AUDIO'] as const}>
                 {(type) => (
@@ -329,7 +334,7 @@ export function EvidenceUploader() {
           </div>
 
           <div class="form-section">
-            <label class="form-label">[UPLOAD MODE]</label>
+            <Form.Label text='UPLOAD MODE' />
             <div class="upload-mode-selector">
               <button
                 class={`type-btn ${uploadMode() === 'url' ? 'selected' : ''}`}
@@ -338,17 +343,17 @@ export function EvidenceUploader() {
                 [{uploadMode() === 'url' ? 'X' : ' '}] URL (External)
               </button>
               <button
-                class={`type-btn ${uploadMode() === 'inventory' ? 'selected' : ''}`}
-                onClick={() => { setUploadMode('inventory'); setUrl(''); setPreviewUrl(''); }}
+                class={`type-btn ${uploadMode() === 'file' ? 'selected' : ''}`}
+                onClick={() => { setUploadMode('file'); setUrl(''); setPreviewUrl(''); }}
               >
-                [{uploadMode() === 'inventory' ? 'X' : ' '}] FROM INVENTORY
+                [{uploadMode() === 'file' ? 'X' : ' '}] FROM FILE
               </button>
             </div>
           </div>
 
           <Show when={uploadMode() === 'url'}>
             <div class="form-section">
-              <label class="form-label">[URL]</label>
+              <Form.Label text='URL' />
               <input
                 type="text"
                 class={`dos-input ${validationError() ? 'error' : ''}`}
@@ -365,8 +370,8 @@ export function EvidenceUploader() {
 
           <Show when={uploadMode() === 'file'}>
             <div class="form-section">
-              <label class="form-label">[SELECT FILE]</label>
-              <input
+              <Form.Label text='SELECT FILE' />
+              <Input.Root
                 type="file"
                 class="dos-input"
                 onChange={handleFileSelect}
@@ -382,8 +387,8 @@ export function EvidenceUploader() {
           </Show>
 
           <div class="form-section">
-            <label class="form-label">[DESCRIPTION]</label>
-            <textarea
+            <Form.Label text='DESCRIPTION' />
+            <Textarea.Root
               class="dos-textarea"
               value={description()}
               onInput={(e) => setDescription(e.currentTarget.value)}
@@ -395,7 +400,7 @@ export function EvidenceUploader() {
 
           <Show when={previewUrl()}>
             <div class="preview-section">
-              <div class="form-label">[PREVIEW]</div>
+              <Form.Label text='PREVIEW' />
               <Show when={uploadMode() === 'url'}>
                 <div class="url-preview">
                   <div class="preview-label">Sanitized URL:</div>
@@ -434,23 +439,20 @@ export function EvidenceUploader() {
             </ul>
           </div>
 
-          <div class="modal-footer">
+          <Modal.Footer>
             <Show when={isUploading()}>
               <span class="uploading-text">[UPLOADING...]</span>
             </Show>
-            <button 
-              class="btn btn-primary" 
+            <Button.Root
+              variant='primary'
               onClick={handleSubmit}
               disabled={isUploading() || (uploadMode() === 'url' ? !url().trim() : !selectedFile())}
             >
               {isUploading() ? '[PLEASE WAIT...]' : '[UPLOAD]'}
-            </button>
-            <button class="btn" onClick={closeModal} disabled={isUploading()}>
-              [CANCEL]
-            </button>
-          </div>
+            </Button.Root>
+            <Button.Root label='CANCEL' onClick={closeModal} disabled={isUploading()} />
+          </Modal.Footer>
         </div>
-      </div>
-    </div>
+    </Modal.Root>
   );
 }

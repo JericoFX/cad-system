@@ -1,9 +1,4 @@
---[[
-C.A.D. System
-Created by JericoFX
-GitHub: https://github.com/JericoFX
-License: GNU GPL v3
-]]
+
 
 CAD = CAD or {}
 CAD.Core = CAD.Core or {}
@@ -46,8 +41,7 @@ function CAD.Core.Server.QB.ResolveIdentity(source, fallbackIdentifier)
     local firstName = pd.charinfo and pd.charinfo.firstname or 'Officer'
     local lastName = pd.charinfo and pd.charinfo.lastname or tostring(source)
     local fullName = ('%s %s'):format(firstName, lastName)
-    
-    -- Check DB first for callsign, then metadata, then fallback
+
     local callsign = CAD.Officers.GetCallsign(pd.citizenid or fallbackIdentifier)
     if not callsign then
         callsign = (pd.metadata and pd.metadata.callsign)

@@ -1,6 +1,7 @@
 import { createSignal, createMemo, For, Show, onMount } from 'solid-js';
 import { terminalActions } from '~/stores/terminalStore';
 import { photoActions, photoState, type PhotoMetadata } from '~/stores/photoStore';
+import { Button, Input, Modal } from '~/components/ui';
 
 interface ReleasedEvidenceFeedProps {
   onPhotoSelect?: (photo: PhotoMetadata) => void;
@@ -83,7 +84,7 @@ export function ReleasedEvidenceFeed(props: ReleasedEvidenceFeedProps) {
 
       {/* Search */}
       <div style={{ 'margin-bottom': '15px' }}>
-        <input
+        <Input.Root
           type="text"
           class="dos-input"
           value={searchQuery()}
@@ -150,11 +151,7 @@ export function ReleasedEvidenceFeed(props: ReleasedEvidenceFeedProps) {
                     'background-color': 'rgba(0, 0, 0, 0.3)',
                     cursor: 'pointer',
                     overflow: 'hidden',
-                    transition: 'all 0.2s',
-                    ':hover': {
-                      'border-color': '#ffff00',
-                      'background-color': 'rgba(255, 255, 0, 0.05)'
-                    }
+                    transition: 'all 0.2s'
                   }}
                 >
                   {/* Image */}
@@ -200,8 +197,7 @@ export function ReleasedEvidenceFeed(props: ReleasedEvidenceFeedProps) {
                       'align-items': 'center',
                       'justify-content': 'center',
                       opacity: 0,
-                      transition: 'opacity 0.2s',
-                      ':hover': { opacity: 1 }
+                      transition: 'opacity 0.2s'
                     }}>
                       <span style={{ color: '#ffff00', 'font-size': '14px' }}>
                         [VIEW DETAILS]
@@ -257,11 +253,7 @@ export function ReleasedEvidenceFeed(props: ReleasedEvidenceFeedProps) {
 
       {/* Selected Photo Detail Modal */}
       <Show when={selectedPhoto()}>
-        <div 
-          class="modal-overlay"
-          onClick={() => setSelectedPhoto(null)}
-          style={{ 'z-index': 100 }}
-        >
+                <Modal.Root onClose={() => setSelectedPhoto(null)} useContentWrapper={false}>
           <div
             class="modal-content"
             onClick={e => e.stopPropagation()}
@@ -438,14 +430,14 @@ export function ReleasedEvidenceFeed(props: ReleasedEvidenceFeedProps) {
                 'justify-content': 'space-between',
                 'align-items': 'center'
               }}>
-                <button 
+                <Button.Root 
                   class="btn" 
                   onClick={() => setSelectedPhoto(null)}
                 >
                   [CLOSE]
-                </button>
+                </Button.Root>
                 
-                <button 
+                <Button.Root 
                   class="btn btn-primary"
                   onClick={() => {
                     terminalActions.addLine(
@@ -460,11 +452,11 @@ export function ReleasedEvidenceFeed(props: ReleasedEvidenceFeedProps) {
                   }}
                 >
                   [USE IN ARTICLE]
-                </button>
+                </Button.Root>
               </div>
             </div>
           </div>
-        </div>
+        </Modal.Root>
       </Show>
     </div>
   );

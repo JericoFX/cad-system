@@ -1,6 +1,7 @@
 import { createSignal, Show, createMemo } from 'solid-js';
 import { terminalActions } from '~/stores/terminalStore';
-import { photoActions, photoState, type PhotoMetadata } from '~/stores/photoStore';
+import { photoActions, type PhotoMetadata } from '~/stores/photoStore';
+import { Button, Modal, Select, Textarea } from '~/components/ui';
 
 interface PhotoReleaseModalProps {
   photo: PhotoMetadata;
@@ -70,7 +71,7 @@ export function PhotoReleaseModal(props: PhotoReleaseModalProps) {
   };
 
   return (
-    <div class="modal-overlay" onClick={props.onClose}>
+        <Modal.Root onClose={props.onClose} useContentWrapper={false}>
       <div 
         class="modal-content photo-release-modal" 
         onClick={e => e.stopPropagation()}
@@ -160,7 +161,7 @@ export function PhotoReleaseModal(props: PhotoReleaseModalProps) {
             }}>
               Release Reason <span style={{ color: '#ff0000' }}>*</span>
             </label>
-            <textarea
+            <Textarea.Root
               class="dos-textarea"
               value={reason()}
               onInput={e => {
@@ -189,7 +190,7 @@ export function PhotoReleaseModal(props: PhotoReleaseModalProps) {
             }}>
               Publication Duration:
             </label>
-            <select
+            <Select.Root
               class="dos-select"
               value={expiryDays()}
               onChange={e => setExpiryDays(e.currentTarget.value)}
@@ -200,7 +201,7 @@ export function PhotoReleaseModal(props: PhotoReleaseModalProps) {
               <option value="30">30 Days</option>
               <option value="60">60 Days</option>
               <option value="0">No Expiry</option>
-            </select>
+            </Select.Root>
             <div style={{ 
               'font-size': '12px', 
               'margin-top': '5px',
@@ -230,15 +231,15 @@ export function PhotoReleaseModal(props: PhotoReleaseModalProps) {
             'justify-content': 'space-between',
             'align-items': 'center'
           }}>
-            <button 
+            <Button.Root 
               class="btn" 
               onClick={props.onClose}
               disabled={isLoading()}
             >
               [CANCEL]
-            </button>
+            </Button.Root>
             
-            <button 
+            <Button.Root 
               class="btn btn-primary"
               onClick={handleRelease}
               disabled={isLoading() || !isValid()}
@@ -249,10 +250,10 @@ export function PhotoReleaseModal(props: PhotoReleaseModalProps) {
               }}
             >
               {isLoading() ? '[PROCESSING...]' : '[RELEASE TO PRESS]'}
-            </button>
+            </Button.Root>
           </div>
         </div>
       </div>
-    </div>
+    </Modal.Root>
   );
 }

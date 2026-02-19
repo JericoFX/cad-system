@@ -21,9 +21,18 @@ import {
 } from '../handlers';
 import { injectMockEvent } from './eventBus';
 import { cadActions } from '~/stores/cadStore';
+import { terminalActions, terminalState } from '~/stores/terminalStore';
 
 export async function loadScenario(scenario: Scenario): Promise<void> {
   console.log(`[MOCK] Loading scenario: ${scenario.name}`);
+
+  const isVehicleScenario = scenario.id === 'VEHICLE_COMPACT';
+  terminalActions.setVehicleContext(isVehicleScenario);
+  terminalActions.setUIMode(isVehicleScenario ? 'compact' : 'normal');
+  terminalActions.setVehicleSpeed(isVehicleScenario ? 35 : 0);
+  if (!isVehicleScenario && terminalState.activeModal === 'VEHICLE_CAD') {
+    terminalActions.setActiveModal(null);
+  }
   
   // Clear all existing mock data
   clearMockCases();
@@ -119,6 +128,23 @@ export async function loadScenario(scenario: Scenario): Promise<void> {
   }, 200);
   
   console.log(`[MOCK] Scenario ${scenario.name} loaded successfully`);
+
+  // Special handling for vehicle compact scenario
+  if (isVehicleScenario) {
+    terminalActions.setActiveModal('VEHICLE_CAD');
+
+    // Simulate radar data
+    window.postMessage({
+      action: 'radarData',
+      data: [
+        { id: 1, coords: { x: 450, y: -980, z: 0 }, distance: 25, isWanted: false },
+        { id: 2, coords: { x: 465, y: -995, z: 0 }, distance: 42, isWanted: true }
+      ]
+    }, '*');
+
+    terminalActions.addLine('✓ Vehicle CAD activated', 'system');
+    terminalActions.addLine('  Speed: 35 MPH | Radar active', 'system');
+  }
 }
 
 export function resetMockData(): void {

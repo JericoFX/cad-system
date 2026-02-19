@@ -5,6 +5,21 @@ import { cadState, cadActions, type Case, type Note, type Evidence } from '~/sto
 import { userActions } from '~/stores/userStore';
 import { viewerActions } from '~/stores/viewerStore';
 import { fetchNui } from '~/utils/fetchNui';
+import { Button, Input, Modal, Select, Tabs, Text, Textarea } from '~/components/ui';
+
+type CaseApiError = {
+  ok: false;
+  error: string;
+};
+
+const isCaseApiError = (value: unknown): value is CaseApiError => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const row = value as Record<string, unknown>;
+  return row.ok === false && typeof row.error === 'string';
+};
 
 export function CaseManager() {
   const [activeTab, setActiveTab] = createSignal<'list' | 'detail' | 'notes' | 'evidence' | 'tasks'>('list');
@@ -80,7 +95,7 @@ export function CaseManager() {
 
     const found = cadState.cases[caseId];
     if (found) {
-      selectCase(found);
+      void selectCase(found);
     }
   };
 
@@ -90,10 +105,32 @@ export function CaseManager() {
     }
   });
 
-  const selectCase = (caseItem: Case) => {
+  const selectCase = async (caseItem: Case) => {
     setSelectedCase(caseItem);
     cadActions.setCurrentCase(caseItem);
     setActiveTab('detail');
+
+    try {
+      const result = await fetchNui<Case | CaseApiError>('cad:getCase', {
+        caseId: caseItem.caseId,
+      });
+
+      if (isCaseApiError(result)) {
+        terminalActions.addLine(`Failed loading case details: ${result.error}`, 'error');
+        return;
+      }
+
+      if (!result || typeof result !== 'object' || !('caseId' in result)) {
+        return;
+      }
+
+      const detailedCase = result as Case;
+      cadActions.addCase(detailedCase);
+      cadActions.setCurrentCase(detailedCase);
+      setSelectedCase(detailedCase);
+    } catch (error) {
+      terminalActions.addLine(`Failed loading case details: ${String(error)}`, 'error');
+    }
   };
 
   const closeCase = async () => {
@@ -101,9 +138,19 @@ export function CaseManager() {
     if (!caseItem) return;
     
     try {
-      
+      const result = await fetchNui<{ ok?: boolean; success?: boolean; error?: string }>('cad:closeCase', {
+        caseId: caseItem.caseId,
+        resolution: closeResolution().trim(),
+      });
+
+      if (result?.ok === false) {
+        terminalActions.addLine(`Failed to close case: ${result.error || 'unknown_error'}`, 'error');
+        return;
+      }
+
       cadActions.updateCase(caseItem.caseId, { 
-        status: 'CLOSED'
+        status: 'CLOSED',
+        updatedAt: new Date().toISOString(),
       });
       
       terminalActions.addLine(`✓ Case ${caseItem.caseId} closed`, 'output');
@@ -287,26 +334,7 @@ export function CaseManager() {
   };
 
   const createNewCase = () => {
-    const newCaseId = `CASE_${Date.now()}`;
-    const newCase: Case = {
-      caseId: newCaseId,
-      title: 'New Case',
-      caseType: 'GENERAL',
-      status: 'OPEN',
-      priority: 3,
-      createdAt: new Date().toISOString(),
-      notes: [],
-      evidence: [],
-      tasks: []
-    };
-
-    cadActions.addCase(newCase);
-    selectCase(newCase);
-    
-    // Create dispatch call
-    createDispatchCall(newCase);
-    
-    terminalActions.addLine(`✓ Case ${newCaseId} created`, 'output');
+    terminalActions.setActiveModal('CASE_CREATOR');
   };
 
   const requestHelp = () => {
@@ -317,139 +345,87 @@ export function CaseManager() {
     }
 
     // Create high priority dispatch
-    createDispatchCall(caseItem, true);
+    void createDispatchCall(caseItem, true);
     
     terminalActions.addLine(`✓ Help requested for case ${caseItem.caseId}`, 'output');
   };
 
-  const createDispatchCall = (caseItem: Case, isEmergency = false) => {
-    const dispatchData = {
-      callId: `CALL_${Date.now()}`,
-      type: caseItem.caseType,
-      priority: isEmergency ? 1 : caseItem.priority,
-      location: 'Auto-generated from case',
-      description: `Case: ${caseItem.title}`,
-      status: 'PENDING',
-      units: [],
-      createdAt: new Date().toISOString(),
-      subjects: [{
-        id: 'UNKNOWN',
-        name: 'Case Subjects',
-        description: 'Auto-generated from case'
-      }]
-    };
+  const createDispatchCall = async (caseItem: Case, isEmergency = false) => {
+    try {
+      const callPriority = isEmergency ? 1 : Math.max(1, Math.min(3, caseItem.priority || 2));
+      const callResult = await fetchNui<{ callId?: string; ok?: boolean; error?: string }>('cad:createDispatchCall', {
+        type: caseItem.caseType,
+        priority: callPriority,
+        title: `CASE ${caseItem.caseId}`,
+        location: caseItem.personName || caseItem.linkedCallId || 'Case escalation',
+        description: `Escalation from case ${caseItem.caseId}`,
+      });
 
-    // Send to dispatch system
-    fetchNui('cad:dispatch:create', dispatchData);
-    
-    // Broadcast via radio
-    fetchNui('cad:radio:broadcast', {
-      channel: 'ALL_UNITS',
-      message: `10-3${isEmergency ? '1' : '2'}: ${caseItem.title} - ${caseItem.caseId}`
-    });
-  };
-
-  const generateFine = () => {
-    const caseItem = selectedCase();
-    if (!caseItem) return;
-
-    const input = lib.inputDialog('Create Fine', [
-      {
-        type: 'input',
-        label: 'Violation',
-        required: true,
-        placeholder: 'Speeding'
-      },
-      {
-        type: 'number',
-        label: 'Amount ($)',
-        required: true,
-        placeholder: '250',
-        min: 10,
-        max: 5000
-      },
-      {
-        type: 'textarea',
-        label: 'Notes',
-        required: false,
-        placeholder: 'Details about the violation...'
+      if (callResult?.ok === false) {
+        terminalActions.addLine(`Dispatch call failed: ${callResult.error || 'unknown_error'}`, 'error');
+        return;
       }
-    ]);
 
-    if (!input) return;
+      if (callResult?.callId) {
+        cadActions.updateCase(caseItem.caseId, { linkedCallId: callResult.callId });
 
-    const [violation, amount, notes] = input;
+        void fetchNui('cad:updateCase', {
+          caseId: caseItem.caseId,
+          linkedCallId: callResult.callId,
+        });
 
-    const fine = {
-      fineId: `FINE_${Date.now()}`,
-      caseId: caseItem.caseId,
-      violation,
-      amount: Number(amount),
-      notes,
-      createdAt: new Date().toISOString(),
-      status: 'PENDING'
-    };
-
-    cadActions.addFine(fine);
-    terminalActions.addLine(`✓ Fine created: $${amount} for ${violation}`, 'output');
+        terminalActions.addLine(`Dispatch call created: ${callResult.callId}`, 'output');
+      }
+    } catch (error) {
+      terminalActions.addLine(`Dispatch call failed: ${String(error)}`, 'error');
+    }
   };
 
   return (
-    <div class="modal-overlay" onClick={closeModal}>
-      <div class="modal-content case-manager" onClick={e => e.stopPropagation()}>
-        <div class="modal-header">
-          <h2>=== CASE MANAGER ===</h2>
-          <button class="modal-close" onClick={closeModal}>[X]</button>
-        </div>
+    <Modal.Root onClose={closeModal} contentClass='case-manager'>
+      <Modal.Header>
+        <Modal.Title>=== CASE MANAGER ===</Modal.Title>
+        <Modal.Close />
+      </Modal.Header>
 
-        <div class="detail-tabs">
-          <button 
-            class={`tab ${activeTab() === 'list' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('list'); setSelectedCase(null); }}
-          >
-            [LIST ({filteredCases().length})]
-          </button>
+      <Tabs.Root
+        value={activeTab()}
+        onValueChange={(value) => {
+          const nextTab = value as 'list' | 'detail' | 'notes' | 'evidence' | 'tasks';
+          setActiveTab(nextTab);
+          if (nextTab === 'list') {
+            setSelectedCase(null);
+          }
+        }}
+      >
+        <Tabs.List>
+          <Tabs.Trigger value='list' label='LIST' badge={filteredCases().length} />
           <Show when={selectedCase()}>
-            <button 
-              class={`tab ${activeTab() === 'detail' ? 'active' : ''}`}
-              onClick={() => setActiveTab('detail')}
-            >
-              [DETAIL]
-            </button>
-            <button 
-              class={`tab ${activeTab() === 'notes' ? 'active' : ''}`}
-              onClick={() => setActiveTab('notes')}
-            >
-              [NOTES ({selectedCase()?.notes?.length || 0})]
-            </button>
-            <button 
-              class={`tab ${activeTab() === 'evidence' ? 'active' : ''}`}
-              onClick={() => setActiveTab('evidence')}
-            >
-              [EVIDENCE ({selectedCase()?.evidence?.length || 0})]
-            </button>
-            <button 
-              class={`tab ${activeTab() === 'tasks' ? 'active' : ''}`}
-              onClick={() => setActiveTab('tasks')}
-            >
-              [TASKS ({selectedCase()?.tasks?.length || 0})]
-            </button>
+            <Tabs.Trigger value='detail' label='DETAIL' />
+            <Tabs.Trigger value='notes' label='NOTES' badge={selectedCase()?.notes?.length || 0} />
+            <Tabs.Trigger
+              value='evidence'
+              label='EVIDENCE'
+              badge={selectedCase()?.evidence?.length || 0}
+            />
+            <Tabs.Trigger value='tasks' label='TASKS' badge={selectedCase()?.tasks?.length || 0} />
           </Show>
-        </div>
+        </Tabs.List>
+      </Tabs.Root>
 
         <Show when={activeTab() === 'list'}>
           <div class="case-list-container">
             <Show when={modalData()?.caseId}>
               <div class="case-modal-hint">
                 Opened from case reference: {modalData()?.caseId}
-                <button class="btn-small" onClick={openCaseFromModalData}>
+                <Button.Root class="btn-small" onClick={openCaseFromModalData}>
                   [OPEN]
-                </button>
+                </Button.Root>
               </div>
             </Show>
 
          <div class="case-filters">
-           <input
+           <Input.Root
              type="text"
              class="dos-input"
              placeholder="Search cases..."
@@ -458,15 +434,15 @@ export function CaseManager() {
            />
            
            <div class="case-actions">
-             <button class="btn btn-primary" onClick={createNewCase}>
+             <Button.Root class="btn btn-primary" onClick={createNewCase}>
                [+ NEW CASE]
-             </button>
-             <button class="btn" onClick={requestHelp}>
+             </Button.Root>
+             <Button.Root class="btn" onClick={requestHelp}>
                [REQUEST HELP]
-             </button>
+             </Button.Root>
            </div>
            
-           <select 
+           <Select.Root 
              class="dos-select"
              value={statusFilter()}
              onChange={e => setStatusFilter(e.currentTarget.value)}
@@ -474,8 +450,8 @@ export function CaseManager() {
              <option value="all">All Status</option>
              <option value="OPEN">Open</option>
              <option value="CLOSED">Closed</option>
-           </select>
-           <select 
+           </Select.Root>
+           <Select.Root 
              class="dos-select"
              value={typeFilter()}
              onChange={e => setTypeFilter(e.currentTarget.value)}
@@ -484,8 +460,8 @@ export function CaseManager() {
              <For each={caseTypes()}>
                {type => <option value={type}>{type}</option>}
              </For>
-           </select>
-           <select 
+           </Select.Root>
+           <Select.Root 
              class="dos-select"
              value={priorityFilter()}
              onChange={e => setPriorityFilter(e.currentTarget.value)}
@@ -495,7 +471,7 @@ export function CaseManager() {
              <option value="2">High</option>
              <option value="3">Normal</option>
              <option value="4">Low</option>
-           </select>
+           </Select.Root>
          </div>
 
             <div class="cases-list">
@@ -507,8 +483,8 @@ export function CaseManager() {
                 {caseItem => (
                    <div 
                      class={`case-card ${caseItem.status === 'CLOSED' ? 'closed' : ''}`}
-                     onClick={() => selectCase(caseItem)}
-                     onDblClick={() => { selectCase(caseItem); setActiveTab('evidence'); }}
+                     onClick={() => void selectCase(caseItem)}
+                     onDblClick={() => { void selectCase(caseItem); setActiveTab('evidence'); }}
                    >
                     <div class="case-header">
                       <span class="case-id">{caseItem.caseId}</span>
@@ -541,20 +517,20 @@ export function CaseManager() {
             <div class="detail-header">
               <h3>{selectedCase()!.caseId}</h3>
               <div class="detail-actions">
-                <button 
+                <Button.Root 
                   class="btn btn-primary"
                   onClick={() => void printCaseReport()}
                   title="Print case report"
                 >
                   [PRINT REPORT]
-                </button>
+                </Button.Root>
                 <Show when={selectedCase()!.status === 'OPEN'}>
-                  <button 
+                  <Button.Root 
                     class="btn btn-danger"
                     onClick={() => setShowCloseConfirm(true)}
                   >
                     [CLOSE CASE]
-                  </button>
+                  </Button.Root>
                 </Show>
               </div>
             </div>
@@ -589,7 +565,7 @@ export function CaseManager() {
             <Show when={showCloseConfirm()}>
               <div class="close-confirm">
                 <h4>Close Case - Resolution Required</h4>
-                <textarea
+                <Textarea.Root
                   class="dos-textarea"
                   placeholder="Enter resolution notes..."
                   value={closeResolution()}
@@ -597,12 +573,12 @@ export function CaseManager() {
                   rows={3}
                 />
                 <div class="confirm-actions">
-                  <button class="btn btn-primary" onClick={closeCase}>
+                  <Button.Root class="btn btn-primary" onClick={() => void closeCase()}>
                     [CONFIRM CLOSE]
-                  </button>
-                  <button class="btn" onClick={() => setShowCloseConfirm(false)}>
+                  </Button.Root>
+                  <Button.Root class="btn" onClick={() => setShowCloseConfirm(false)}>
                     [CANCEL]
-                  </button>
+                  </Button.Root>
                 </div>
               </div>
             </Show>
@@ -613,7 +589,7 @@ export function CaseManager() {
           <div class="case-notes">
             <div class="add-note-form">
               <h4>Add Note</h4>
-              <select 
+              <Select.Root 
                 class="dos-select"
                 value={newNoteType()}
                 onChange={e => setNewNoteType(e.currentTarget.value as Note['type'])}
@@ -622,17 +598,17 @@ export function CaseManager() {
                 <option value="observation">Observation</option>
                 <option value="interview">Interview</option>
                 <option value="evidence">Evidence</option>
-              </select>
-              <textarea
+              </Select.Root>
+              <Textarea.Root
                 class="dos-textarea"
                 placeholder="Enter note content..."
                 value={newNoteContent()}
                 onInput={e => setNewNoteContent(e.currentTarget.value)}
                 rows={3}
               />
-              <button class="btn btn-primary" onClick={addNote}>
+              <Button.Root class="btn btn-primary" onClick={addNote}>
                 [ADD NOTE]
-              </button>
+              </Button.Root>
             </div>
 
             <div class="notes-list">
@@ -649,12 +625,12 @@ export function CaseManager() {
                       <span class="note-author">by {note.author}</span>
                     </div>
                     <div class="note-content">{note.content}</div>
-                    <button 
+                    <Button.Root 
                       class="btn-small btn-danger"
                       onClick={() => deleteNote(note.id)}
                     >
                       [DELETE]
-                    </button>
+                    </Button.Root>
                   </div>
                 )}
               </For>
@@ -666,7 +642,7 @@ export function CaseManager() {
           <div class="case-evidence">
             <div class="add-evidence-form">
               <h4>Add Evidence</h4>
-              <select 
+              <Select.Root 
                 class="dos-select"
                 value={newEvidenceType()}
                 onChange={e => setNewEvidenceType(e.currentTarget.value)}
@@ -676,24 +652,24 @@ export function CaseManager() {
                 <option value="AUDIO_URL">Audio URL</option>
                 <option value="DOCUMENT">Document</option>
                 <option value="PHYSICAL">Physical Item</option>
-              </select>
-              <input
+              </Select.Root>
+              <Input.Root
                 type="text"
                 class="dos-input"
                 placeholder="Evidence URL or identifier..."
                 value={newEvidenceUrl()}
                 onInput={e => setNewEvidenceUrl(e.currentTarget.value)}
               />
-              <input
+              <Input.Root
                 type="text"
                 class="dos-input"
                 placeholder="Description..."
                 value={newEvidenceDesc()}
                 onInput={e => setNewEvidenceDesc(e.currentTarget.value)}
               />
-              <button class="btn btn-primary" onClick={addEvidence}>
+              <Button.Root class="btn btn-primary" onClick={addEvidence}>
                 [ADD EVIDENCE]
-              </button>
+              </Button.Root>
             </div>
 
             <div class="evidence-list">
@@ -720,12 +696,12 @@ export function CaseManager() {
                     </div>
                     <div class="evidence-desc">{evidenceData.description || 'No description'}</div>
                     <Show when={evidenceData.url && isViewable}>
-                      <button 
+                      <Button.Root 
                         class="btn-small"
                         onClick={() => viewEvidence(ev)}
                       >
                         [VIEW {ev.evidenceType.includes('VIDEO') ? 'VIDEO' : ev.evidenceType.includes('AUDIO') ? 'AUDIO' : 'IMAGE'}]
-                      </button>
+                      </Button.Root>
                     </Show>
                   </div>
                     );
@@ -740,30 +716,30 @@ export function CaseManager() {
           <div class="case-tasks">
             <div class="add-task-form">
               <h4>Add Task</h4>
-              <input
+              <Input.Root
                 type="text"
                 class="dos-input"
                 placeholder="Task title..."
                 value={newTaskTitle()}
                 onInput={e => setNewTaskTitle(e.currentTarget.value)}
               />
-              <input
+              <Input.Root
                 type="text"
                 class="dos-input"
                 placeholder="Description..."
                 value={newTaskDesc()}
                 onInput={e => setNewTaskDesc(e.currentTarget.value)}
               />
-              <input
+              <Input.Root
                 type="text"
                 class="dos-input"
                 placeholder="Assigned to (ID)..."
                 value={newTaskAssignedTo()}
                 onInput={e => setNewTaskAssignedTo(e.currentTarget.value)}
               />
-              <button class="btn btn-primary" onClick={addTask}>
+              <Button.Root class="btn btn-primary" onClick={addTask}>
                 [ADD TASK]
-              </button>
+              </Button.Root>
             </div>
 
             <div class="tasks-list">
@@ -786,12 +762,12 @@ export function CaseManager() {
                       <span>Due: {formatDate(task.dueDate)}</span>
                     </div>
                     <Show when={task.status === 'PENDING'}>
-                      <button 
+                      <Button.Root 
                         class="btn-small btn-success"
                         onClick={() => completeTask(task.taskId)}
                       >
                         [COMPLETE]
-                      </button>
+                      </Button.Root>
                     </Show>
                   </div>
                 )}
@@ -800,13 +776,12 @@ export function CaseManager() {
           </div>
         </Show>
 
-        <div class="modal-footer">
-          <span style={{ color: '#808080' }}>
-            Total Cases: {allCases().length} | Current: {cadState.currentCase?.caseId || 'None'}
-          </span>
-          <button class="btn" onClick={closeModal}>[CLOSE]</button>
-        </div>
-      </div>
-    </div>
+      <Modal.Footer>
+        <Text.Root as='span' tone='dim'>
+          Total Cases: {allCases().length} | Current: {cadState.currentCase?.caseId || 'None'}
+        </Text.Root>
+        <Button.Root label='CLOSE' onClick={closeModal} />
+      </Modal.Footer>
+    </Modal.Root>
   );
 }

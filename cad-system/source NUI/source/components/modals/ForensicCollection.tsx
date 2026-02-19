@@ -4,6 +4,7 @@ import { cadState, cadActions } from '~/stores/cadStore';
 import { fetchNui } from '~/utils/fetchNui';
 import { t } from '~/utils/i18n';
 import type { Evidence } from '~/stores/cadStore';
+import { Button, Input, Modal } from '~/components/ui';
 
 export function ForensicCollection() {
   const [evidenceType, setEvidenceType] = createSignal('FINGERPRINT');
@@ -73,8 +74,18 @@ export function ForensicCollection() {
     terminalActions.setActiveModal(null);
   };
 
+  const getEvidenceTimeLabel = (evidence: Evidence) => {
+    const dataCollectedAt =
+      typeof evidence.data?.collectedAt === 'string' ? evidence.data.collectedAt : null;
+    const timestamp = evidence.attachedAt || dataCollectedAt;
+    if (!timestamp) {
+      return '--:--';
+    }
+    return new Date(timestamp).toLocaleTimeString();
+  };
+
   return (
-    <div class="modal-overlay" onClick={closeModal}>
+        <Modal.Root onClose={closeModal} useContentWrapper={false}>
       <div class="modal-content forensic-collection" onClick={(e) => e.stopPropagation()}>
         <div class="modal-header">
           <h2>{t('forensics.title')}</h2>
@@ -151,14 +162,14 @@ export function ForensicCollection() {
           <Show when={evidenceType() === 'FIBERS'}>
             <div class="form-section">
               <label class="form-label">{t('forensics.fiberColor')}</label>
-              <input type="text" class="dos-input" value={fiberColor()} onInput={(e) => setFiberColor(e.currentTarget.value)} />
+              <Input.Root type="text" class="dos-input" value={fiberColor()} onInput={(e) => setFiberColor(e.currentTarget.value)} />
             </div>
           </Show>
           
           <Show when={evidenceType() === 'FINGERPRINT'}>
             <div class="form-section">
               <label class="form-label">{t('forensics.quality', undefined, { value: quality() })}</label>
-              <input type="range" class="dos-input" min="0" max="100" value={quality()} onInput={(e) => setQuality(parseInt(e.currentTarget.value))} />
+              <Input.Root type="range" class="dos-input" min="0" max="100" value={quality()} onInput={(e) => setQuality(parseInt(e.currentTarget.value))} />
             </div>
           </Show>
           
@@ -182,10 +193,10 @@ export function ForensicCollection() {
           </div>
           
           <div class="form-actions">
-            <button class="btn btn-primary" onClick={handleCollect} disabled={isCollecting() || !caseId()}>
+            <Button.Root class="btn btn-primary" onClick={handleCollect} disabled={isCollecting() || !caseId()}>
               {isCollecting() ? t('forensics.collecting') : t('forensics.collect')}
-            </button>
-            <button class="btn" onClick={closeModal}>{t('forensics.cancel')}</button>
+            </Button.Root>
+            <Button.Root class="btn" onClick={closeModal}>{t('forensics.cancel')}</Button.Root>
           </div>
           
           <Show when={collectedEvidence()}>
@@ -196,13 +207,13 @@ export function ForensicCollection() {
                 <div class="evidence-details">
                   <div>Type: {evidence().evidenceType}</div>
                   <div>Case: {evidence().caseId}</div>
-                  <div>{t('forensics.timeLabel')}: {new Date(evidence().attachedAt).toLocaleTimeString()}</div>
+                  <div>{t('forensics.timeLabel')}: {getEvidenceTimeLabel(evidence())}</div>
                 </div>
               </div>
             )}
           </Show>
         </div>
       </div>
-    </div>
+    </Modal.Root>
   );
 }

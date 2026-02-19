@@ -13,7 +13,7 @@ export interface NuiMessage<T = unknown> {
 // ============================================================
 export interface CadOpenedData {
   terminalId: string;
-  location: { x: number; y: number; z: number };
+  location?: { x: number; y: number; z: number };
   hasContainer: boolean;
   hasReader: boolean;
 }
@@ -49,43 +49,51 @@ export interface DispatchUnit {
   currentCall?: string;
 }
 
-export interface DispatchCallCreatedData {
-  call: DispatchCall;
+export interface DispatchPublicStateData {
+  rev: number;
+  generatedAt: string;
+  calls: Record<string, DispatchCall>;
+  units: Record<string, DispatchUnit>;
 }
 
-export interface DispatchCallUpdatedData {
-  callId: string;
-  changes: Partial<DispatchCall>;
-  updatedBy: string;
+// ============================================================
+// Security Cameras
+// ============================================================
+export interface SecurityCamera {
+  cameraId: string;
+  cameraNumber: number;
+  label: string;
+  street: string;
+  crossStreet: string;
+  zone: string;
+  coords: { x: number; y: number; z: number };
+  rotation: { x: number; y: number; z: number };
+  fov: number;
+  status: 'ACTIVE' | 'DISABLED';
+  installedBy: string;
+  installedByName?: string;
+  createdAt: string;
   updatedAt: string;
 }
 
-export interface DispatchCallClosedData {
-  callId: string;
-  closedBy: string;
-  closedAt: string;
+export interface CameraCreatedData {
+  camera: SecurityCamera;
 }
 
-export interface DispatchUnitStatusChangedData {
-  unitId: string;
-  oldStatus: string;
-  newStatus: string;
-  changedAt: string;
+export interface CameraUpdatedData {
+  camera: SecurityCamera;
 }
 
-export interface DispatchUnitPositionUpdatedData {
-  unitId: string;
-  x: number;
-  y: number;
-  z: number;
-  updatedAt: string;
+export interface CameraRemovedData {
+  cameraId: string;
 }
 
-export interface DispatchCallAssignedData {
-  callId: string;
-  unitId: string;
-  assignedAt: string;
-  assignedBy: string;
+export interface CameraViewStartedData {
+  camera: SecurityCamera;
+}
+
+export interface CameraViewStoppedData {
+  timestamp: number;
 }
 
 // ============================================================
@@ -105,6 +113,28 @@ export interface Case {
   personId?: string;
   personName?: string;
   caseCode?: string;
+  notes?: CaseNote[];
+  evidence?: Evidence[];
+  tasks?: Array<Record<string, unknown>>;
+}
+
+export interface CustodyEvent {
+  eventId: string;
+  evidenceId: string;
+  eventType:
+    | 'ATTACHED'
+    | 'COLLECTED'
+    | 'TRANSFERRED'
+    | 'STORED'
+    | 'ANALYZED'
+    | 'SUBMITTED'
+    | 'RELEASED';
+  recordedBy: string;
+  timestamp: string;
+  notes?: string;
+  fromOfficer?: string;
+  toOfficer?: string;
+  location?: string;
 }
 
 export interface CaseNote {
@@ -116,35 +146,10 @@ export interface CaseNote {
   type: 'general' | 'observation' | 'interview' | 'evidence';
 }
 
-export interface CaseCreatedData {
-  case: Case;
-}
-
-export interface CaseUpdatedData {
-  caseId: string;
-  changes: Partial<Case>;
-  updatedBy: string;
-  updatedAt: string;
-}
-
-export interface CaseClosedData {
-  caseId: string;
-  closedBy: string;
-  closedAt: string;
-}
-
-export interface CaseNoteAddedData {
-  caseId: string;
-  note: CaseNote;
-  addedBy: string;
-  addedAt: string;
-}
-
-export interface CaseEvidenceAttachedData {
-  caseId: string;
-  evidenceId: string;
-  attachedBy: string;
-  attachedAt: string;
+export interface CasePublicStateData {
+  rev: number;
+  generatedAt: string;
+  cases: Record<string, Case>;
 }
 
 // ============================================================
@@ -157,6 +162,9 @@ export interface Evidence {
   data: Record<string, unknown>;
   attachedBy: string;
   attachedAt: string;
+  custodyChain?: CustodyEvent[];
+  currentLocation?: string;
+  currentCustodian?: string;
 }
 
 export interface EvidenceStagedData {
@@ -182,10 +190,14 @@ export interface EvidenceCollectedData {
   data: Record<string, unknown>;
   collectedBy: string;
   collectedAt: string;
+  attachedBy?: string;
+  attachedAt?: string;
+  custodyChain?: Array<Record<string, unknown>>;
 }
 
 export interface EvidenceTransferredData {
   evidenceId: string;
+  caseId?: string;
   fromOfficer: string;
   toOfficer: string;
   location: string;
@@ -262,9 +274,11 @@ export interface EmsHandoffCompleteData {
 // ============================================================
 export interface ForensicAnalysis {
   analysisId: string;
+  caseId?: string;
   evidenceId: string;
-  evidenceType: string;
-  analystId: string;
+  evidenceType?: string;
+  analystId?: string;
+  startedBy?: string;
   status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
   startedAt: string;
   completedAt?: string;
@@ -273,9 +287,11 @@ export interface ForensicAnalysis {
 
 export interface ForensicTrace {
   traceId: string;
-  type: string;
-  location: { x: number; y: number; z: number };
-  collected: boolean;
+  type?: string;
+  evidenceType?: string;
+  location?: { x: number; y: number; z: number };
+  coords?: { x: number; y: number; z: number };
+  collected?: boolean;
   collectedBy?: string;
   collectedAt?: string;
 }
@@ -286,6 +302,7 @@ export interface ForensicsAnalysisStartedData {
 
 export interface ForensicsAnalysisCompletedData {
   analysisId: string;
+  caseId?: string;
   evidenceId: string;
   results: Record<string, unknown>;
   completedBy: string;
@@ -293,14 +310,18 @@ export interface ForensicsAnalysisCompletedData {
 }
 
 export interface ForensicsEvidenceComparedData {
-  evidenceId: string;
-  comparisonId: string;
-  matchResults: {
+  evidenceId?: string;
+  evidenceA?: string;
+  evidenceB?: string;
+  comparisonId?: string;
+  match?: boolean;
+  confidence?: number;
+  matchResults?: {
     match: boolean;
     confidence: number;
     details?: Record<string, unknown>;
   };
-  comparedAt: string;
+  comparedAt?: string;
 }
 
 export interface ForensicsWorldTraceFoundData {
@@ -309,9 +330,15 @@ export interface ForensicsWorldTraceFoundData {
 
 export interface ForensicsTraceBaggedData {
   traceId: string;
-  evidenceId: string;
+  evidenceId?: string;
   baggedBy: string;
   baggedAt: string;
+  staging?: {
+    stagingId: string;
+    evidenceType: string;
+    data: Record<string, unknown>;
+    createdAt: string;
+  };
 }
 
 // ============================================================
@@ -339,7 +366,14 @@ export interface PhotoMetadata {
   location: { x: number; y: number; z: number };
   description?: string;
   job: 'police' | 'reporter';
+  fov?: {
+    hit: boolean;
+    hitCoords?: { x: number; y: number; z: number };
+    distance: number;
+    entityType?: string;
+  };
   isEvidence?: boolean;
+  stagingId?: string;
   attachedCaseId?: string;
 }
 
@@ -380,6 +414,10 @@ export interface Fine {
   paid: boolean;
   paidAt?: string;
   paidMethod?: 'CASH' | 'BANK';
+  isBail: boolean;
+  bailDeadline?: string;
+  status: 'PENDING' | 'PAID' | 'OVERDUE';
+  attachedCaseId?: string;
 }
 
 export interface FineCreatedData {
@@ -433,6 +471,39 @@ export interface OfflineSyncData {
 }
 
 // ============================================================
+// Vehicle Tablet
+// ============================================================
+export interface VehicleContextData {
+  isInPoliceVehicle: boolean;
+  tabletOpen?: boolean;
+  vehicleSpeed?: number;
+  plate?: string;
+  model?: string;
+  role?: 'DRIVER' | 'PASSENGER' | 'OTHER' | 'NONE';
+  quickDockEnabled?: boolean;
+  quickLock?: {
+    plate: string;
+    model: string;
+    riskLevel: 'NONE' | 'MEDIUM' | 'HIGH';
+    riskTags: string[];
+    noteHint?: string;
+    ownerId?: string;
+    ownerName?: string;
+    distance?: number;
+    scannedAt: number;
+    stopId?: string;
+  };
+}
+
+export interface VehicleCadToggleData {
+  timestamp: number;
+}
+
+export interface VehiclePrefillSearchData {
+  plate?: string;
+}
+
+// ============================================================
 // Message Map
 // ============================================================
 export interface NuiMessageMap {
@@ -441,19 +512,17 @@ export interface NuiMessageMap {
   'cad:closed': CadClosedData;
   
   // Dispatch
-  'dispatch:callCreated': DispatchCallCreatedData;
-  'dispatch:callUpdated': DispatchCallUpdatedData;
-  'dispatch:callClosed': DispatchCallClosedData;
-  'dispatch:callAssigned': DispatchCallAssignedData;
-  'dispatch:unitStatusChanged': DispatchUnitStatusChangedData;
-  'dispatch:unitPositionUpdated': DispatchUnitPositionUpdatedData;
+  'dispatch:publicState': DispatchPublicStateData;
+
+  // Security Cameras
+  'camera:created': CameraCreatedData;
+  'camera:updated': CameraUpdatedData;
+  'camera:removed': CameraRemovedData;
+  'camera:viewStarted': CameraViewStartedData;
+  'camera:viewStopped': CameraViewStoppedData;
   
   // Cases
-  'case:created': CaseCreatedData;
-  'case:updated': CaseUpdatedData;
-  'case:closed': CaseClosedData;
-  'case:noteAdded': CaseNoteAddedData;
-  'case:evidenceAttached': CaseEvidenceAttachedData;
+  'case:publicState': CasePublicStateData;
   
   // Evidence
   'evidence:staged': EvidenceStagedData;
@@ -495,6 +564,12 @@ export interface NuiMessageMap {
   
   // Offline sync
   'cad:syncOffline': OfflineSyncData;
+
+  // Vehicle
+  'vehicle:context': VehicleContextData;
+  'vehicle:cadOpen': VehicleCadToggleData;
+  'vehicle:cadClose': VehicleCadToggleData;
+  'vehicle:prefillSearch': VehiclePrefillSearchData;
 }
 
 export type NuiAction = keyof NuiMessageMap;

@@ -1,9 +1,5 @@
---[[
-CAD ID-Based Person Search Integration
-Enables searching people by ID card directly from inventory
-]]
 
--- Register ID card usage export
+
 exports('useIdCard', function(data)
     local citizenId = data.metadata.citizenid
     local firstname = data.metadata.firstname
@@ -18,7 +14,6 @@ exports('useIdCard', function(data)
         return
     end
 
-    -- Send to NUI for person search
     SendNUIMessage({
         action = 'searchPerson',
         data = {
@@ -34,10 +29,9 @@ exports('useIdCard', function(data)
     })
 end)
 
--- Register driver's license usage
 exports('useDriverLicense', function(data)
     local citizenId = data.metadata.citizenid
-    
+
     if not citizenId or citizenId == '' then
         lib.notify({
             title = 'CAD',
@@ -62,7 +56,6 @@ exports('useDriverLicense', function(data)
     })
 end)
 
--- Handle NUI response
 RegisterNUICallback('personSearchResult', function(data, cb)
     if data.success then
         lib.notify({

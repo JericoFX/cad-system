@@ -12,7 +12,8 @@ import {
   type NewsParagraph,
   type NewsTemplate
 } from '~/stores/newsStore';
-import { photoActions, type PhotoMetadata } from '~/stores/photoStore';
+import type { PhotoMetadata } from '~/stores/photoStore';
+import { Button, Modal, Tabs } from '~/components/ui';
 
 // Lazy load photo components
 const NewsPhotoImporter = lazy(() => import('./NewsPhotoImporter').then(m => ({ default: m.NewsPhotoImporter })));
@@ -297,12 +298,14 @@ export function NewsManager() {
   
   // Handle imported photos from camera
   const handlePhotosImported = (photos: PhotoMetadata[]) => {
-    photos.forEach(photo => {
-      setGallery([...gallery(), { 
-        url: photo.photoUrl, 
-        caption: photo.description || `Photo by ${photo.takenBy} - ${new Date(photo.takenAt).toLocaleDateString()}`
-      }]);
-    });
+    setGallery((prev) => [
+      ...prev,
+      ...photos.map((photo) => ({
+        url: photo.photoUrl,
+        caption: photo.description ||
+          `Photo by ${photo.takenBy} - ${new Date(photo.takenAt).toLocaleDateString()}`,
+      })),
+    ]);
     
     const count = photos.length;
     terminalActions.addLine(`✓ ${count} photo${count === 1 ? '' : 's'} imported from camera`, 'output');
@@ -347,53 +350,28 @@ export function NewsManager() {
   };
   
   return (
-    <div class="modal-overlay" onClick={closeModal}>
+        <Modal.Root onClose={closeModal} useContentWrapper={false}>
       <div class="modal-content news-manager" onClick={e => e.stopPropagation()}>
         <div class="modal-header">
           <h2>📰 CENTRAL DE NOTICIAS - Los Santos News Network</h2>
           <button class="close-btn" onClick={closeModal}>×</button>
         </div>
         
-        <div class="detail-tabs">
-          <button 
-            class={`tab ${activeTab() === 'list' ? 'active' : ''}`}
-            onClick={() => setActiveTab('list')}
-          >
-            📰 Noticias
-          </button>
-          <button 
-            class={`tab ${activeTab() === 'templates' ? 'active' : ''}`}
-            onClick={() => setActiveTab('templates')}
-          >
-            📋 Plantillas
-          </button>
-          <button 
-            class={`tab ${activeTab() === 'approval' ? 'active' : ''}`}
-            onClick={() => setActiveTab('approval')}
-          >
-            ⏳ Aprobaciones
-          </button>
-          <button 
-            class={`tab ${activeTab() === 'released' ? 'active' : ''}`}
-            onClick={() => setActiveTab('released')}
-            style={{ color: '#ffff00' }}
-          >
-            📸 Evidencia Liberada
-          </button>
-          <button 
-            class={`tab ${activeTab() === 'editor' ? 'active' : ''}`}
-            onClick={() => setActiveTab('editor')}
-          >
-            ✏️ Editor
-          </button>
-          <button 
-            class={`tab ${activeTab() === 'preview' ? 'active' : ''}`}
-            onClick={() => setActiveTab('preview')}
-            disabled={!newsState.selectedArticle}
-          >
-            👁️ Vista Previa
-          </button>
-        </div>
+        <Tabs.Root
+          value={activeTab()}
+          onValueChange={(value) => setActiveTab(value as 'list' | 'editor' | 'preview' | 'templates' | 'approval' | 'released')}
+          bracketed={false}
+          uppercase={false}
+        >
+          <Tabs.List>
+            <Tabs.Trigger value='list' label='📰 Noticias' />
+            <Tabs.Trigger value='templates' label='📋 Plantillas' />
+            <Tabs.Trigger value='approval' label='⏳ Aprobaciones' />
+            <Tabs.Trigger value='released' label='📸 Evidencia Liberada' style={{ color: '#ffff00' }} />
+            <Tabs.Trigger value='editor' label='✏️ Editor' />
+            <Tabs.Trigger value='preview' label='👁️ Vista Previa' disabled={!newsState.selectedArticle} />
+          </Tabs.List>
+        </Tabs.Root>
 
         <div class="news-workspace-bar">
           <div class="workspace-role">
@@ -413,9 +391,9 @@ export function NewsManager() {
             <div class="news-list">
               <div class="section-header">
                 <h3>📰 Noticias Publicadas</h3>
-                <button class="btn btn-primary" onClick={createNewArticle}>
+                <Button.Root class="btn btn-primary" onClick={createNewArticle}>
                   ➕ Nueva Noticia
-                </button>
+                </Button.Root>
               </div>
               
               <div class="articles-grid">
@@ -450,30 +428,30 @@ export function NewsManager() {
                       </div>
                       
                       <div class="article-actions">
-                        <button class="btn btn-small" onClick={() => viewArticle(article)}>
+                        <Button.Root class="btn btn-small" onClick={() => viewArticle(article)}>
                           👁 Ver
-                        </button>
+                        </Button.Root>
                         
                         {(canEditAll() || article.author.id === newsState.currentUser?.id) && (
-                          <button class="btn btn-small" onClick={() => editArticle(article)}>
+                          <Button.Root class="btn btn-small" onClick={() => editArticle(article)}>
                             ✏️ Editar
-                          </button>
+                          </Button.Root>
                         )}
                         
-                        <button 
+                        <Button.Root 
                           class="btn btn-small btn-secondary" 
                           onClick={() => copyShareCode(article.shareCode)}
                         >
                           📋 {article.shareCode}
-                        </button>
+                        </Button.Root>
                         
                         {canPin() && (
-                          <button 
+                          <Button.Root 
                             class="btn btn-small"
                             onClick={() => newsActions.togglePin(article.articleId)}
                           >
                             {article.isPinned ? '📌 Quitar' : '📌 Anclar'}
-                          </button>
+                          </Button.Root>
                         )}
                       </div>
                     </div>
@@ -497,9 +475,9 @@ export function NewsManager() {
                           <span>Editado: {new Date(article.updatedAt).toLocaleDateString()}</span>
                         </div>
                         <div class="article-actions">
-                          <button class="btn btn-small" onClick={() => editArticle(article)}>
+                          <Button.Root class="btn btn-small" onClick={() => editArticle(article)}>
                             ✏️ Continuar
-                          </button>
+                          </Button.Root>
                         </div>
                       </div>
                     )}
@@ -561,9 +539,9 @@ export function NewsManager() {
                         </div>
                         <h4>{article.headline}</h4>
                         <p>Enviado: {new Date(article.updatedAt).toLocaleDateString()}</p>
-                        <button class="btn btn-small" onClick={() => editArticle(article)}>
+                        <Button.Root class="btn btn-small" onClick={() => editArticle(article)}>
                           Ver/Editar
-                        </button>
+                        </Button.Root>
                       </div>
                     )}
                   </For>
@@ -587,7 +565,7 @@ export function NewsManager() {
                         <h4>{article.headline}</h4>
                         <p>Por: {article.author.name}</p>
                         <div class="approval-actions">
-                          <button 
+                          <Button.Root 
                             class="btn btn-small btn-success" 
                             onClick={() => {
                               newsActions.approveArticle(article.articleId, newsState.currentUser?.id || 'SYSTEM');
@@ -595,8 +573,8 @@ export function NewsManager() {
                             }}
                           >
                             ✅ Aprobar
-                          </button>
-                          <button 
+                          </Button.Root>
+                          <Button.Root 
                             class="btn btn-small btn-danger" 
                             onClick={() => {
                               newsActions.rejectArticle(article.articleId, 'Rechazado por editor');
@@ -604,10 +582,10 @@ export function NewsManager() {
                             }}
                           >
                             ❌ Rechazar
-                          </button>
-                          <button class="btn btn-small" onClick={() => editArticle(article)}>
+                          </Button.Root>
+                          <Button.Root class="btn btn-small" onClick={() => editArticle(article)}>
                             Revisar
-                          </button>
+                          </Button.Root>
                         </div>
                       </div>
                     )}
@@ -723,12 +701,12 @@ export function NewsManager() {
                         <div class="paragraph-item">
                           <span class="para-number">{index() + 1}</span>
                           <p>{para.content}</p>
-                          <button 
+                          <Button.Root 
                             class="btn btn-small btn-danger"
                             onClick={() => removeParagraph(para.paragraphId)}
                           >
                             🗑️
-                          </button>
+                          </Button.Root>
                         </div>
                       )}
                     </For>
@@ -741,9 +719,9 @@ export function NewsManager() {
                       placeholder="Escribir nuevo párrafo..."
                       rows={2}
                     />
-                    <button class="btn btn-secondary" onClick={addParagraph}>
+                    <Button.Root class="btn btn-secondary" onClick={addParagraph}>
                       ➕ Añadir Párrafo
-                    </button>
+                    </Button.Root>
                   </div>
                 </div>
                 
@@ -784,12 +762,12 @@ export function NewsManager() {
                         <div class="gallery-item">
                           <img src={normalizeMediaUrl(img.url)} alt={img.caption} />
                           <span>{img.caption}</span>
-                          <button 
+                          <Button.Root 
                             class="btn btn-small btn-danger"
                             onClick={() => removeImage(index())}
                           >
                             🗑️
-                          </button>
+                          </Button.Root>
                         </div>
                       )}
                     </For>
@@ -808,19 +786,19 @@ export function NewsManager() {
                       onInput={(e) => setNewImageCaption(e.currentTarget.value)}
                       placeholder="Pie de foto (opcional)"
                     />
-                    <button class="btn btn-secondary" onClick={addImage}>
+                    <Button.Root class="btn btn-secondary" onClick={addImage}>
                       ➕ Añadir Imagen
-                    </button>
+                    </Button.Root>
                   </div>
                   
                   <div style={{ 'margin-top': '10px', 'border-top': '1px solid var(--terminal-border-dim)', 'padding-top': '10px' }}>
-                    <button 
+                    <Button.Root 
                       class="btn btn-primary"
                       onClick={() => setShowPhotoImporter(true)}
                       style={{ 'background-color': '#00ffff', color: '#000', width: '100%' }}
                     >
                       📷 Importar Fotos de Cámara
-                    </button>
+                    </Button.Root>
                   </div>
                 </div>
               </div>
@@ -847,30 +825,30 @@ export function NewsManager() {
                     placeholder="Nueva etiqueta"
                     onKeyPress={(e) => e.key === 'Enter' && addTag()}
                   />
-                  <button class="btn btn-secondary" onClick={addTag}>
+                  <Button.Root class="btn btn-secondary" onClick={addTag}>
                     ➕ Añadir
-                  </button>
+                  </Button.Root>
                 </div>
               </div>
               
               <div class="editor-actions">
-                <button class="btn btn-secondary" onClick={() => setActiveTab('list')}>
+                <Button.Root class="btn btn-secondary" onClick={() => setActiveTab('list')}>
                   Cancelar
-                </button>
-                <button class="btn btn-primary" onClick={saveDraft}>
+                </Button.Root>
+                <Button.Root class="btn btn-primary" onClick={saveDraft}>
                   💾 Guardar Borrador
-                </button>
+                </Button.Root>
                 
                 <Show when={!canPublish()}>
-                  <button class="btn btn-warning" onClick={submitForApproval}>
+                  <Button.Root class="btn btn-warning" onClick={submitForApproval}>
                     📤 Enviar a Aprobación
-                  </button>
+                  </Button.Root>
                 </Show>
                 
                 <Show when={canPublish()}>
-                  <button class="btn btn-success" onClick={publishArticle}>
+                  <Button.Root class="btn btn-success" onClick={publishArticle}>
                     📢 Publicar Noticia
-                  </button>
+                  </Button.Root>
                 </Show>
               </div>
             </div>
@@ -961,16 +939,16 @@ export function NewsManager() {
                       <div class="share-section">
                         <strong>Compartir:</strong>
                         <span class="share-code">Código: {article.shareCode}</span>
-                        <button 
+                        <Button.Root 
                           class="btn btn-small"
                           onClick={() => copyShareCode(article.shareCode)}
                         >
                           📋 Copiar
-                        </button>
+                        </Button.Root>
                       </div>
                       
                       <Show when={canDelete() || article.author.id === newsState.currentUser?.id}>
-                        <button 
+                        <Button.Root 
                           class="btn btn-danger"
                           onClick={() => {
                             if (confirm('¿Eliminar esta noticia?')) {
@@ -980,7 +958,7 @@ export function NewsManager() {
                           }}
                         >
                           🗑️ Eliminar Noticia
-                        </button>
+                        </Button.Root>
                       </Show>
                     </div>
                   </div>
@@ -999,6 +977,6 @@ export function NewsManager() {
           maxPhotos={10}
         />
       </Show>
-    </div>
+    </Modal.Root>
   );
 }

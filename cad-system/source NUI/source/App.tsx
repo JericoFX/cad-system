@@ -9,7 +9,6 @@ import {
   FlowMinimizedIndicator,
 } from './components/FlowMacros';
 import { AuditViewer, AuditQuickButton } from './components/AuditViewer';
-import { HomeScreen } from './components/HomeScreen';
 import { DispatchTable } from './components/modals/DispatchTable';
 import { CaseCreator } from './components/modals/CaseCreator';
 import { CaseManager } from './components/modals/CaseManager';
@@ -35,10 +34,13 @@ import { PersonSnapshot } from './components/modals/PersonSnapshot';
 import { RadioMarkers } from './components/modals/RadioMarkers';
 import { BoloManager } from './components/modals/BoloManager';
 import { ForensicCollection } from './components/modals/ForensicCollection';
+import { PhotoCapturePreview } from './components/modals/PhotoCapturePreview';
 import { ImageViewer } from './components/modals/ImageViewer';
 import { MediaPlayer } from './components/modals/MediaPlayer';
+import { VehicleCAD } from './components/modals/VehicleCAD';
 import { CallsignPrompt } from './components/modals/CallsignPrompt';
 import { BrowserHelper } from './components/BrowserHelper';
+import { VehicleQuickDock } from './components/VehicleQuickDock';
 import { terminalState, terminalActions } from './stores/terminalStore';
 import { viewerState, viewerActions } from './stores/viewerStore';
 import { uiPrefsState, uiPrefsActions } from './stores/uiPreferencesStore';
@@ -46,10 +48,20 @@ import { featureState } from './stores/featureStore';
 import { appState, appActions } from './stores/appStore';
 import { CONFIG } from './config';
 import { MockController } from './mocks';
+import { fetchNui } from './utils/fetchNui';
 
 export function App() {
+  const isVehicleOverlayMode = createMemo(() => {
+    return CONFIG.FEATURES.VEHICLE_DOCK && terminalState.isInPoliceVehicle;
+  });
+
   const appClasses = createMemo(() => {
     const classes = ['cad-app'];
+
+    if (isVehicleOverlayMode()) {
+      classes.push('vehicle-dock-shell');
+    }
+
     classes.push(`nav-mode-${uiPrefsState.navigationMode}`);
     if (uiPrefsActions.isTerminalCompact()) {
       classes.push('terminal-compact');
@@ -65,9 +77,68 @@ export function App() {
     return classes.join(' ');
   });
 
+  const photoPreviewData = createMemo(() => {
+    if (terminalState.activeModal !== 'PHOTO_PREVIEW') {
+      return null;
+    }
+
+    const payload = terminalState.modalData as {
+      photoId?: string;
+      photoUrl?: string;
+      job?: 'police' | 'reporter';
+      description?: string;
+      location?: { x?: number; y?: number; z?: number };
+      fov?: {
+        hit?: boolean;
+        hitCoords?: { x?: number; y?: number; z?: number };
+        distance?: number;
+        entityType?: string;
+      };
+    } | null;
+
+    if (!payload?.photoId || !payload.photoUrl || !payload.job) {
+      return null;
+    }
+
+    const location = payload.location || { x: 0, y: 0, z: 0 };
+    return {
+      photoId: payload.photoId,
+      photoUrl: payload.photoUrl,
+      job: payload.job,
+      description: payload.description,
+      location: {
+        x: Number(location.x) || 0,
+        y: Number(location.y) || 0,
+        z: Number(location.z) || 0,
+      },
+      fov: {
+        hit: payload.fov?.hit === true,
+        hitCoords: payload.fov?.hitCoords
+          ? {
+              x: Number(payload.fov.hitCoords.x) || 0,
+              y: Number(payload.fov.hitCoords.y) || 0,
+              z: Number(payload.fov.hitCoords.z) || 0,
+            }
+          : undefined,
+        distance: Number(payload.fov?.distance) || 0,
+        entityType: payload.fov?.entityType,
+      },
+    };
+  });
+
   // Handle Escape key to close CAD or active modal
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
+      if (terminalState.activeModal === 'VEHICLE_CAD' && terminalState.isInPoliceVehicle) {
+        void fetchNui('cad:vehicle:setOpen', { open: false }).catch(() => {});
+        terminalActions.closeVehicleCAD();
+        return;
+      }
+
+      if (terminalState.isInPoliceVehicle) {
+        return;
+      }
+
       // If a modal is open, close it first
       if (terminalState.activeModal) {
         terminalActions.setActiveModal(null);
@@ -98,16 +169,36 @@ export function App() {
     <>
       <Show when={appState.isVisible}>
         <div class={appClasses()}>
-          {/* Hacker background terminal - optimized, no memory leak */}
-          <HackerTerminalBg maxLines={250} intervalMs={500} seed={20260215} />
+          <Show when={!isVehicleOverlayMode()}>
+            {/* Hacker background terminal - optimized, no memory leak */}
+            <HackerTerminalBg maxLines={250} intervalMs={500} seed={20260215} />
+          </Show>
 
-          <Show when={!CONFIG.DOCK_ONLY && uiPrefsActions.shouldShowTerminal()}>
+          <Show
+            when={
+              !CONFIG.DOCK_ONLY &&
+              uiPrefsActions.shouldShowTerminal() &&
+              !isVehicleOverlayMode()
+            }
+          >
             <div class={terminalClasses()}>
               <Terminal />
             </div>
           </Show>
 
-          <CenterBadge />
+          <Show when={!isVehicleOverlayMode()}>
+            <CenterBadge />
+          </Show>
+
+          <Show
+            when={
+              isVehicleOverlayMode() &&
+              terminalState.activeModal !== 'VEHICLE_CAD' &&
+              terminalState.showVehicleQuickDock
+            }
+          >
+            <VehicleQuickDock />
+          </Show>
 
           <Switch>
             <Match when={terminalState.activeModal === 'CALLSIGN_PROMPT'}>
@@ -192,44 +283,55 @@ export function App() {
             <Match when={terminalState.activeModal === 'PERSON_SNAPSHOT'}>
               <PersonSnapshot />
             </Match>
-            <Match when={terminalState.activeModal === 'RADIO_MARKERS'}>
-              <RadioMarkers />
-            </Match>
-            <Match when={terminalState.activeModal === 'BOLO_MANAGER'}>
-              <BoloManager />
-            </Match>
-            <Match
-              when={
-                terminalState.activeModal === 'FORENSIC_COLLECTION' &&
-                featureState.forensics.visible
-              }
-            >
-              <ForensicCollection />
-            </Match>
-          </Switch>
+             <Match when={terminalState.activeModal === 'RADIO_MARKERS'}>
+               <RadioMarkers />
+             </Match>
+             <Match when={terminalState.activeModal === 'BOLO_MANAGER'}>
+               <BoloManager />
+             </Match>
+             <Match when={terminalState.activeModal === 'VEHICLE_CAD'}>
+               <VehicleCAD />
+             </Match>
+             <Match
+               when={
+                 terminalState.activeModal === 'FORENSIC_COLLECTION' &&
+                 featureState.forensics.visible
+               }
+             >
+               <ForensicCollection />
+             </Match>
+             <Match when={terminalState.activeModal === 'PHOTO_PREVIEW' && photoPreviewData()}>
+               <PhotoCapturePreview
+                 photoData={photoPreviewData()!}
+                 onClose={() => terminalActions.setActiveModal(null)}
+               />
+             </Match>
+           </Switch>
 
-          {viewerState.isOpen && viewerState.mediaType === 'image' && (
-            <ImageViewer
-              images={viewerState.images}
-              title={viewerState.title}
-              onClose={viewerActions.close}
-            />
-          )}
+           {viewerState.isOpen && viewerState.mediaType === 'image' && (
+             <ImageViewer
+               images={viewerState.images}
+               title={viewerState.title}
+               onClose={viewerActions.close}
+             />
+           )}
 
-          {viewerState.isOpen && (viewerState.mediaType === 'video' || viewerState.mediaType === 'audio') && (
-            <MediaPlayer />
-          )}
+           {viewerState.isOpen && (viewerState.mediaType === 'video' || viewerState.mediaType === 'audio') && (
+             <MediaPlayer />
+           )}
 
-          <SessionContextBar />
+          <Show when={!isVehicleOverlayMode()}>
+            <SessionContextBar />
 
-          <DockLauncher />
+            <DockLauncher />
 
-          <FlowProgressOverlay />
-          <FlowMinimizedIndicator />
+            <FlowProgressOverlay />
+            <FlowMinimizedIndicator />
 
-          <AuditViewer />
+            <AuditViewer />
 
-          <AuditQuickButton />
+            <AuditQuickButton />
+          </Show>
 
           {/* HomeScreen disabled - was closing entire CAD on X button */}
           {/* <HomeScreen /> */}

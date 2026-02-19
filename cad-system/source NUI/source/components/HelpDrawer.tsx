@@ -14,6 +14,7 @@ interface CommandWithGUI {
 const COMMAND_TO_GUI_MAP: Record<string, string> = {
   'case': 'CASE_CREATOR',
   'evidence': 'EVIDENCE',
+  'forensics': 'FORENSIC_COLLECTION',
   'addevidence': 'UPLOAD',
   'notes': 'NOTES',
   'notegui': 'NOTES_FILE',

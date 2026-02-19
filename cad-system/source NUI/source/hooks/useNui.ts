@@ -63,30 +63,10 @@ export function useCadEvents(handlers: {
  * Hook for Dispatch events
  */
 export function useDispatchEvents(handlers: {
-  onCallCreated?: (data: NuiMessageMap['dispatch:callCreated']) => void;
-  onCallUpdated?: (data: NuiMessageMap['dispatch:callUpdated']) => void;
-  onCallClosed?: (data: NuiMessageMap['dispatch:callClosed']) => void;
-  onCallAssigned?: (data: NuiMessageMap['dispatch:callAssigned']) => void;
-  onUnitStatusChanged?: (data: NuiMessageMap['dispatch:unitStatusChanged']) => void;
-  onUnitPositionUpdated?: (data: NuiMessageMap['dispatch:unitPositionUpdated']) => void;
+  onPublicState?: (data: NuiMessageMap['dispatch:publicState']) => void;
 }) {
-  if (handlers.onCallCreated) {
-    useNui('dispatch:callCreated', handlers.onCallCreated);
-  }
-  if (handlers.onCallUpdated) {
-    useNui('dispatch:callUpdated', handlers.onCallUpdated);
-  }
-  if (handlers.onCallClosed) {
-    useNui('dispatch:callClosed', handlers.onCallClosed);
-  }
-  if (handlers.onCallAssigned) {
-    useNui('dispatch:callAssigned', handlers.onCallAssigned);
-  }
-  if (handlers.onUnitStatusChanged) {
-    useNui('dispatch:unitStatusChanged', handlers.onUnitStatusChanged);
-  }
-  if (handlers.onUnitPositionUpdated) {
-    useNui('dispatch:unitPositionUpdated', handlers.onUnitPositionUpdated);
+  if (handlers.onPublicState) {
+    useNui('dispatch:publicState', handlers.onPublicState);
   }
 }
 
@@ -94,26 +74,10 @@ export function useDispatchEvents(handlers: {
  * Hook for Case events
  */
 export function useCaseEvents(handlers: {
-  onCreated?: (data: NuiMessageMap['case:created']) => void;
-  onUpdated?: (data: NuiMessageMap['case:updated']) => void;
-  onClosed?: (data: NuiMessageMap['case:closed']) => void;
-  onNoteAdded?: (data: NuiMessageMap['case:noteAdded']) => void;
-  onEvidenceAttached?: (data: NuiMessageMap['case:evidenceAttached']) => void;
+  onPublicState?: (data: NuiMessageMap['case:publicState']) => void;
 }) {
-  if (handlers.onCreated) {
-    useNui('case:created', handlers.onCreated);
-  }
-  if (handlers.onUpdated) {
-    useNui('case:updated', handlers.onUpdated);
-  }
-  if (handlers.onClosed) {
-    useNui('case:closed', handlers.onClosed);
-  }
-  if (handlers.onNoteAdded) {
-    useNui('case:noteAdded', handlers.onNoteAdded);
-  }
-  if (handlers.onEvidenceAttached) {
-    useNui('case:evidenceAttached', handlers.onEvidenceAttached);
+  if (handlers.onPublicState) {
+    useNui('case:publicState', handlers.onPublicState);
   }
 }
 

@@ -1,6 +1,7 @@
 import { Show, For } from 'solid-js';
 import { terminalActions } from '~/stores/terminalStore';
 import { viewerState, viewerActions } from '~/stores/viewerStore';
+import { Button, Modal } from '~/components/ui';
 
 interface ImageViewerProps {
   imageUrl?: string;
@@ -31,7 +32,7 @@ export function ImageViewer(props: ImageViewerProps) {
   };
 
   return (
-    <div class="modal-overlay" onClick={handleClose}>
+        <Modal.Root onClose={handleClose} useContentWrapper={false}>
       <div class="modal-content image-viewer" onClick={(e) => e.stopPropagation()}>
         <div class="modal-header">
           <h2>{props.title || 'IMAGE VIEWER'} [{currentIndex() + 1}/{totalImages()}]</h2>
@@ -68,13 +69,13 @@ export function ImageViewer(props: ImageViewerProps) {
             'border-top': '2px solid var(--terminal-border)',
             'background-color': 'var(--terminal-bg)'
           }}>
-            <button 
+            <Button.Root 
               class="btn"
               onClick={() => viewerActions.prevImage()}
               disabled={currentIndex() === 0}
             >
               [&lt;&lt;]
-            </button>
+            </Button.Root>
             
             <div class="image-thumbnails" style={{
               display: 'flex',
@@ -104,21 +105,21 @@ export function ImageViewer(props: ImageViewerProps) {
               </For>
             </div>
             
-            <button 
+            <Button.Root 
               class="btn"
               onClick={() => viewerActions.nextImage()}
               disabled={currentIndex() === totalImages() - 1}
             >
               [&gt;&gt;]
-            </button>
+            </Button.Root>
           </div>
         </Show>
 
         <div class="modal-footer">
           <span class="footer-text">Image evidence</span>
-          <button class="btn" onClick={handleClose}>[CLOSE]</button>
+          <Button.Root class="btn" onClick={handleClose}>[CLOSE]</Button.Root>
         </div>
       </div>
-    </div>
+    </Modal.Root>
   );
 }

@@ -13,6 +13,8 @@ import { initPhotoHandlers } from './photoHandlers';
 import { initFineHandlers } from './fineHandlers';
 import { initPoliceHandlers } from './policeHandlers';
 import { initCadHandlers } from './cadHandlers';
+import { initVehicleHandlers } from './vehicleHandlers';
+import { initSecurityCameraHandlers } from './securityCameraHandlers';
 
 /**
  * Initialize all NUI handlers
@@ -24,6 +26,8 @@ export function initAllNuiHandlers(): void {
   
   // Initialize all domain handlers
   initCadHandlers();
+  initVehicleHandlers();
+  initSecurityCameraHandlers();
   initDispatchHandlers();
   initCaseHandlers();
   initEvidenceHandlers();
@@ -38,6 +42,8 @@ export function initAllNuiHandlers(): void {
 
 // Re-export all handlers for manual use
 export * from './cadHandlers';
+export * from './vehicleHandlers';
+export * from './securityCameraHandlers';
 export * from './dispatchHandlers';
 export * from './caseHandlers';
 export * from './evidenceHandlers';

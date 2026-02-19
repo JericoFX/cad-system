@@ -10,6 +10,19 @@ export interface TerminalLine {
   timestamp: number;
 }
 
+export interface VehicleQuickLock {
+  plate: string;
+  model: string;
+  riskLevel: 'NONE' | 'MEDIUM' | 'HIGH';
+  riskTags: string[];
+  noteHint?: string;
+  ownerId?: string;
+  ownerName?: string;
+  distance?: number;
+  scannedAt: number;
+  stopId?: string;
+}
+
 interface TerminalState {
   lines: TerminalLine[];
   history: string[];
@@ -21,6 +34,9 @@ interface TerminalState {
   isInPoliceVehicle: boolean;
   uiMode: 'normal' | 'compact';
   vehicleSpeed: number;
+  showVehicleQuickDock: boolean;
+  vehicleQuickLock: VehicleQuickLock | null;
+  vehicleOverlayOwned: boolean;
 }
 
 const bootLines = generateMiniBoot().map((content, index) => ({
@@ -41,6 +57,9 @@ const initialState: TerminalState = {
   isInPoliceVehicle: false,
   uiMode: 'normal',
   vehicleSpeed: 0,
+  showVehicleQuickDock: true,
+  vehicleQuickLock: null,
+  vehicleOverlayOwned: false,
 };
 
 export const [terminalState, setTerminalState] = createStore(initialState);
@@ -132,6 +151,22 @@ export const terminalActions = {
   
   setVehicleContext: (isInVehicle: boolean) => {
     setTerminalState('isInPoliceVehicle', isInVehicle);
+  },
+
+  setVehicleQuickDockVisible: (visible: boolean) => {
+    setTerminalState('showVehicleQuickDock', visible);
+  },
+
+  setVehicleQuickLock: (lock: VehicleQuickLock | null) => {
+    setTerminalState('vehicleQuickLock', lock);
+  },
+
+  clearVehicleQuickLock: () => {
+    setTerminalState('vehicleQuickLock', null);
+  },
+
+  setVehicleOverlayOwned: (owned: boolean) => {
+    setTerminalState('vehicleOverlayOwned', owned);
   },
   
   setUIMode: (mode: 'normal' | 'compact') => {

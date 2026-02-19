@@ -1,9 +1,10 @@
-import { createSignal, Show, createEffect, For, onMount } from 'solid-js';
+import { createSignal, Show, createEffect, For } from 'solid-js';
 import { userActions, userState } from '~/stores/userStore';
 import { appActions } from '~/stores/appStore';
-import { terminalActions } from '~/stores/terminalStore';
+import { terminalActions, terminalState } from '~/stores/terminalStore';
 import { continueCadInit } from '~/handlers/cadHandlers';
 import { sessionState } from '~/stores/sessionStore';
+import { Button, Modal } from '~/components/ui';
 
 interface CallsignPromptProps {
   mode?: 'setup' | 'change';
@@ -16,7 +17,6 @@ export function CallsignPrompt(props: CallsignPromptProps) {
   const [isLoading, setIsLoading] = createSignal(false);
   const [warning, setWarning] = createSignal<string | null>(null);
 
-  // Validate on input change
   createEffect(() => {
     const value = input();
     if (!value) {
@@ -32,7 +32,6 @@ export function CallsignPrompt(props: CallsignPromptProps) {
     setIsValid(result.valid);
     setError(result.valid ? null : result.error || null);
     
-    // Check for common patterns and show preview
     if (result.valid) {
       setWarning(null);
     }
@@ -53,18 +52,19 @@ export function CallsignPrompt(props: CallsignPromptProps) {
     setIsLoading(true);
     setError(null);
 
+    const modalData = terminalState.modalData as
+      | { returnModal?: string; returnData?: unknown }
+      | null;
+    const returnModal = modalData?.returnModal;
+    const returnData = modalData?.returnData;
+
     const normalized = userActions.normalizeCallsign(input());
     const result = await userActions.saveCallsign(normalized);
 
     setIsLoading(false);
 
     if (result.success) {
-      // Close modal
-      terminalActions.setActiveModal(null);
-      
-      // Continue CAD initialization with terminal context
       if (props.mode !== 'change') {
-        // Build CadOpenedData from session store
         const data = {
           terminalId: sessionState.terminalId || 'unknown',
           location: sessionState.terminalLocation || undefined,
@@ -72,6 +72,12 @@ export function CallsignPrompt(props: CallsignPromptProps) {
           hasReader: sessionState.hasReader || false,
         };
         await continueCadInit(data);
+      } else {
+        terminalActions.setActiveModal(null);
+      }
+
+      if (returnModal) {
+        terminalActions.setActiveModal(returnModal, returnData);
       }
     } else {
       setError(result.error || 'Error al guardar el callsign');
@@ -79,16 +85,13 @@ export function CallsignPrompt(props: CallsignPromptProps) {
   };
 
   const handleCancel = () => {
-    // If in setup mode (no callsign), close the entire CAD
     if (props.mode !== 'change' && !userState.callsign) {
       appActions.hide();
-      // Also notify server to close NUI focus
       fetch('https://cad-system/closeUI', {
         method: 'POST',
         body: '{}',
       }).catch(() => {});
     } else {
-      // Just close the modal
       terminalActions.setActiveModal(null);
     }
   };
@@ -110,7 +113,11 @@ export function CallsignPrompt(props: CallsignPromptProps) {
   ];
 
   return (
-    <div class="modal-overlay" onKeyDown={handleKeyDown}>
+    <Modal.Root
+      closeOnOverlay={false}
+      useContentWrapper={false}
+      overlayAttributes={{ onKeyDown: handleKeyDown }}
+    >
       <div class="callsign-prompt-modal">
         <div class="callsign-header">
           <div class="callsign-icon">🎯</div>
@@ -135,7 +142,7 @@ export function CallsignPrompt(props: CallsignPromptProps) {
               placeholder="1-ADAM-15"
               classList={{
                 'callsign-input': true,
-                'callsign-input--error': error() && input().length > 0,
+                'callsign-input--error': Boolean(error() && input().length > 0),
                 'callsign-input--valid': isValid(),
               }}
               disabled={isLoading()}
@@ -177,21 +184,21 @@ export function CallsignPrompt(props: CallsignPromptProps) {
           </div>
 
           <div class="callsign-actions">
-            <button
+            <Button.Root
               type="button"
               class="btn btn-secondary"
               onClick={handleCancel}
               disabled={isLoading()}
             >
               {props.mode === 'change' ? 'Cancelar' : 'Cerrar CAD'}
-            </button>
-            <button
+            </Button.Root>
+            <Button.Root
               type="submit"
               class="btn btn-primary"
               disabled={!isValid() || isLoading()}
             >
               {isLoading() ? 'Guardando...' : 'Confirmar'}
-            </button>
+            </Button.Root>
           </div>
         </form>
 
@@ -205,6 +212,6 @@ export function CallsignPrompt(props: CallsignPromptProps) {
           </div>
         </Show>
       </div>
-    </div>
+    </Modal.Root>
   );
 }

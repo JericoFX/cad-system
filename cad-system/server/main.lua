@@ -1,9 +1,4 @@
---[[
-C.A.D. System
-Created by JericoFX
-GitHub: https://github.com/JericoFX
-License: GNU GPL v3
-]]
+
 
 CAD = CAD or {}
 
@@ -171,7 +166,54 @@ local function bootstrapFromDatabase()
         }
     end
 
-    CAD.Log('success', 'Bootstrap loaded: %s cases, %s calls, %s fines, %s blood requests', #caseRows, #callRows, #fineRows, #bloodRows)
+    CAD.State.SecurityCameras = CAD.State.SecurityCameras or {
+        Cameras = {},
+        LastNumber = 0,
+    }
+    CAD.State.SecurityCameras.Cameras = CAD.State.SecurityCameras.Cameras or {}
+    CAD.State.SecurityCameras.LastNumber = 0
+
+    local cameraRows = safeQuery('SELECT * FROM cad_security_cameras', {}, 'cad_security_cameras')
+    for i = 1, #cameraRows do
+        local row = cameraRows[i]
+        local cameraNumber = tonumber(row.camera_number) or 0
+        CAD.State.SecurityCameras.Cameras[row.camera_id] = {
+            cameraId = row.camera_id,
+            cameraNumber = cameraNumber,
+            label = row.label or ('Camera %04d'):format(math.max(0, cameraNumber)),
+            street = row.street or '',
+            crossStreet = row.cross_street or '',
+            zone = row.zone_name or '',
+            coords = safeJsonDecode(row.coords, nil, ('cad_security_cameras.coords:%s'):format(tostring(row.camera_id))),
+            rotation = safeJsonDecode(row.rotation, nil, ('cad_security_cameras.rotation:%s'):format(tostring(row.camera_id))),
+            fov = tonumber(row.fov) or 55.0,
+            status = row.status or 'ACTIVE',
+            installedBy = row.installed_by,
+            installedByName = row.installed_by_name,
+            createdAt = row.created_at,
+            updatedAt = row.updated_at,
+        }
+
+        if cameraNumber > CAD.State.SecurityCameras.LastNumber then
+            CAD.State.SecurityCameras.LastNumber = cameraNumber
+        end
+    end
+
+    local virtualSlots = 0
+    if CAD.VirtualContainer and CAD.VirtualContainer.LoadFromDatabase then
+        virtualSlots = tonumber(CAD.VirtualContainer.LoadFromDatabase()) or 0
+    end
+
+    CAD.Log(
+        'success',
+        'Bootstrap loaded: %s cases, %s calls, %s fines, %s blood requests, %s cameras, %s virtual slots',
+        #caseRows,
+        #callRows,
+        #fineRows,
+        #bloodRows,
+        #cameraRows,
+        virtualSlots
+    )
 end
 
 CreateThread(function()
@@ -188,6 +230,24 @@ lib.callback.register('cad:getConfig', CAD.Auth.WithGuard('default', function()
         priorities = { 1, 2, 3, 4, 5 },
     }
 end))
+
+local function getCallsignPolicy()
+    local policy = CAD.Config.Security and CAD.Config.Security.Callsign or {}
+    local prefixes = {}
+    local raw = type(policy.RequireWhenPrefix) == 'table' and policy.RequireWhenPrefix or { 'B-' }
+
+    for i = 1, #raw do
+        local prefix = CAD.Server.SanitizeString(raw[i], 20)
+        if prefix ~= '' then
+            prefixes[#prefixes + 1] = string.upper(prefix)
+        end
+    end
+
+    return {
+        requireWhenEmpty = policy.RequireWhenEmpty ~= false,
+        blockedPrefixes = prefixes,
+    }
+end
 
 lib.callback.register('cad:getPlayerData', function(source)
     local officer = CAD.Auth.GetOfficerData(source)
@@ -206,6 +266,7 @@ lib.callback.register('cad:getPlayerData', function(source)
         jobLabel = officer.jobLabel,
         grade = officer.grade,
         isAdmin = officer.isAdmin,
+        callsignPolicy = getCallsignPolicy(),
     }
 end)
 
@@ -213,11 +274,13 @@ AddEventHandler('playerDropped', function()
     local source = source
     CAD.State.OfficerStatus[source] = nil
     CAD.State.Evidence.Staging[source] = nil
+    if CAD.Photos and CAD.Photos.State and CAD.Photos.State.Staging then
+        CAD.Photos.State.Staging[source] = nil
+    end
 end)
 
--- Callsign callbacks
 lib.callback.register('cad:getCallsign', function(source)
-    local identifier = CAD.Core.Server.GetIdentifier(source)
+    local identifier = CAD.Server.GetIdentifier(source)
     if not identifier then
         return { success = false, error = 'no_identifier' }
     end
@@ -231,7 +294,7 @@ lib.callback.register('cad:getCallsign', function(source)
 end)
 
 lib.callback.register('cad:setCallsign', function(source, data)
-    local identifier = CAD.Core.Server.GetIdentifier(source)
+    local identifier = CAD.Server.GetIdentifier(source)
     if not identifier then
         return { success = false, error = 'no_identifier' }
     end
@@ -240,7 +303,6 @@ lib.callback.register('cad:setCallsign', function(source, data)
         return { success = false, error = 'invalid_data' }
     end
 
-    -- Validate format
     local valid, normalizedOrError = CAD.Officers.ValidateCallsign(data.callsign)
     if not valid then
         return { success = false, error = 'invalid_format', detail = normalizedOrError }
@@ -248,16 +310,13 @@ lib.callback.register('cad:setCallsign', function(source, data)
 
     local callsign = normalizedOrError
 
-    -- Check for duplicate (warning, not blocking)
     local isDuplicate = CAD.Officers.CheckDuplicate(callsign, identifier)
 
-    -- Save to database
     local saved = CAD.Officers.SetCallsignDB(identifier, callsign)
     if not saved then
         return { success = false, error = 'db_error' }
     end
 
-    -- Sync to framework
     CAD.Officers.SyncToFramework(source, callsign)
 
     CAD.Log('info', 'Officer %s set callsign to %s', identifier, callsign)

@@ -12,8 +12,11 @@ import { violentCrimeScenario } from './violentCrimeScenario';
 import { accidentSceneScenario } from './accidentSceneScenario';
 import { evidenceCollectionScenario } from './evidenceCollectionScenario';
 
+import { vehicleCompactScenario } from './vehicleCompactScenario';
+
 export const ALL_SCENARIOS: Scenario[] = [
   emptyScenario,
+  vehicleCompactScenario,
   dispatchActiveScenario,
   forensicSceneScenario,
   emsBusyScenario,
@@ -47,3 +50,4 @@ export { drugBustScenario };
 export { violentCrimeScenario };
 export { accidentSceneScenario };
 export { evidenceCollectionScenario };
+export { vehicleCompactScenario };

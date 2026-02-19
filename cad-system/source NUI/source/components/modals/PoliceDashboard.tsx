@@ -2,6 +2,7 @@ import { createSignal, createMemo, For, Show, onMount } from 'solid-js';
 import { terminalActions, terminalState } from '~/stores/terminalStore';
 import { cadState, cadActions, type CriminalRecord, type Warrant, type Vehicle, type Evidence } from '~/stores/cadStore';
 import { fetchNui } from '~/utils/fetchNui';
+import { Button, Input, Modal, Tabs, Textarea } from '~/components/ui';
 
 type JailTransfer = {
   transferId: string;
@@ -418,51 +419,26 @@ export function PoliceDashboard() {
   };
 
   return (
-    <div class="modal-overlay" onClick={closeModal}>
+        <Modal.Root onClose={closeModal} useContentWrapper={false}>
       <div class="modal-content police-dashboard" onClick={(e) => e.stopPropagation()}>
         <div class="modal-header">
           <h2>=== POLICE DASHBOARD ===</h2>
           <button class="modal-close" onClick={closeModal}>[X]</button>
         </div>
 
-        <div class="detail-tabs">
-          <button 
-            class={`tab ${activeTab() === 'arrests' ? 'active' : ''}`}
-            onClick={() => setActiveTab('arrests')}
-          >
-            [ARRESTS ({recentArrests().length})]
-          </button>
-          <button 
-            class={`tab ${activeTab() === 'warrants' ? 'active' : ''}`}
-            onClick={() => setActiveTab('warrants')}
-          >
-            [WARRANTS ({activeWarrants().length})]
-          </button>
-          <button 
-            class={`tab ${activeTab() === 'impounds' ? 'active' : ''}`}
-            onClick={() => setActiveTab('impounds')}
-          >
-            [IMPOUNDS ({impoundedVehicles().length})]
-          </button>
-          <button 
-            class={`tab ${activeTab() === 'evidence' ? 'active' : ''}`}
-            onClick={() => setActiveTab('evidence')}
-          >
-            [EVIDENCE]
-          </button>
-          <button
-            class={`tab ${activeTab() === 'jail' ? 'active' : ''}`}
-            onClick={() => setActiveTab('jail')}
-          >
-            [JAIL ({jailTransfers().length})]
-          </button>
-          <button 
-            class={`tab ${activeTab() === 'create' ? 'active' : ''}`}
-            onClick={() => setActiveTab('create')}
-          >
-            [+ NEW]
-          </button>
-        </div>
+        <Tabs.Root
+          value={activeTab()}
+          onValueChange={(value) => setActiveTab(value as 'arrests' | 'warrants' | 'impounds' | 'evidence' | 'jail' | 'create')}
+        >
+          <Tabs.List>
+            <Tabs.Trigger value='arrests' label='ARRESTS' badge={recentArrests().length} />
+            <Tabs.Trigger value='warrants' label='WARRANTS' badge={activeWarrants().length} />
+            <Tabs.Trigger value='impounds' label='IMPOUNDS' badge={impoundedVehicles().length} />
+            <Tabs.Trigger value='evidence' label='EVIDENCE' />
+            <Tabs.Trigger value='jail' label='JAIL' badge={jailTransfers().length} />
+            <Tabs.Trigger value='create' label='+ NEW' />
+          </Tabs.List>
+        </Tabs.Root>
 
         <div class="tab-content">
           <Show when={activeTab() === 'arrests'}>
@@ -509,12 +485,12 @@ export function PoliceDashboard() {
                   <div class="warrant-reason">{warrant.reason}</div>
                   <div class="warrant-meta">
                     <span>Expires: {formatDate(warrant.expiresAt || '')}</span>
-                    <button 
+                    <Button.Root 
                       class="btn-small btn-danger"
                       onClick={() => cancelWarrant(warrant.warrantId)}
                     >
                       [CANCEL]
-                    </button>
+                    </Button.Root>
                   </div>
                 </div>
               )}
@@ -539,12 +515,12 @@ export function PoliceDashboard() {
                     {vehicle.year} {vehicle.make} {vehicle.model} - {vehicle.color}
                   </div>
                   <div class="vehicle-owner">Owner: {vehicle.ownerName}</div>
-                  <button 
+                  <Button.Root 
                     class="btn-small btn-primary"
                     onClick={() => releaseVehicle(vehicle.plate)}
                   >
                     [RELEASE]
-                  </button>
+                  </Button.Root>
                 </div>
               )}
             </For>
@@ -582,23 +558,23 @@ export function PoliceDashboard() {
                 <option value="PHYSICAL">PHYSICAL ITEM</option>
                 <option value="DIGITAL">DIGITAL FILE</option>
               </select>
-              <input
+              <Input.Root
                 type="text"
                 class="dos-input"
                 placeholder="Evidence URL (http://...)"
                 value={evidenceForm().url}
                 onInput={(e: any) => setEvidenceForm({ ...evidenceForm(), url: e.currentTarget.value })}
               />
-              <input
+              <Input.Root
                 type="text"
                 class="dos-input"
                 placeholder="Description"
                 value={evidenceForm().description}
                 onInput={(e: any) => setEvidenceForm({ ...evidenceForm(), description: e.currentTarget.value })}
               />
-              <button class="btn btn-primary" onClick={handleAddEvidence}>
+              <Button.Root class="btn btn-primary" onClick={handleAddEvidence}>
                 [ADD EVIDENCE]
-              </button>
+              </Button.Root>
             </div>
 
             <Show when={evidenceForm().caseId && caseEvidence().length > 0}>
@@ -643,14 +619,14 @@ export function PoliceDashboard() {
 
             <div class="create-form">
               <h3>[LOG JAIL TRANSFER]</h3>
-              <input
+              <Input.Root
                 type="text"
                 class="dos-input"
                 placeholder="Citizen ID"
                 value={jailForm().citizenId}
                 onInput={(e) => setJailForm({ ...jailForm(), citizenId: e.currentTarget.value })}
               />
-              <input
+              <Input.Root
                 type="text"
                 class="dos-input"
                 placeholder="Person Name"
@@ -669,28 +645,28 @@ export function PoliceDashboard() {
                   )}
                 </For>
               </select>
-              <input
+              <Input.Root
                 type="number"
                 class="dos-input"
                 placeholder="Jail Months"
                 value={jailForm().jailMonths}
                 onInput={(e) => setJailForm({ ...jailForm(), jailMonths: e.currentTarget.value })}
               />
-              <input
+              <Input.Root
                 type="text"
                 class="dos-input"
                 placeholder="Facility"
                 value={jailForm().facility}
                 onInput={(e) => setJailForm({ ...jailForm(), facility: e.currentTarget.value })}
               />
-              <input
+              <Input.Root
                 type="text"
                 class="dos-input"
                 placeholder="Reason"
                 value={jailForm().reason}
                 onInput={(e) => setJailForm({ ...jailForm(), reason: e.currentTarget.value })}
               />
-              <textarea
+              <Textarea.Root
                 class="dos-textarea"
                 rows={2}
                 placeholder="Notes (optional)"
@@ -698,8 +674,8 @@ export function PoliceDashboard() {
                 onInput={(e) => setJailForm({ ...jailForm(), notes: e.currentTarget.value })}
               />
               <div class="form-actions">
-                <button class="btn btn-primary" onClick={() => void handleLogJailTransfer()}>[LOG TRANSFER]</button>
-                <button class="btn" onClick={() => void loadJailTransfers()}>[REFRESH]</button>
+                <Button.Root class="btn btn-primary" onClick={() => void handleLogJailTransfer()}>[LOG TRANSFER]</Button.Root>
+                <Button.Root class="btn" onClick={() => void loadJailTransfers()}>[REFRESH]</Button.Root>
               </div>
             </div>
 
@@ -736,7 +712,7 @@ export function PoliceDashboard() {
                     <option value="PERSON">PERSON</option>
                     <option value="VEHICLE">VEHICLE</option>
                   </select>
-                  <input
+                  <Input.Root
                     type="text"
                     class="dos-input"
                     placeholder={lookupMode() === 'PERSON' ? 'Citizen ID or Name' : 'Plate or Owner'}
@@ -745,10 +721,10 @@ export function PoliceDashboard() {
                   />
                 </div>
                 <div class="form-actions">
-                  <button class="btn btn-primary" onClick={handleLookupApplyFirst}>[AUTOFILL]</button>
-                  <button class="btn" onClick={() => lookupMode() === 'PERSON' ? openPersonSearch() : openVehicleSearch()}>
+                  <Button.Root class="btn btn-primary" onClick={handleLookupApplyFirst}>[AUTOFILL]</Button.Root>
+                  <Button.Root class="btn" onClick={() => lookupMode() === 'PERSON' ? openPersonSearch() : openVehicleSearch()}>
                     [OPEN SEARCH]
-                  </button>
+                  </Button.Root>
                 </div>
 
                 <Show when={lookupResults().length > 0}>
@@ -771,28 +747,28 @@ export function PoliceDashboard() {
 
               <div class="create-form">
                 <h3>[REGISTER ARREST]</h3>
-                <input
+                <Input.Root
                   type="text"
                   class="dos-input"
                   placeholder="Citizen ID"
                   value={arrestForm().citizenId}
                   onInput={(e) => setArrestForm({ ...arrestForm(), citizenId: e.currentTarget.value })}
                 />
-                <input
+                <Input.Root
                   type="text"
                   class="dos-input"
                   placeholder="Person Name"
                   value={arrestForm().personName}
                   onInput={(e) => setArrestForm({ ...arrestForm(), personName: e.currentTarget.value })}
                 />
-                <input
+                <Input.Root
                   type="text"
                   class="dos-input"
                   placeholder="Charges (comma-separated)"
                   value={arrestForm().charges}
                   onInput={(e) => setArrestForm({ ...arrestForm(), charges: e.currentTarget.value })}
                 />
-                <input
+                <Input.Root
                   type="text"
                   class="dos-input"
                   placeholder="Sentence (e.g., 5 years)"
@@ -800,14 +776,14 @@ export function PoliceDashboard() {
                   onInput={(e) => setArrestForm({ ...arrestForm(), sentence: e.currentTarget.value })}
                 />
                 <div class="form-row">
-                  <input
+                  <Input.Root
                     type="number"
                     class="dos-input"
                     placeholder="Fine $"
                     value={arrestForm().fine}
                     onInput={(e) => setArrestForm({ ...arrestForm(), fine: e.currentTarget.value })}
                   />
-                  <input
+                  <Input.Root
                     type="number"
                     class="dos-input"
                     placeholder="Jail (months)"
@@ -815,21 +791,21 @@ export function PoliceDashboard() {
                     onInput={(e) => setArrestForm({ ...arrestForm(), jailTime: e.currentTarget.value })}
                   />
                 </div>
-                <button class="btn btn-primary" onClick={handleCreateArrest}>
+                <Button.Root class="btn btn-primary" onClick={handleCreateArrest}>
                   [REGISTER ARREST]
-                </button>
+                </Button.Root>
               </div>
 
               <div class="create-form">
                 <h3>[ISSUE WARRANT]</h3>
-                <input
+                <Input.Root
                   type="text"
                   class="dos-input"
                   placeholder="Citizen ID"
                   value={warrantForm().citizenId}
                   onInput={(e) => setWarrantForm({ ...warrantForm(), citizenId: e.currentTarget.value })}
                 />
-                <input
+                <Input.Root
                   type="text"
                   class="dos-input"
                   placeholder="Person Name"
@@ -844,51 +820,51 @@ export function PoliceDashboard() {
                   <option value="ARREST">ARREST WARRANT</option>
                   <option value="SEARCH">SEARCH WARRANT</option>
                 </select>
-                <input
+                <Input.Root
                   type="text"
                   class="dos-input"
                   placeholder="Reason"
                   value={warrantForm().reason}
                   onInput={(e) => setWarrantForm({ ...warrantForm(), reason: e.currentTarget.value })}
                 />
-                <input
+                <Input.Root
                   type="number"
                   class="dos-input"
                   placeholder="Expires (days)"
                   value={warrantForm().expiresDays}
                   onInput={(e) => setWarrantForm({ ...warrantForm(), expiresDays: e.currentTarget.value })}
                 />
-                <button class="btn btn-primary" onClick={handleCreateWarrant}>
+                <Button.Root class="btn btn-primary" onClick={handleCreateWarrant}>
                   [ISSUE WARRANT]
-                </button>
+                </Button.Root>
               </div>
 
               <div class="create-form">
                 <h3>[IMPOUND VEHICLE]</h3>
-                <input
+                <Input.Root
                   type="text"
                   class="dos-input"
                   placeholder="License Plate"
                   value={impoundForm().plate}
                   onInput={(e) => setImpoundForm({ ...impoundForm(), plate: e.currentTarget.value })}
                 />
-                <input
+                <Input.Root
                   type="text"
                   class="dos-input"
                   placeholder="Impound Reason"
                   value={impoundForm().reason}
                   onInput={(e) => setImpoundForm({ ...impoundForm(), reason: e.currentTarget.value })}
                 />
-                <input
+                <Input.Root
                   type="number"
                   class="dos-input"
                   placeholder="Duration (days, 0 = indefinite)"
                   value={impoundForm().duration}
                   onInput={(e) => setImpoundForm({ ...impoundForm(), duration: e.currentTarget.value })}
                 />
-                <button class="btn btn-primary" onClick={handleImpoundVehicle}>
+                <Button.Root class="btn btn-primary" onClick={handleImpoundVehicle}>
                   [IMPOUND VEHICLE]
-                </button>
+                </Button.Root>
               </div>
             </div>
           </Show>
@@ -898,9 +874,9 @@ export function PoliceDashboard() {
           <span style={{ color: '#808080' }}>
             Police Dashboard v1.0
           </span>
-          <button class="btn" onClick={closeModal}>[CLOSE]</button>
+          <Button.Root class="btn" onClick={closeModal}>[CLOSE]</Button.Root>
         </div>
       </div>
-    </div>
+    </Modal.Root>
   );
 }

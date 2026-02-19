@@ -1,9 +1,4 @@
---[[
-C.A.D. System
-Created by JericoFX
-GitHub: https://github.com/JericoFX
-License: GNU GPL v3
-]]
+
 
 CAD = CAD or {}
 CAD.Server = CAD.Server or {}
@@ -26,7 +21,7 @@ function CAD.Server.SanitizeString(value, maxLen)
     text = text:gsub('<.->', '')
     text = text:gsub('[\r\n\t]+', ' ')
     text = text:gsub('%s+', ' ')
-    text = text:gsub('^%s+', ''):gsub('%s+$', '')
+    text = CAD.StringTrim(text)
     if maxLen and #text > maxLen then
         text = text:sub(1, maxLen)
     end
@@ -118,12 +113,6 @@ function CAD.Server.NotifyJobs(jobs, message, notificationType)
     end
 end
 
--- ============================================================
--- NUI Event Broadcasting System
--- Broadcast events from server to client NUI
--- ============================================================
-
--- Broadcast to specific jobs
 function CAD.Server.BroadcastToJobs(jobs, eventName, data)
     local players = GetPlayers()
     for i = 1, #players do
@@ -134,20 +123,16 @@ function CAD.Server.BroadcastToJobs(jobs, eventName, data)
     end
 end
 
--- Broadcast to all players
 function CAD.Server.BroadcastToAll(eventName, data)
     TriggerClientEvent('cad:client:' .. eventName, -1, data)
 end
 
--- Broadcast to specific player
 function CAD.Server.BroadcastToPlayer(source, eventName, data)
     TriggerClientEvent('cad:client:' .. eventName, source, data)
 end
 
--- Offline event queue for disconnected players
 CAD.Server.OfflineQueue = {}
 
--- Queue event for offline player
 function CAD.Server.QueueOfflineEvent(playerId, eventName, data)
     if not CAD.Server.OfflineQueue[playerId] then
         CAD.Server.OfflineQueue[playerId] = {}
@@ -159,12 +144,11 @@ function CAD.Server.QueueOfflineEvent(playerId, eventName, data)
     })
 end
 
--- Send queued events to reconnected player
 function CAD.Server.SendOfflineQueue(playerId, source)
     if CAD.Server.OfflineQueue[playerId] then
         local events = CAD.Server.OfflineQueue[playerId]
         CAD.Server.OfflineQueue[playerId] = nil
-        
+
         TriggerClientEvent('cad:client:syncOffline', source, {
             events = events
         })

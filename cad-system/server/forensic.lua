@@ -1,9 +1,4 @@
---[[
-C.A.D. System
-Created by JericoFX
-GitHub: https://github.com/JericoFX
-License: GNU GPL v3
-]]
+
 
 CAD = CAD or {}
 CAD.Forensic = CAD.Forensic or {}
@@ -12,6 +7,38 @@ local pendingAnalysis = {}
 CAD.State.Forensics = CAD.State.Forensics or {}
 CAD.State.Forensics.WorldTraces = CAD.State.Forensics.WorldTraces or {}
 local worldTraces = CAD.State.Forensics.WorldTraces
+local ingestRateState = {}
+
+local function getNowMs()
+    local gameTimer = GetGameTimer and GetGameTimer() or nil
+    if type(gameTimer) == 'number' then
+        return gameTimer
+    end
+    return math.floor(os.clock() * 1000)
+end
+
+local function getForensicsConfig()
+    return CAD.Config.Forensics or {}
+end
+
+local function canIngestNow(sourceName)
+    -- Limita la ingesta por recurso para reducir spam de trazas al servidor.
+    local cfg = getForensicsConfig()
+    local minIntervalMs = tonumber(cfg.WorldTraceMinIntervalMs) or 750
+    if minIntervalMs <= 0 then
+        return true
+    end
+
+    local key = tostring(sourceName or 'unknown')
+    local now = getNowMs()
+    local last = ingestRateState[key] or 0
+    if (now - last) < minIntervalMs then
+        return false
+    end
+
+    ingestRateState[key] = now
+    return true
+end
 
 local function isForensicsEnabled()
     return CAD.IsFeatureEnabled('Forensics') and CAD.Config.ForensicLabs.Enabled ~= false
@@ -63,7 +90,8 @@ local function canHandleWorldTrace(source)
 end
 
 local function shouldAcceptIngestFrom(resourceName)
-    if CAD.Config.Forensics.AllowAllIngestResources == true then
+    local cfg = getForensicsConfig()
+    if cfg.AllowAllIngestResources == true then
         return true
     end
 
@@ -71,7 +99,7 @@ local function shouldAcceptIngestFrom(resourceName)
         return false
     end
 
-    local allowed = CAD.Config.Forensics.AllowedIngestResources or {}
+    local allowed = cfg.AllowedIngestResources or {}
     return CAD.TableContains(allowed, resourceName)
 end
 
@@ -86,12 +114,17 @@ local function sanitizeTracePayload(payload)
         end
     end
 
+    local cfg = getForensicsConfig()
     local ttlSeconds = tonumber(tracePayload.ttlSeconds)
     if not ttlSeconds or ttlSeconds <= 0 then
-        ttlSeconds = CAD.Config.Forensics.WorldTraceTTLSeconds or 1800
+        ttlSeconds = cfg.WorldTraceTTLSeconds or 1800
+    end
+    if ttlSeconds > 86400 then
+        ttlSeconds = 86400
     end
 
-    local evidenceType = tostring(tracePayload.evidenceType or 'DNA'):upper()
+    local evidenceType = CAD.Server.SanitizeString(tracePayload.evidenceType, 32)
+    evidenceType = (evidenceType ~= '' and evidenceType or 'DNA'):upper()
     local description = CAD.Server.SanitizeString(tracePayload.description, 500)
 
     return {
@@ -134,6 +167,321 @@ local function pruneExpiredWorldTraces()
     end
 end
 
+local function ensureSceneEvidenceState()
+    local evidences = GlobalState.evidences
+    local changed = false
+
+    if type(evidences) ~= 'table' then
+        evidences = {
+            blood = {},
+            fingerprints = {},
+            casings = {},
+        }
+        changed = true
+    else
+        if type(evidences.blood) ~= 'table' then
+            evidences.blood = {}
+            changed = true
+        end
+        if type(evidences.fingerprints) ~= 'table' then
+            evidences.fingerprints = {}
+            changed = true
+        end
+        if type(evidences.casings) ~= 'table' then
+            evidences.casings = {}
+            changed = true
+        end
+    end
+
+    if changed then
+        GlobalState:set('evidences', evidences, true)
+    end
+
+    return evidences
+end
+
+local function syncSceneEvidenceState(evidences)
+    GlobalState:set('evidences', evidences, true)
+end
+
+local function normalizeSceneEvidenceType(value)
+    local evidenceType = CAD.Server.SanitizeString(value, 32):upper()
+    if evidenceType == 'FINGERPRINTS' then
+        evidenceType = 'FINGERPRINT'
+    elseif evidenceType == 'CASINGS' then
+        evidenceType = 'CASING'
+    end
+
+    return evidenceType
+end
+
+local function getSceneEvidenceBucketKey(evidenceType)
+    if evidenceType == 'BLOOD' then
+        return 'blood'
+    end
+
+    if evidenceType == 'FINGERPRINT' then
+        return 'fingerprints'
+    end
+
+    if evidenceType == 'CASING' then
+        return 'casings'
+    end
+
+    return nil
+end
+
+local function asVector3Coords(value)
+    if type(value) == 'vector3' then
+        return value
+    end
+
+    if type(value) == 'table' then
+        local x = tonumber(value.x)
+        local y = tonumber(value.y)
+        local z = tonumber(value.z)
+        if x and y and z then
+            return vector3(x, y, z)
+        end
+    end
+
+    return nil
+end
+
+local function getFingerprintCoords(entry)
+    local netId = tonumber(entry and (entry.entityNetId or entry.entity)) or 0
+    if netId <= 0 or not NetworkDoesNetworkIdExist(netId) then
+        return nil
+    end
+
+    local entity = NetworkGetEntityFromNetworkId(netId)
+    if not entity or entity == 0 or not DoesEntityExist(entity) then
+        return nil
+    end
+
+    local boneName = type(entry.bone) == 'string' and entry.bone or ''
+    if boneName ~= '' then
+        local boneIndex = GetEntityBoneIndexByName(entity, boneName)
+        if boneIndex and boneIndex ~= -1 then
+            return GetWorldPositionOfEntityBone(entity, boneIndex)
+        end
+    end
+
+    return GetEntityCoords(entity)
+end
+
+local function getSceneEvidenceCoords(bucketKey, entry)
+    if bucketKey == 'fingerprints' then
+        return getFingerprintCoords(entry)
+    end
+
+    return asVector3Coords(entry and entry.coords)
+end
+
+local function resolveSceneEvidence(evidences, evidenceType, reference, radius, source)
+    local bucketKey = getSceneEvidenceBucketKey(evidenceType)
+    if not bucketKey then
+        return nil, nil, nil
+    end
+
+    local bucket = evidences[bucketKey] or {}
+    local referenceId = type(reference) == 'string' and CAD.Server.SanitizeString(reference, 64) or ''
+    if referenceId ~= '' and bucket[referenceId] then
+        local entry = bucket[referenceId]
+        return referenceId, entry, getSceneEvidenceCoords(bucketKey, entry)
+    end
+
+    local origin = asVector3Coords(reference)
+    if not origin then
+        local ped = GetPlayerPed(source)
+        if ped and ped > 0 then
+            origin = GetEntityCoords(ped)
+        end
+    end
+
+    if not origin then
+        return nil, nil, nil
+    end
+
+    local maxDistance = tonumber(radius)
+    if not maxDistance or maxDistance <= 0 then
+        maxDistance = 1.8
+    end
+
+    local nearestId, nearestEntry, nearestCoords = nil, nil, nil
+    local nearestDistance = maxDistance
+
+    for evidenceId, entry in pairs(bucket) do
+        local entryCoords = getSceneEvidenceCoords(bucketKey, entry)
+        if entryCoords then
+            local distance = #(origin - entryCoords)
+            if distance <= nearestDistance then
+                nearestId = evidenceId
+                nearestEntry = entry
+                nearestCoords = entryCoords
+                nearestDistance = distance
+            end
+        end
+    end
+
+    return nearestId, nearestEntry, nearestCoords
+end
+
+local function buildSceneEvidenceData(evidenceType, evidenceId, entry, coords, officer)
+    local payload = {
+        sourceEvidenceId = evidenceId,
+        collectedAt = CAD.Server.ToIso(),
+        collectedBy = officer.identifier,
+        location = coords and ('%.2f, %.2f, %.2f'):format(coords.x, coords.y, coords.z) or 'Unknown',
+    }
+
+    if coords then
+        payload.coords = {
+            x = coords.x,
+            y = coords.y,
+            z = coords.z,
+        }
+    end
+
+    if evidenceType == 'BLOOD' then
+        payload.bloodType = entry and entry.bloodType or CAD.EvidenceTypes.GetRandomBloodType()
+    elseif evidenceType == 'FINGERPRINT' then
+        payload.entityNetId = entry and tonumber(entry.entityNetId or entry.entity) or nil
+        payload.surface = entry and entry.surface or nil
+        payload.bone = entry and entry.bone or nil
+        payload.ownerId = entry and entry.ownerId or nil
+    elseif evidenceType == 'CASING' then
+        payload.ownerId = entry and entry.ownerId or nil
+    end
+
+    return payload
+end
+
+local function addSceneEvidenceToStaging(source, evidenceType, data)
+    local bucket = CAD.State.Evidence.Staging[source] or {}
+    CAD.State.Evidence.Staging[source] = bucket
+
+    local maxStaging = tonumber(CAD.Config.Evidence.MaxStagingPerOfficer) or 60
+    if #bucket >= maxStaging then
+        return nil, 'staging_limit_reached'
+    end
+
+    local staged = {
+        stagingId = CAD.Server.GenerateId('STAGE'),
+        evidenceType = evidenceType,
+        data = data,
+        createdAt = CAD.Server.ToIso(),
+    }
+
+    bucket[#bucket + 1] = staged
+
+    CAD.Server.BroadcastToPlayer(source, 'evidenceStaged', {
+        stagingId = staged.stagingId,
+        evidenceType = staged.evidenceType,
+        data = staged.data,
+        createdAt = staged.createdAt,
+    })
+
+    return staged, nil
+end
+
+local function canUseSceneEvidenceActions(source)
+    return canHandleWorldTrace(source)
+end
+
+RegisterNetEvent('cad:forensic:reveal', function(evidenceType, reference, radius)
+    local source = source
+    if not canUseSceneEvidenceActions(source) then
+        return
+    end
+
+    local normalizedType = normalizeSceneEvidenceType(evidenceType)
+    if normalizedType == '' then
+        return
+    end
+
+    local evidences = ensureSceneEvidenceState()
+    local evidenceId, entry = resolveSceneEvidence(evidences, normalizedType, reference, radius, source)
+    if not evidenceId or not entry then
+        return
+    end
+
+    entry.revealed = true
+    entry.revealedAt = CAD.Server.ToIso()
+
+    syncSceneEvidenceState(evidences)
+end)
+
+RegisterNetEvent('cad:forensic:collect', function(evidenceType, reference, radius)
+    local source = source
+    local officer = CAD.Auth.GetOfficerData(source)
+    if not officer or not canUseSceneEvidenceActions(source) then
+        return
+    end
+
+    local normalizedType = normalizeSceneEvidenceType(evidenceType)
+    if normalizedType == '' then
+        return
+    end
+
+    local evidences = ensureSceneEvidenceState()
+    local evidenceId, entry, coords = resolveSceneEvidence(evidences, normalizedType, reference, radius, source)
+
+    if not evidenceId or not entry then
+        CAD.Server.Notify(source, 'No matching scene evidence found', 'error')
+        return
+    end
+
+    if not coords then
+        coords = asVector3Coords(reference)
+    end
+    if not coords then
+        local ped = GetPlayerPed(source)
+        if ped and ped > 0 then
+            coords = GetEntityCoords(ped)
+        end
+    end
+
+    local data = buildSceneEvidenceData(normalizedType, evidenceId, entry, coords, officer)
+    local staged, stageErr = addSceneEvidenceToStaging(source, normalizedType, data)
+    if not staged then
+        CAD.Server.Notify(source, ('Cannot collect evidence: %s'):format(stageErr or 'unknown_error'), 'error')
+        return
+    end
+
+    local bucketKey = getSceneEvidenceBucketKey(normalizedType)
+    if bucketKey and evidenceId and evidences[bucketKey] and evidences[bucketKey][evidenceId] then
+        evidences[bucketKey][evidenceId] = nil
+        syncSceneEvidenceState(evidences)
+    end
+
+    CAD.Server.Notify(source, ('Evidence collected: %s'):format(staged.stagingId), 'success')
+end)
+
+RegisterNetEvent('cad:forensic:destroy', function(evidenceType, reference, radius)
+    local source = source
+    if not canUseSceneEvidenceActions(source) then
+        return
+    end
+
+    local normalizedType = normalizeSceneEvidenceType(evidenceType)
+    if normalizedType == '' then
+        return
+    end
+
+    local evidences = ensureSceneEvidenceState()
+    local evidenceId = resolveSceneEvidence(evidences, normalizedType, reference, radius, source)
+
+    local bucketKey = getSceneEvidenceBucketKey(normalizedType)
+    if not bucketKey or not evidenceId or not evidences[bucketKey] or not evidences[bucketKey][evidenceId] then
+        return
+    end
+
+    evidences[bucketKey][evidenceId] = nil
+    syncSceneEvidenceState(evidences)
+    CAD.Server.Notify(source, ('Evidence destroyed: %s'):format(evidenceId), 'success')
+end)
+
 lib.callback.register('cad:forensic:checkInLab', CAD.Auth.WithGuard('default', function(source)
     return {
         enabled = isForensicsEnabled(),
@@ -146,8 +494,8 @@ lib.callback.register('cad:forensic:getPendingEvidence', CAD.Auth.WithGuard('def
         return {}
     end
 
-    local caseId = payload and payload.caseId
-    if not caseId or not CAD.State.Cases[caseId] then
+    local caseId = CAD.Server.SanitizeString(payload and payload.caseId, 64)
+    if caseId == '' or not CAD.State.Cases[caseId] then
         return {}
     end
 
@@ -168,9 +516,9 @@ lib.callback.register('cad:forensic:analyzeEvidence', CAD.Auth.WithGuard('heavy'
         return { ok = false, error = 'not_in_lab' }
     end
 
-    local caseId = payload.caseId
-    local evidenceId = payload.evidenceId
-    if not caseId or not evidenceId then
+    local caseId = CAD.Server.SanitizeString(payload and payload.caseId, 64)
+    local evidenceId = CAD.Server.SanitizeString(payload and payload.evidenceId, 64)
+    if caseId == '' or evidenceId == '' then
         return { ok = false, error = 'invalid_payload' }
     end
 
@@ -196,35 +544,72 @@ lib.callback.register('cad:forensic:analyzeEvidence', CAD.Auth.WithGuard('heavy'
         analysisId = analysisId,
         caseId = caseId,
         evidenceId = evidenceId,
+        evidenceType = tostring(found.evidenceType or 'UNKNOWN'):upper(),
         startedBy = officer.identifier,
         startedAt = CAD.Server.ToIso(),
         status = 'IN_PROGRESS',
     }
 
+    CAD.Server.BroadcastToJobs(
+        {'police', 'sheriff', 'csi', 'ambulance', 'ems'},
+        'forensicsAnalysisStarted',
+        {
+            analysis = {
+                analysisId = analysisId,
+                caseId = caseId,
+                evidenceId = evidenceId,
+                evidenceType = pendingAnalysis[analysisId].evidenceType,
+                analystId = officer.identifier,
+                startedBy = officer.identifier,
+                startedAt = pendingAnalysis[analysisId].startedAt,
+                status = 'IN_PROGRESS',
+            }
+        }
+    )
+
     return pendingAnalysis[analysisId]
 end))
 
-lib.callback.register('cad:forensic:completeAnalysis', CAD.Auth.WithGuard('heavy', function(_, payload, officer)
+lib.callback.register('cad:forensic:completeAnalysis', CAD.Auth.WithGuard('heavy', function(source, payload, officer)
     if not isForensicsEnabled() then
         return { ok = false, error = 'forensics_disabled' }
     end
 
-    local analysis = pendingAnalysis[payload.analysisId]
+    if not isInLab(source) then
+        return { ok = false, error = 'not_in_lab' }
+    end
+
+    payload = type(payload) == 'table' and payload or {}
+
+    local analysisId = CAD.Server.SanitizeString(payload.analysisId, 64)
+    if analysisId == '' then
+        return { ok = false, error = 'invalid_payload' }
+    end
+
+    local analysis = pendingAnalysis[analysisId]
     if not analysis then
         return { ok = false, error = 'analysis_not_found' }
     end
 
+    if analysis.status == 'COMPLETED' then
+        return { ok = false, error = 'already_completed' }
+    end
+
+    if not officer.isAdmin and analysis.startedBy ~= officer.identifier then
+        return { ok = false, error = 'forbidden' }
+    end
+
     analysis.status = 'COMPLETED'
-    analysis.result = payload.result or {}
+    analysis.result = type(payload.result) == 'table' and payload.result or {}
     analysis.completedAt = CAD.Server.ToIso()
     analysis.completedBy = officer.identifier
 
-    -- Broadcast analysis completion
     CAD.Server.BroadcastToJobs(
-        {'police', 'sheriff'},
+        {'police', 'sheriff', 'csi', 'ambulance', 'ems'},
         'forensicsAnalysisCompleted',
         {
             analysisId = analysis.analysisId,
+            caseId = analysis.caseId,
             evidenceId = analysis.evidenceId,
             results = analysis.result,
             completedBy = officer.identifier,
@@ -235,82 +620,137 @@ lib.callback.register('cad:forensic:completeAnalysis', CAD.Auth.WithGuard('heavy
     return analysis
 end))
 
-lib.callback.register('cad:forensic:getAnalysisResults', CAD.Auth.WithGuard('default', function(_, payload)
+lib.callback.register('cad:forensic:getAnalysisResults', CAD.Auth.WithGuard('default', function(_, payload, officer)
     if not isForensicsEnabled() then
         return {}
     end
 
-    local evidenceId = payload and payload.evidenceId
+    local evidenceId = CAD.Server.SanitizeString(payload and payload.evidenceId, 64)
+    local caseId = CAD.Server.SanitizeString(payload and payload.caseId, 64)
+    if evidenceId == '' then
+        evidenceId = nil
+    end
+    if caseId == '' then
+        caseId = nil
+    end
+
     local out = {}
     for _, entry in pairs(pendingAnalysis) do
-        if not evidenceId or entry.evidenceId == evidenceId then
+        local matches = true
+        if evidenceId and entry.evidenceId ~= evidenceId then
+            matches = false
+        end
+        if caseId and entry.caseId ~= caseId then
+            matches = false
+        end
+        if not officer.isAdmin and not evidenceId and not caseId and entry.startedBy ~= officer.identifier then
+            matches = false
+        end
+
+        if matches then
             out[#out + 1] = entry
         end
     end
     return out
 end))
 
-lib.callback.register('cad:forensic:compareEvidence', CAD.Auth.WithGuard('default', function(_, payload)
+lib.callback.register('cad:forensic:compareEvidence', CAD.Auth.WithGuard('default', function(source, payload)
     if not isForensicsEnabled() then
         return { ok = false, error = 'forensics_disabled' }
     end
 
+    local evidenceA = CAD.Server.SanitizeString(payload and (payload.evidenceA or payload.evidenceId1), 64)
+    local evidenceB = CAD.Server.SanitizeString(payload and (payload.evidenceB or payload.evidenceId2), 64)
+    if evidenceA == '' or evidenceB == '' then
+        return { ok = false, error = 'invalid_payload' }
+    end
+
+    local comparisonId = CAD.Server.GenerateId('CMP')
+    local confidence = math.random(60, 98) / 100
+    local isMatch = confidence >= 0.8
+    local summary = isMatch and 'Automated comparison found a probable match' or
+        'Automated comparison found no reliable match'
+
+    CAD.Server.BroadcastToPlayer(source, 'forensicsEvidenceCompared', {
+        evidenceId = evidenceA,
+        comparisonId = comparisonId,
+        matchResults = {
+            match = isMatch,
+            confidence = confidence,
+            details = {
+                evidenceA = evidenceA,
+                evidenceB = evidenceB,
+                summary = summary,
+            },
+        },
+        comparedAt = CAD.Server.ToIso(),
+    })
+
     return {
         ok = true,
-        evidenceA = payload and payload.evidenceA,
-        evidenceB = payload and payload.evidenceB,
-        confidence = math.random(60, 98),
-        summary = 'Automated comparison completed',
+        evidenceA = evidenceA,
+        evidenceB = evidenceB,
+        comparisonId = comparisonId,
+        confidence = confidence,
+        match = isMatch,
+        summary = summary,
     }
 end))
 
--- Collect forensic evidence
 lib.callback.register('cad:forensic:collectEvidence', CAD.Auth.WithGuard('heavy', function(source, payload, officer)
     if not isForensicsEnabled() then
         return { ok = false, error = 'forensics_disabled' }
     end
 
-    local caseId = payload.caseId
-    local evidenceType = payload.evidenceType
-    
-    if not caseId or not evidenceType then
+    payload = type(payload) == 'table' and payload or {}
+
+    local caseId = CAD.Server.SanitizeString(payload.caseId, 64)
+    local evidenceType = CAD.Server.SanitizeString(payload.evidenceType, 32):upper()
+
+    if caseId == '' or evidenceType == '' then
         return { ok = false, error = 'missing_required_fields' }
     end
-    
+
     local caseObj = CAD.State.Cases[caseId]
     if not caseObj then
         return { ok = false, error = 'case_not_found' }
     end
-    
-    -- Generate evidence data based on type
+
     local data = {}
-    
+    data.description = CAD.Server.SanitizeString(payload.description, 500)
+    data.collectedBy = officer.identifier
+    data.collectedByName = officer.name
+    data.collectedAt = CAD.Server.ToIso()
+
     if evidenceType == 'FINGERPRINT' then
         data.fingerprintId = CAD.Server.GenerateId('FPR')
-        data.quality = payload.quality or math.random(40, 100)
+        local quality = tonumber(payload.quality) or math.random(40, 100)
+        if quality < 0 then quality = 0 end
+        if quality > 100 then quality = 100 end
+        data.quality = math.floor(quality)
         data.pattern = (math.random(1, 3) == 1 and 'loop') or (math.random(1, 2) == 1 and 'whorl' or 'arch')
     elseif evidenceType == 'BLOOD' then
-        data.bloodType = payload.bloodType or 'O+'
+        local bloodType = CAD.Server.SanitizeString(payload.bloodType, 8)
+        data.bloodType = bloodType ~= '' and bloodType or 'O+'
     elseif evidenceType == 'DNA' then
         data.dnaHash = CAD.Server.GenerateId('DNA')
         data.profile = 'Generated DNA Profile'
     elseif evidenceType == 'CASING' or evidenceType == 'BULLET' then
-        data.caliber = payload.caliber or '9mm'
+        local caliber = CAD.Server.SanitizeString(payload.caliber, 24)
+        data.caliber = caliber ~= '' and caliber or '9mm'
         data.markings = CAD.Server.GenerateId('MKS')
     elseif evidenceType == 'FIBERS' then
-        data.color = payload.fiberColor or 'white'
+        local fiberColor = CAD.Server.SanitizeString(payload.fiberColor, 64)
+        data.color = fiberColor ~= '' and fiberColor or 'white'
         data.material = 'cotton'
     end
-    
-    -- Create evidence
+
     local evidence = {
         evidenceId = CAD.Server.GenerateId('EVI'),
         caseId = caseId,
         evidenceType = evidenceType,
-        description = payload.description or 'No description',
-        collectedBy = officer.identifier,
-        collectedByName = officer.name,
-        collectedAt = CAD.Server.ToIso(),
+        attachedBy = officer.identifier,
+        attachedAt = CAD.Server.ToIso(),
         data = data,
         custodyChain = {
             {
@@ -325,14 +765,12 @@ lib.callback.register('cad:forensic:collectEvidence', CAD.Auth.WithGuard('heavy'
         },
         analysisStatus = 'PENDING',
     }
-    
+
     evidence.custodyChain[1].evidenceId = evidence.evidenceId
-    
-    -- Add to case
+
     caseObj.evidence = caseObj.evidence or {}
     table.insert(caseObj.evidence, evidence)
-    
-    -- Save to database
+
     local saved, saveErr = pcall(function()
         MySQL.insert.await([[
             INSERT INTO cad_evidence (evidence_id, case_id, evidence_type, payload, attached_by, attached_at, custody_chain)
@@ -342,8 +780,8 @@ lib.callback.register('cad:forensic:collectEvidence', CAD.Auth.WithGuard('heavy'
             evidence.caseId,
             evidence.evidenceType,
             json.encode(evidence.data),
-            evidence.collectedBy,
-            evidence.collectedAt,
+            evidence.attachedBy,
+            evidence.attachedAt,
             json.encode(evidence.custodyChain),
         })
     end)
@@ -354,20 +792,22 @@ lib.callback.register('cad:forensic:collectEvidence', CAD.Auth.WithGuard('heavy'
         return { ok = false, error = 'db_write_failed' }
     end
 
-    -- Broadcast evidence collected
     CAD.Server.BroadcastToJobs(
-        {'police', 'sheriff', 'forensics'},
+        {'police', 'sheriff', 'csi', 'ambulance', 'ems'},
         'evidenceCollected',
         {
             evidenceId = evidence.evidenceId,
             caseId = caseId,
             evidenceType = evidenceType,
             data = data,
+            attachedBy = evidence.attachedBy,
+            attachedAt = evidence.attachedAt,
             collectedBy = officer.identifier,
-            collectedAt = evidence.collectedAt
+            collectedAt = evidence.attachedAt,
+            custodyChain = evidence.custodyChain,
         }
     )
-    
+
     return { ok = true, evidence = evidence }
 end))
 
@@ -421,6 +861,8 @@ lib.callback.register('cad:forensic:bagWorldTrace', CAD.Auth.WithGuard('heavy', 
     if not isForensicsEnabled() then
         return { ok = false, error = 'forensics_disabled' }
     end
+
+    payload = type(payload) == 'table' and payload or {}
 
     if not canHandleWorldTrace(source) then
         return { ok = false, error = 'forbidden' }
@@ -526,6 +968,14 @@ lib.callback.register('cad:forensic:bagWorldTrace', CAD.Auth.WithGuard('heavy', 
         end
     end
 
+    CAD.Server.BroadcastToPlayer(source, 'forensicsTraceBagged', {
+        traceId = trace.traceId,
+        evidenceId = staged.stagingId,
+        baggedBy = officer.identifier,
+        baggedAt = staged.createdAt,
+        staging = staged,
+    })
+
     return {
         ok = true,
         staging = staged,
@@ -537,6 +987,8 @@ lib.callback.register('cad:forensic:debugCreateTrace', CAD.Auth.WithGuard('heavy
     if CAD.Config.Debug ~= true then
         return { ok = false, error = 'debug_disabled' }
     end
+
+    payload = type(payload) == 'table' and payload or {}
 
     if not CAD.Server.HasRole(source, { 'police', 'sheriff', 'csi', 'admin' }) then
         return { ok = false, error = 'forbidden' }
@@ -550,9 +1002,9 @@ lib.callback.register('cad:forensic:debugCreateTrace', CAD.Auth.WithGuard('heavy
     local coords = GetEntityCoords(ped)
     local trace, err = ingestWorldTrace({
         coords = vector3(coords.x, coords.y, coords.z),
-        evidenceType = payload and payload.evidenceType or 'DNA',
-        description = payload and payload.description or 'Debug forensic trace',
-        ttlSeconds = payload and payload.ttlSeconds,
+        evidenceType = payload.evidenceType or 'DNA',
+        description = payload.description or 'Debug forensic trace',
+        ttlSeconds = payload.ttlSeconds,
         metadata = {
             debug = true,
         },
@@ -577,6 +1029,11 @@ RegisterNetEvent('cad:forensic:ingestWorldTrace', function(payload)
         return
     end
 
+    if not canIngestNow(invoking) then
+        CAD.Log('warn', 'Rate-limited world trace ingest from %s', invoking)
+        return
+    end
+
     local trace, err = ingestWorldTrace(payload)
     if not trace then
         CAD.Log('warn', 'Failed world trace ingest from %s: %s', invoking, tostring(err))
@@ -590,6 +1047,10 @@ exports('IngestWorldTrace', function(payload)
     local invoking = GetInvokingResource() or 'unknown'
     if not shouldAcceptIngestFrom(invoking) then
         return nil, 'ingest_resource_not_allowed'
+    end
+
+    if not canIngestNow(invoking) then
+        return nil, 'ingest_rate_limited'
     end
 
     return ingestWorldTrace(payload)

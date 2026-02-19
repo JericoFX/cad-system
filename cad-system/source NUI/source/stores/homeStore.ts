@@ -37,6 +37,7 @@ const getDefaultActions = (role: UserRole): QuickAction[] => {
         { id: 'new-case', label: 'New Case', icon: '📁', modal: 'CASE_CREATOR', color: '#00ff00' },
         { id: 'arrest', label: 'Arrest', icon: '⛓️', modal: 'ARREST_WIZARD', color: '#ff0000' },
         { id: 'bolo', label: 'BOLO', icon: '⚠️', modal: 'BOLO_MANAGER', color: '#ff8000' },
+        { id: 'forensics', label: 'Forensics', icon: '🔬', modal: 'FORENSIC_COLLECTION', color: '#00ffff' },
         ...common,
         { id: 'evidence', label: 'Evidence', icon: '📎', modal: 'EVIDENCE', color: '#80ffff' },
       ];
@@ -44,6 +45,7 @@ const getDefaultActions = (role: UserRole): QuickAction[] => {
       return [
         { id: 'triage', label: 'Triage', icon: '🏥', command: 'triage', color: '#ff8000' },
         { id: 'treatment', label: 'Treatment', icon: '💊', command: 'treatment', color: '#00ff00' },
+        { id: 'forensics', label: 'Forensics', icon: '🔬', modal: 'FORENSIC_COLLECTION', color: '#00ffff' },
         ...common,
         { id: 'ems-dash', label: 'EMS Dash', icon: '🚑', modal: 'EMS_DASHBOARD', color: '#ff0000' },
       ];

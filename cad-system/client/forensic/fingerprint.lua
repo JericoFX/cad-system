@@ -1,92 +1,111 @@
---[[
-CAD Forensic - Fingerprint Evidence System
-Generates fingerprints on vehicle entry/exit and weapon use during crimes
-]]
-
 CAD = CAD or {}
 CAD.Forensic = CAD.Forensic or {}
-CAD.Forensic.Fingerprints = {}
+CAD.Forensic.Fingerprints = CAD.Forensic.Fingerprints or {}
+
+local function getPed()
+    return cache.ped or PlayerPedId()
+end
+
+local function getLocalServerId()
+    return GetPlayerServerId(PlayerId())
+end
 
 local function isWearingGloves()
+    if GetResourceState('qb-core') ~= 'started' then
+        return false
+    end
+
     local player = exports['qb-core']:GetPlayerData()
-    return player.metadata.glove ~= 0
+    local metadata = player and player.metadata or {}
+    return tonumber(metadata.glove) ~= 0
 end
 
 local function isCrimeContext()
     local calls = CAD.State.Dispatch.Calls or {}
-    for _, call in ipairs(calls) do
-        if call.status == 'ACTIVE' then return true end
+    for i = 1, #calls do
+        if calls[i].status == 'ACTIVE' then
+            return true
+        end
     end
+
     return false
 end
 
 local function createFingerprintEvidence(entity, boneName, surfaceType)
-    local coords = GetEntityCoords(entity)
-    local evidence = {
-        id = 'FP_' .. math.random(1000000),
-        type = 'fingerprint',
-        entity = entity,
-        bone = boneName,
-        surface = surfaceType,
-        createdAt = os.time(),
-        quality = 100
-    }
-    CAD.Forensic.Fingerprints.Evidence[evidence.id] = evidence
-    TriggerServerEvent('cad:forensic:sync', 'fingerprint', PlayerId(), entity, boneName, surfaceType)
-    return evidence
+    if not DoesEntityExist(entity) then
+        return
+    end
+
+    local config = CAD.EvidenceTypes.GetType('fingerprint')
+    if not config then
+        return
+    end
+
+    local chance = tonumber(config.generation and config.generation.chance) or 1.0
+    if chance < 1.0 and math.random() > chance then
+        return
+    end
+
+    local entityNetId = NetworkGetNetworkIdFromEntity(entity)
+    if not entityNetId or entityNetId <= 0 then
+        return
+    end
+
+    TriggerServerEvent(
+        'cad:forensic:sync',
+        'fingerprint',
+        getLocalServerId(),
+        entityNetId,
+        boneName,
+        surfaceType
+    )
 end
 
--- Vehicle fingerprint generation
 lib.onCache('seat', function(seat)
-    if not isCrimeContext() then return end
+    if not isCrimeContext() then
+        return
+    end
 
-    local ped = PlayerPedId()
-    if isWearingGloves(ped) then return end
+    local ped = getPed()
+    if not ped or ped == 0 or isWearingGloves() then
+        return
+    end
 
     local vehicle = GetVehiclePedIsIn(ped, false)
-    if not DoesEntityExist(vehicle) then return end
+    if not DoesEntityExist(vehicle) then
+        return
+    end
 
-    -- Map seat to door bone
     local boneMap = {
-        [0] = 'door_dside_f',
-        [1] = 'door_pside_f',
-        [2] = 'door_dside_r',
-        [3] = 'door_pside_r'
+        [-1] = 'door_dside_f',
+        [0] = 'door_pside_f',
+        [1] = 'door_dside_r',
+        [2] = 'door_pside_r',
     }
+
     local boneName = boneMap[seat]
-    if not boneName then return end
+    if not boneName then
+        return
+    end
 
     createFingerprintEvidence(vehicle, boneName, 'Vehicle Door')
 end)
 
--- Weapon fingerprint generation
 AddEventHandler('ox_inventory:usedItem', function(data)
-    if not isCrimeContext() then return end
-
-    local ped = PlayerPedId()
-    if isWearingGloves(ped) then return end
-
-    -- Check if item is a weapon
-    if data.name:find('weapon_') then
-        createFingerprintEvidence(ped, 'weapon', 'Weapon Grip')
+    if not isCrimeContext() then
+        return
     end
-end)
 
--- Initialize
-CAD.Forensic.Fingerprints.Evidence = {}
+    if type(data) ~= 'table' or type(data.name) ~= 'string' then
+        return
+    end
 
--- Cleanup expired evidence
-CreateThread(function()
-    while true do
-        local now = os.time()
-        local config = CAD.EvidenceTypes.GetType('fingerprint')
-        
-        for id, evidence in pairs(CAD.Forensic.Fingerprints.Evidence) do
-            local age = now - evidence.createdAt
-            if age > config.decay.visibilityHalfLife * 2 then
-                CAD.Forensic.Fingerprints.Evidence[id] = nil
-            end
-        end
-        Wait(5000)
+    local ped = getPed()
+    if not ped or ped == 0 or isWearingGloves() then
+        return
+    end
+
+    if data.name:find('weapon_', 1, true) then
+        createFingerprintEvidence(ped, 'weapon', 'Weapon Grip')
     end
 end)

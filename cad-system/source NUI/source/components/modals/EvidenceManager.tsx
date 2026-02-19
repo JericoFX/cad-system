@@ -1,11 +1,13 @@
-import { createSignal, createMemo, Show, For } from 'solid-js';
+import { createSignal, createMemo, Show, For, onMount } from 'solid-js';
 import { terminalActions } from '~/stores/terminalStore';
 import { cadActions, cadState } from '~/stores/cadStore';
+import { photoActions, photoState, type PhotoMetadata } from '~/stores/photoStore';
 import { viewerActions } from '~/stores/viewerStore';
 import { fetchNui } from '~/utils/fetchNui';
 import type { Evidence, Case, StagingEvidence, CustodyEvent } from '~/stores/cadStore';
 import { userActions } from '~/stores/userStore';
 import type { FileItem } from '../FileExplorer.types';
+import { Button, Modal, Select } from '~/components/ui';
 
 function isEvidence(value: unknown): value is Evidence {
   if (!value || typeof value !== 'object') {
@@ -25,6 +27,17 @@ function isEvidence(value: unknown): value is Evidence {
 
 type SelectedEvidence = Evidence | StagingEvidence;
 
+type LockerSlot = {
+  slot: number;
+  label?: string;
+  itemName?: string;
+  metadata?: {
+    evidenceType?: string;
+    stagingId?: string;
+    storedAt?: string;
+  };
+};
+
 const FileExplorer = (await import('../FileExplorer')).FileExplorer;
 
 const extractUrl = (data: unknown): string | null => {
@@ -42,6 +55,14 @@ export function EvidenceManager() {
   const [currentCase, setCurrentCase] = createSignal<Case | null>(null);
   const [selectedEvidence, setSelectedEvidence] = createSignal<SelectedEvidence | null>(null);
   const [currentPath, setCurrentPath] = createSignal('');
+  const [lockerSlots, setLockerSlots] = createSignal<LockerSlot[]>([]);
+  const [lockerTerminalId, setLockerTerminalId] = createSignal<string | null>(null);
+  const [lockerBusy, setLockerBusy] = createSignal(false);
+  const [selectedStagingPhotoId, setSelectedStagingPhotoId] = createSignal<string | null>(null);
+
+  const selectedStagingPhoto = createMemo(() =>
+    photoState.stagingPhotos.find((photo) => photo.photoId === selectedStagingPhotoId()) || null
+  );
 
   const getEvidenceIcon = (type: string) => {
     const icons: Record<string, string> = {
@@ -137,6 +158,166 @@ export function EvidenceManager() {
     }
     return allEvidenceFiles().filter(item => item.path === path);
   });
+
+  const resolveLockerContext = async (quiet = false) => {
+    const context = await fetchNui<{
+      ok: boolean;
+      terminalId?: string;
+      hasContainer?: boolean;
+      error?: string;
+    }>('cad:getComputerContext');
+
+    if (!context?.ok || !context.terminalId || !context.hasContainer) {
+      if (!quiet) {
+        terminalActions.addLine(`Evidence locker unavailable: ${context?.error || 'no_terminal_container'}`, 'error');
+      }
+      return null;
+    }
+
+    return context.terminalId;
+  };
+
+  const loadLocker = async () => {
+    if (lockerBusy()) {
+      return;
+    }
+
+    setLockerBusy(true);
+    try {
+      const terminalId = await resolveLockerContext(true);
+      if (!terminalId) {
+        setLockerSlots([]);
+        setLockerTerminalId(null);
+        return;
+      }
+
+      const response = await fetchNui<{
+        ok: boolean;
+        terminalId?: string;
+        slots?: LockerSlot[];
+        error?: string;
+      }>('cad:evidence:container:list', { terminalId });
+
+      if (!response?.ok) {
+        terminalActions.addLine(`Failed to load evidence locker: ${response?.error || 'unknown_error'}`, 'error');
+        return;
+      }
+
+      setLockerTerminalId(response.terminalId || terminalId);
+      setLockerSlots(Array.isArray(response.slots) ? response.slots : []);
+    } catch (error) {
+      terminalActions.addLine(`Failed to load evidence locker: ${error}`, 'error');
+    } finally {
+      setLockerBusy(false);
+    }
+  };
+
+  const handleStoreToLocker = async () => {
+    const selected = selectedEvidence();
+    if (!selected || !('stagingId' in selected)) {
+      terminalActions.addLine('Select staging evidence to store in locker', 'error');
+      return;
+    }
+
+    if (lockerBusy()) {
+      return;
+    }
+
+    setLockerBusy(true);
+    try {
+      const terminalId = lockerTerminalId() || (await resolveLockerContext(false));
+      if (!terminalId) {
+        return;
+      }
+
+      const response = await fetchNui<{
+        ok: boolean;
+        slot?: number;
+        error?: string;
+      }>('cad:evidence:container:store', {
+        terminalId,
+        stagingId: selected.stagingId,
+      });
+
+      if (!response?.ok) {
+        terminalActions.addLine(`Failed to store evidence: ${response?.error || 'unknown_error'}`, 'error');
+        return;
+      }
+
+      cadActions.removeStagingEvidence(selected.stagingId);
+      setSelectedEvidence(null);
+      terminalActions.addLine(`✓ Evidence stored in locker slot ${response.slot || '?'}`, 'output');
+      await loadLocker();
+    } catch (error) {
+      terminalActions.addLine(`Failed to store evidence: ${error}`, 'error');
+    } finally {
+      setLockerBusy(false);
+    }
+  };
+
+  const handlePullFromLocker = async (slot: number) => {
+    if (lockerBusy()) {
+      return;
+    }
+
+    setLockerBusy(true);
+    try {
+      const terminalId = lockerTerminalId() || (await resolveLockerContext(false));
+      if (!terminalId) {
+        return;
+      }
+
+      const response = await fetchNui<{
+        ok: boolean;
+        slot?: number;
+        staging?: StagingEvidence;
+        error?: string;
+      }>('cad:evidence:container:pull', {
+        terminalId,
+        slot,
+      });
+
+      if (!response?.ok || !response.staging) {
+        terminalActions.addLine(`Failed to pull evidence: ${response?.error || 'unknown_error'}`, 'error');
+        return;
+      }
+
+      cadActions.addStagingEvidence(response.staging);
+      terminalActions.addLine(`✓ Evidence pulled from locker slot ${response.slot || slot}`, 'output');
+      await loadLocker();
+    } catch (error) {
+      terminalActions.addLine(`Failed to pull evidence: ${error}`, 'error');
+    } finally {
+      setLockerBusy(false);
+    }
+  };
+
+  onMount(() => {
+    void loadLocker();
+    void photoActions.fetchStagingPhotos();
+  });
+
+  const handleAttachStagingPhotoToCase = async () => {
+    const photo = selectedStagingPhoto();
+    const targetCase = currentCase();
+    if (!photo || !targetCase) {
+      terminalActions.addLine('Select a staging photo and target case first', 'error');
+      return;
+    }
+
+    const result = await photoActions.attachToCase(photo.photoId, targetCase.caseId);
+    if (!result.success) {
+      terminalActions.addLine(`Failed to attach photo: ${String(result.error || 'unknown_error')}`, 'error');
+      return;
+    }
+
+    terminalActions.addLine(`Photo ${photo.photoId} attached to case ${targetCase.caseId}`, 'output');
+    setSelectedStagingPhotoId(null);
+  };
+
+  const viewStagingPhoto = (photo: PhotoMetadata) => {
+    viewerActions.openImage(photo.photoUrl, `Staging Photo - ${photo.photoId}`);
+  };
 
   const closeModal = () => {
     terminalActions.setActiveModal(null);
@@ -333,7 +514,7 @@ export function EvidenceManager() {
   };
 
   return (
-    <div class="modal-overlay" onClick={closeModal}>
+        <Modal.Root onClose={closeModal} useContentWrapper={false}>
       <div class="modal-content evidence-manager" onClick={(e) => e.stopPropagation()}>
         <div class="modal-header">
           <h2>=== EVIDENCE MANAGER ===</h2>
@@ -354,7 +535,7 @@ export function EvidenceManager() {
             >
               [STAGING ({cadState.stagingEvidence.length})]
             </button>
-            <select
+            <Select.Root
               class="dos-select"
               value={currentCase()?.caseId || ''}
               onChange={(e) => {
@@ -373,7 +554,17 @@ export function EvidenceManager() {
               {Object.values(cadState.cases).map((caseItem) => (
                 <option value={caseItem.caseId}>{caseItem.caseId} - {caseItem.title}</option>
               ))}
-            </select>
+            </Select.Root>
+            <Button.Root class="btn" onClick={() => void loadLocker()} disabled={lockerBusy()}>
+              [LOCKER REFRESH]
+            </Button.Root>
+            <Button.Root
+              class="btn"
+              onClick={() => void handleStoreToLocker()}
+              disabled={lockerBusy() || !selectedEvidence() || !('stagingId' in selectedEvidence()!)}
+            >
+              [STORE TO LOCKER]
+            </Button.Root>
           </div>
           
           <div class="evidence-breadcrumb">
@@ -410,6 +601,105 @@ export function EvidenceManager() {
             />
           </div>
 
+          <div class="evidence-preview" style={{ border: '2px solid #ffaa00', padding: '14px', 'max-width': '260px' }}>
+            <h3>[LOCKER]</h3>
+            <div class="preview-content" style={{ 'font-size': '12px' }}>
+              <div><strong>Terminal:</strong> {lockerTerminalId() || 'N/A'}</div>
+              <div><strong>Slots:</strong> {lockerSlots().length}</div>
+            </div>
+            <div style={{ 'margin-top': '10px', 'max-height': '280px', 'overflow-y': 'auto' }}>
+              <Show
+                when={lockerSlots().length > 0}
+                fallback={<div style={{ color: '#808080' }}>Locker empty or unavailable</div>}
+              >
+                <For each={lockerSlots()}>
+                  {(slot) => (
+                    <div style={{ border: '1px solid #555', padding: '6px', 'margin-bottom': '6px' }}>
+                      <div><strong>SLOT {slot.slot}</strong></div>
+                      <div>{slot.label || slot.itemName || 'Evidence'}</div>
+                      <div style={{ color: '#c0c0c0' }}>
+                        {slot.metadata?.evidenceType || 'UNKNOWN'}
+                      </div>
+                      <Button.Root
+                        class="btn"
+                        style={{ 'margin-top': '6px' }}
+                        onClick={() => void handlePullFromLocker(slot.slot)}
+                        disabled={lockerBusy()}
+                      >
+                        [PULL]
+                      </Button.Root>
+                    </div>
+                  )}
+                </For>
+              </Show>
+            </div>
+          </div>
+
+          <div class="evidence-preview" style={{ border: '2px solid #00ffff', padding: '14px', 'max-width': '280px' }}>
+            <h3>[PHOTO STAGING]</h3>
+            <div class="preview-content" style={{ 'font-size': '12px' }}>
+              <div><strong>Items:</strong> {photoState.stagingPhotos.length}</div>
+            </div>
+            <div style={{ 'margin-top': '10px', 'max-height': '280px', 'overflow-y': 'auto' }}>
+              <Show
+                when={photoState.stagingPhotos.length > 0}
+                fallback={<div style={{ color: '#808080' }}>No staged photos</div>}
+              >
+                <For each={photoState.stagingPhotos}>
+                  {(photo) => (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedStagingPhotoId(photo.photoId)}
+                      style={{
+                        width: '100%',
+                        border: selectedStagingPhotoId() === photo.photoId ? '1px solid #00ffff' : '1px solid #555',
+                        'background-color': selectedStagingPhotoId() === photo.photoId ? 'rgba(0,255,255,0.12)' : 'rgba(0,0,0,0.35)',
+                        color: 'inherit',
+                        padding: '6px',
+                        'margin-bottom': '6px',
+                        'text-align': 'left',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <img
+                          src={photo.photoUrl}
+                          alt={photo.photoId}
+                          style={{ width: '62px', height: '44px', 'object-fit': 'cover', border: '1px solid #444' }}
+                        />
+                        <div style={{ flex: 1, 'min-width': 0 }}>
+                          <div style={{ color: '#00ffff', 'font-size': '11px', 'white-space': 'nowrap', overflow: 'hidden', 'text-overflow': 'ellipsis' }}>
+                            {photo.photoId}
+                          </div>
+                          <div style={{ color: '#c0c0c0', 'font-size': '11px' }}>
+                            {new Date(photo.takenAt).toLocaleDateString()}
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  )}
+                </For>
+              </Show>
+            </div>
+            <Show when={selectedStagingPhoto()}>
+              <div style={{ 'margin-top': '10px', 'border-top': '1px solid #444', padding: '8px 0 0' }}>
+                <div style={{ 'font-size': '11px', color: '#c0c0c0', 'margin-bottom': '6px' }}>
+                  {selectedStagingPhoto()!.description || 'No description'}
+                </div>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <Button.Root class="btn" onClick={() => viewStagingPhoto(selectedStagingPhoto()!)}>[VIEW]</Button.Root>
+                  <Button.Root
+                    class="btn btn-primary"
+                    onClick={() => void handleAttachStagingPhotoToCase()}
+                    disabled={!currentCase()}
+                  >
+                    [ATTACH]
+                  </Button.Root>
+                </div>
+              </div>
+            </Show>
+          </div>
+
           <Show when={selectedEvidence()}>
             <div class="evidence-preview" style={{ border: '2px solid #00ff00', padding: '20px' }}>
               <h3>[EVIDENCE DETAILS]</h3>
@@ -425,7 +715,7 @@ export function EvidenceManager() {
                       {extractUrl(selectedEvidence()!.data)}
                     </a>
                   </div>
-                  <button 
+                  <Button.Root 
                     class="btn btn-primary" 
                     style={{ 'margin-top': '8px' }}
                     onClick={() => {
@@ -452,7 +742,7 @@ export function EvidenceManager() {
                       const isAudio = ev.evidenceType === 'AUDIO' || ev.evidenceType === 'AUDIO_URL' || url.match(/\.(mp3|wav|ogg|m4a|aac)$/i);
                       return isVideo ? 'VIDEO' : isAudio ? 'AUDIO' : 'IMAGE';
                     })()}]
-                  </button>
+                  </Button.Root>
                 </Show>
                 
                 <Show when={(selectedEvidence()!.data as { description?: string })?.description}>
@@ -518,7 +808,7 @@ export function EvidenceManager() {
                   </div>
                   
                   <Show when={currentPath() !== 'staging' && currentCase()}>
-                    <button 
+                    <Button.Root 
                       class="btn" 
                       style={{ 'margin-top': '12px' }}
                       onClick={() => {
@@ -538,21 +828,21 @@ export function EvidenceManager() {
                       }}
                     >
                       [+ LOG TRANSFER]
-                    </button>
+                    </Button.Root>
                   </Show>
                 </div>
               </Show>
 
               <div class="preview-actions" style={{ 'margin-top': '16px', display: 'flex', gap: '12px' }}>
                 <Show when={currentPath() === 'staging' && currentCase()}>
-                  <button class="btn btn-primary" onClick={handleAttachToCase}>
+                  <Button.Root class="btn btn-primary" onClick={handleAttachToCase}>
                     [ATTACH TO {currentCase()!.caseId}]
-                  </button>
+                  </Button.Root>
                 </Show>
                 <Show when={currentPath() === 'staging'}>
-                  <button class="btn" onClick={handleDeleteEvidence}>
+                  <Button.Root class="btn" onClick={handleDeleteEvidence}>
                     [DELETE]
-                  </button>
+                  </Button.Root>
                 </Show>
               </div>
             </div>
@@ -564,9 +854,9 @@ export function EvidenceManager() {
             Path: {currentPath() || 'root'} | 
             Items: {filteredFiles().length}
           </span>
-          <button class="btn" onClick={closeModal}>[CLOSE]</button>
+          <Button.Root class="btn" onClick={closeModal}>[CLOSE]</Button.Root>
         </div>
       </div>
-    </div>
+    </Modal.Root>
   );
 }

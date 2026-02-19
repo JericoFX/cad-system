@@ -1,27 +1,31 @@
---[[
-C.A.D. System
-Created by JericoFX
-GitHub: https://github.com/JericoFX
-License: GNU GPL v3
-]]
+
 
 CAD = CAD or {}
 
+local mediaService = string.lower(tostring(GetConvar('CAD_MEDIA_SERVICE', 'fivemanage')))
+if mediaService == '' then
+    mediaService = 'fivemanage'
+end
+
+local mediaApiKey = tostring(GetConvar('CAD_MEDIA_API_KEY', ''))
+local mediaUploadUrl = tostring(GetConvar('CAD_MEDIA_UPLOAD_URL', ''))
+
 CAD.Config = {
+    -- Global debug toggle for developer-only helpers and test commands.
     Debug = false,
 
-    -- Framework adapter selection.
-    -- Use 'auto' for mixed/shared setups.
-    -- Force a value only if your server is single-framework.
+    -- Framework adapter used by identity/job resolution.
     Framework = {
-        Preferred = 'qb-core', -- auto | qbox | qb-core | esx | standalone
+        Preferred = 'qb-core',
     },
 
-    -- Feature toggles for backend + UI.
-    -- Set Enabled = false to fully disable a module.
-    -- Set ShowInUI = false to keep backend callbacks available but hide UI entry points.
+    -- Module toggles. Enabled controls backend logic, ShowInUI controls visibility in NUI.
     Features = {
         Dispatch = {
+            Enabled = true,
+            ShowInUI = true,
+        },
+        SecurityCameras = {
             Enabled = true,
             ShowInUI = true,
         },
@@ -35,24 +39,21 @@ CAD.Config = {
         },
     },
 
+    -- CAD terminal access settings and fixed world terminals.
     UI = {
-        -- Command and keybind are always available for allowed jobs.
+
         Command = 'cad',
         Keybind = 'F6',
 
-        -- Access mode for in-world terminals.
-        -- auto: uses ox_target when available, otherwise fallback zone prompts.
-        AccessMode = 'auto', -- auto | zone | target
+        AccessMode = 'auto',
 
-        -- Each access point can enable ID reader and evidence container independently.
-        -- Copy one block and change coords/jobs to add more terminals.
         AccessPoints = {
             {
                 id = 'mrpd_frontdesk',
                 label = 'MRPD Front Desk PC',
                 coords = vector3(441.88, -981.92, 30.69),
                 radius = 1.25,
-                jobs = { 'police', 'sheriff', 'dispatch', 'admin' },
+                jobs = { 'police', 'sheriff', 'csi', 'dispatch', 'admin' },
                 idReader = {
                     enabled = true,
                     stashId = 'cad_id_reader_mrpd_frontdesk',
@@ -94,7 +95,7 @@ CAD.Config = {
                 label = 'Sandy Sheriff Office PC',
                 coords = vector3(1855.74, 3687.66, 34.27),
                 radius = 1.25,
-                jobs = { 'police', 'sheriff', 'dispatch', 'admin' },
+                jobs = { 'police', 'sheriff', 'csi', 'dispatch', 'admin' },
                 idReader = {
                     enabled = true,
                     stashId = 'cad_id_reader_sandy_so_frontdesk',
@@ -121,12 +122,13 @@ CAD.Config = {
         },
     },
 
+    -- Permission matrix and callback rate limits.
     Security = {
-        -- AllowedJobs controls who can open and use CAD callbacks.
-        -- AdminJobs bypasses most role restrictions for moderation/supervision.
+
         AllowedJobs = {
             police = true,
             sheriff = true,
+            csi = true,
             ambulance = true,
             ems = true,
             dispatch = true,
@@ -139,16 +141,24 @@ CAD.Config = {
             emschief = true,
         },
         RateLimitPerMinute = {
-            -- default: regular callbacks
-            -- heavy: expensive callbacks (searches, large payloads)
+
             default = 80,
             heavy = 30,
         },
+        Callsign = {
+            RequireWhenEmpty = true,
+            RequireWhenPrefix = { 'B-' },
+        },
     },
 
+    -- Case defaults and case list retention in replicated public state.
     Cases = {
-        -- Default values for new cases.
+
         DefaultStatus = 'OPEN',
+        PublicState = {
+            ClosedRetentionMinutes = 10,
+            MaxCases = 300,
+        },
         Types = {
             'GENERAL',
             'THEFT',
@@ -163,18 +173,23 @@ CAD.Config = {
         },
     },
 
+    -- Dispatch board behavior, SLA timings, and auto-assignment tuning.
     Dispatch = {
         Enabled = true,
-        -- Player location sync and stale timeout for unit board.
+
         PositionBroadcastMs = 5000,
         UnitStaleSeconds = 300,
 
-        -- If true, EMS can use dispatch controls (assign/release/manage calls).
+        PublicState = {
+            CellSizeMeters = 200,
+            ClosedRetentionMinutes = 10,
+            MaxCalls = 250,
+        },
+
         AllowEMSControl = true,
 
-        -- Quick setup: choose one profile and leave the rest as-is.
         Easy = {
-            Preset = 'standard', -- relaxed | standard | strict
+            Preset = 'standard',
             Presets = {
                 relaxed = {
                     refreshIntervalMs = 10000,
@@ -206,12 +221,9 @@ CAD.Config = {
             },
         },
 
-        -- Optional advanced overrides.
-        -- Leave defaults unless you want custom timings/scoring.
         RefreshIntervalMs = 8000,
         ClockTickMs = 15000,
 
-        -- Call types shown in the incident creator dropdown.
         CallTypeOptions = {
             'GENERAL',
             '10-31',
@@ -220,9 +232,7 @@ CAD.Config = {
             'MEDICAL',
         },
         SLA = {
-            -- SLA thresholds by priority (p1 highest, p3 lowest).
-            -- warning: highlighted
-            -- breach: escalated visual state
+
             Enabled = true,
             Pending = {
                 WarningMinutes = {
@@ -254,8 +264,7 @@ CAD.Config = {
             },
         },
         AutoAssignment = {
-            -- Scoring values used by the "Auto Assign Best" button.
-            -- Lower score = better unit suggestion.
+
             Enabled = true,
             DistanceMetersPerPenaltyPoint = 70,
             UnknownDistancePenalty = 15,
@@ -266,21 +275,45 @@ CAD.Config = {
         },
     },
 
+    -- In-world CCTV settings used by the security camera module.
+    SecurityCameras = {
+        Enabled = true,
+        MaxInstallDistance = 12.0,
+        MinFov = 20.0,
+        MaxFov = 90.0,
+        DefaultFov = 55.0,
+        RotationSpeed = 45.0,
+        PitchMin = -80.0,
+        PitchMax = 25.0,
+        PlacementModel = 'prop_cctv_cam_01a',
+        AllowedJobs = {
+            police = true,
+            sheriff = true,
+            dispatch = true,
+            admin = true,
+        },
+    },
+
+    -- Evidence staging and locker behavior.
     Evidence = {
-        -- Max temporary staging items per officer in current session.
+
         MaxStagingPerOfficer = 60,
 
-        -- Fine ticket inventory item name (ox_inventory).
+        UseVirtualContainer = true,
+        VirtualContainerSlotCount = 200,
+
         TicketItemName = 'cad_ticket',
     },
 
+    -- Fine/ticket policy.
     Fines = {
-        -- Fine definitions are loaded from shared/catalogs/fines.lua.
+
         AllowCustomCode = false,
     },
 
+    -- EMS dashboard and alert lifecycle.
     EMS = {
-        -- How long EMS alerts stay valid before cleanup policies remove them.
+
         AlertTTLSeconds = 1800,
         UnitStatuses = {
             AVAILABLE = true,
@@ -292,15 +325,16 @@ CAD.Config = {
         },
     },
 
+    -- Physical lab locations and job access.
     ForensicLabs = {
-        -- Lab area list used by lab checks and related UI.
+
         Enabled = true,
         Locations = {
             {
                 name = 'Mission Row Lab',
                 coords = vector3(483.2, -988.3, 24.9),
                 radius = 10.0,
-                jobs = { 'police', 'sheriff' },
+                jobs = { 'police', 'sheriff', 'csi' },
             },
             {
                 name = 'Pillbox Lab',
@@ -311,8 +345,9 @@ CAD.Config = {
         },
     },
 
+    -- Forensic subsystem configuration: traces, blood workflow, toxicology, and readers.
     Forensics = {
-        -- Evidence ingestion and analysis configuration.
+
         AutoCreateUnknownCase = true,
         UnknownPersonLabel = 'UNKNOWN',
         DefaultEvidenceItem = 'cad_evidence_item',
@@ -329,16 +364,12 @@ CAD.Config = {
         AllowedIngestResources = {},
         BloodAnalysisDurationMs = 45000,
         BloodPostAnalysis = {
-            -- What happens after analysis is ready but not sent by EMS.
-            -- disabled: no automation
-            -- reminder: notify EMS at interval
-            -- auto_send: transfer automatically after timeout
-            mode = 'reminder', -- disabled | reminder | auto_send
+
+            mode = 'reminder',
             timeoutMs = 120000,
             reminderIntervalMs = 120000,
         },
 
-        -- Temporary sample item used during EMS blood processing.
         BloodSampleItemName = 'cad_blood_sample',
         BloodSampleStash = {
             enabled = true,
@@ -347,98 +378,210 @@ CAD.Config = {
             slots = 200,
             weight = 500000,
         },
+        BloodSampleContainer = {
+            enabled = true,
+            containerKey = 'forensics:cad_ems_blood_lab',
+            slots = 200,
+        },
+        -- Toxicology windows are inferred from ox_inventory item usage.
+        -- Data is stored on QBCore player metadata and copied into blood evidence snapshot.
+        Toxicology = {
+            -- Master toggle for metadata/statebag toxicology tracking.
+            Enabled = true,
+            -- Key inside PlayerData.metadata where active toxicology windows are stored.
+            MetadataKey = 'cad_toxicology',
+            -- Replicated player statebag key with current active toxicology summary.
+            StateBagKey = 'cad_toxicology',
+            -- Fallback duration when a tracked item does not define windowMs.
+            DefaultWindowMs = 1800000,
+            -- Map of item name -> toxicology profile.
+            -- item key: exact ox_inventory item name
+            -- substance: label shown in blood snapshot
+            -- windowMs: how long it can be detected
+            -- severity: LOW | MEDIUM | HIGH | CRITICAL
+            TrackedItems = {
+                weed_joint = {
+                    substance = 'THC',
+                    windowMs = 1800000,
+                    severity = 'LOW',
+                },
+                cocaine_baggy = {
+                    substance = 'COCAINE',
+                    windowMs = 2700000,
+                    severity = 'HIGH',
+                },
+                meth_baggy = {
+                    substance = 'METHAMPHETAMINE',
+                    windowMs = 3600000,
+                    severity = 'HIGH',
+                },
+                heroin_baggy = {
+                    substance = 'OPIOID',
+                    windowMs = 3600000,
+                    severity = 'HIGH',
+                },
+                mdma_tablet = {
+                    substance = 'MDMA',
+                    windowMs = 2400000,
+                    severity = 'MEDIUM',
+                },
+            },
+        },
         IdReader = {
-            -- If true, only allowedItems from each terminal reader are accepted.
+            Enabled = true,
+            UseVirtualContainer = true,
+            ReaderModel = 'hei_prop_hei_securitypanel',
+            ReaderModelFallback = 'prop_ld_keypad_01',
+            CardModel = 'prop_cs_swipe_card',
+            InteractionDistance = 1.6,
+            SlotCount = 5,
+            ReadSlot = 1,
+
             StrictAllowedItems = false,
+            VehicleTablet = {
+                Enabled = true,
+                RequireFrontSeat = true,
+                Slots = 2,
+                ReadSlot = 1,
+                QuickDockEnabled = true,
+                QuickDockLockKey = 'K',
+                QuickDockToggleKey = 'U',
+                StrictAllowedItems = false,
+                AllowedJobs = { 'police', 'sheriff' },
+                PoliceModels = {},
+                DataSource = {
+                    PlayersTable = 'players',
+                    PlayersCitizenColumn = 'citizenid',
+                    PlayersCharinfoColumn = 'charinfo',
+                    PlayersMetadataColumn = 'metadata',
+                    PlayerVehiclesTable = 'player_vehicles',
+                    PlayerVehiclesPlateColumn = 'plate',
+                    PlayerVehiclesOwnerColumn = 'citizenid',
+                    PlayerVehiclesDataColumn = 'vehicle',
+                },
+                AllowedItems = {
+                    'id_card',
+                    'driver_license',
+                    'passport',
+                    'vehicle_registration',
+                    'vehicle_registration_card',
+                },
+            },
+        },
+        VirtualContainer = {
+            Persistence = true,
         },
     },
 
-    --[[
-    Photo System Configuration
-    Camera items for evidence collection and news reporting
-    ]]
+    -- Photo capture/upload providers and media item definitions.
     PhotoSystem = {
-        -- Active provider: 'screenshot-basic' (default) or 'cad-upload'
+
         Provider = 'screenshot-basic',
-        
-        -- Upload API Configuration (for cad-upload provider)
-        UploadAPI = {
-            -- Provider type: 'discord', 'imgur', 'custom'
-            Type = 'discord',
-            
-            -- Discord webhook URL (for Discord uploads)
-            DiscordWebhook = GetConvar('CAD_DISCORD_WEBHOOK', ''),
-            
-            -- Imgur Client ID (for Imgur uploads)
-            ImgurClientId = GetConvar('CAD_IMGUR_CLIENT_ID', ''),
-            
-            -- Custom API endpoint (if Type = 'custom')
-            CustomEndpoint = '',
-            CustomHeaders = {},
+
+        -- Upload routing by media type.
+        -- image is used by CAD camera captures right now.
+        Upload = {
+            MethodByType = {
+                image = 'server_proxy', -- server_proxy | client_direct
+                video = 'medal',
+                audio = 'fivemanage',
+            },
+            Service = mediaService, -- fivemanage | discord | medal | custom
         },
-        
-        -- Minimum rank required to release photos to press
-        -- Uses job grade number (3 = Sargento+)
+
+        UploadAPI = {
+
+            -- Backward-compatible selector used as fallback when Upload.Service is not set.
+            Type = mediaService,
+
+            -- Recommended for CAD evidence uploads.
+            -- With image = server_proxy, the API key stays server-side only.
+            FiveManage = {
+                FormEndpoint = 'https://api.fivemanage.com/api/v3/file',
+                Base64Endpoint = 'https://api.fivemanage.com/api/v3/file/base64',
+                FieldName = 'file',
+                ApiKey = mediaApiKey ~= '' and mediaApiKey or GetConvar('CAD_FIVEMANAGE_API_KEY', ''),
+                UseApiKeyQueryForClientDirect = false,
+                ApiKeyQueryParam = 'apiKey',
+                FilenamePrefix = 'cad_capture',
+                Path = 'cad/photos',
+            },
+
+            -- Direct upload target for screenshot-basic client uploads.
+            Discord = {
+                Webhook = GetConvar('CAD_DISCORD_WEBHOOK', ''),
+                FieldName = 'files[]',
+            },
+
+            -- Medal upload target (set endpoint/key if your Medal pipeline requires it).
+            Medal = {
+                UploadUrl = mediaUploadUrl ~= '' and mediaUploadUrl or GetConvar('CAD_MEDAL_UPLOAD_URL', ''),
+                FieldName = 'file',
+                AuthHeader = 'Authorization',
+                ApiKey = mediaApiKey ~= '' and mediaApiKey or GetConvar('CAD_MEDAL_API_KEY', ''),
+                UseApiKeyQueryForClientDirect = false,
+                ApiKeyQueryParam = 'apiKey',
+            },
+
+            -- Generic endpoint fallback for custom media services.
+            Custom = {
+                Endpoint = mediaUploadUrl,
+                FieldName = 'file',
+                Headers = {},
+                AuthHeader = 'Authorization',
+                ApiKey = mediaApiKey,
+                UseApiKeyQueryForClientDirect = false,
+                ApiKeyQueryParam = 'apiKey',
+            },
+
+        },
+
         ReleaseRanks = {
             police = 3,
             sheriff = 3,
         },
-        
-        -- FOV (Field of View) Settings
+
         FOV = {
-            -- Maximum raycast distance in meters
+
             MaxDistance = 50.0,
-            
-            -- Show visual marker where camera is aiming
+
             ShowMarker = true,
-            
-            -- Size of the aim marker
+
             MarkerSize = 0.1,
-            
-            -- Record detailed entity info on capture
+
             RecordEntityInfo = true,
         },
-        
-        -- Animation settings
+
         Animations = {
-            -- Scenario to play during capture
+
             Scenario = 'WORLD_HUMAN_PAPARAZZI',
-            
-            -- Duration in milliseconds (focus time)
+
             Duration = 2000,
         },
-        
-        -- Maximum photos allowed per player
+
         MaxPhotosPerPlayer = 100,
-        
-        -- Auto-delete local photos after successful upload
+
         AutoDeleteLocal = true,
-        
-        -- Days to keep photos before auto-cleanup (0 = never)
+
         RetentionDays = 30,
     },
 
-    --[[
-    Photo Items Configuration
-    These are physical items for inventory systems (ox_inventory, qb-inventory, etc.)
-    ]]
     PhotoItems = {
-        -- Police evidence camera
+
         ['police_camera'] = {
             label = 'Evidence Camera',
             weight = 500,
             stack = false,
             close = true,
             description = 'Official evidence camera with GPS and FOV tracking',
-            -- client side export when item is used
+
             client = {
                 export = 'cad-system.usePoliceCamera'
             },
-            -- Allowed jobs
+
             jobs = { 'police', 'sheriff', 'admin' },
         },
-        
-        -- News/press camera
+
         ['news_camera'] = {
             label = 'Press Camera',
             weight = 300,
@@ -450,21 +593,19 @@ CAD.Config = {
             },
             jobs = { 'reporter', 'weazelnews', 'admin' },
         },
-        
-        -- Developed evidence photo (police)
+
         ['police_camera_photo'] = {
             label = 'Evidence Photo',
             weight = 0,
             stack = false,
             close = true,
             description = 'Developed evidence photograph with metadata',
-            -- Can be viewed
+
             client = {
                 export = 'cad-system.viewPhotoItem'
             },
         },
-        
-        -- Press photo (news)
+
         ['news_camera_photo'] = {
             label = 'Press Photo',
             weight = 0,
@@ -484,6 +625,10 @@ CAD.State = CAD.State or {
         Units = {},
         Calls = {},
     },
+    SecurityCameras = {
+        Cameras = {},
+        LastNumber = 0,
+    },
     Evidence = {
         Staging = {},
     },
@@ -501,12 +646,17 @@ CAD.State = CAD.State or {
         LockerItems = {},
         WorldTraces = {},
         IdReaders = {},
+        VirtualContainers = {},
+        VirtualContainerLocks = {},
+    },
+    News = {
+        Articles = {},
     },
     Photos = {
-        Photos = {},              -- All photos by ID
-        Staging = {},            -- Per-officer staging
-        ReviewQueue = {},        -- News → Police submissions
-        ReleasedPhotos = {},     -- Police → News released
+        Photos = {},
+        Staging = {},
+        ReviewQueue = {},
+        ReleasedPhotos = {},
         LastId = 0,
     },
 }

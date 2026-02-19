@@ -1,9 +1,4 @@
---[[
-C.A.D. System
-Created by JericoFX
-GitHub: https://github.com/JericoFX
-License: GNU GPL v3
-]]
+
 
 CAD = CAD or {}
 CAD.Client = CAD.Client or {}
@@ -32,11 +27,7 @@ function CAD.Client.CollectEvidence(evidenceType, description)
 end
 
 if CAD.Config.Debug == true then
-    -- Debug command using ox_lib
-    lib.addCommand('collectevidence', {
-        help = 'Debug: Collect evidence',
-        restricted = false,
-    }, function()
+    RegisterCommand('collectevidence', function()
         local input = lib.inputDialog('Collect Evidence (Debug)', {
             { type = 'input', label = 'Evidence Type', placeholder = 'PHOTO / DOCUMENT / DNA', required = true },
             { type = 'textarea', label = 'Description', required = false },
@@ -47,13 +38,9 @@ if CAD.Config.Debug == true then
         end
 
         CAD.Client.CollectEvidence(input[1], input[2])
-    end)
+    end, false)
 
-    -- Debug command to create evidence item from image URL using ox_lib
-    lib.addCommand('cadevidencedebug', {
-        help = 'Debug: Create evidence item with image URL',
-        restricted = 'group.admin', -- Only admins can use this
-    }, function()
+    RegisterCommand('cadevidencedebug', function()
         local input = lib.inputDialog('CAD Evidence Debug - Create Evidence Item', {
             { type = 'input', label = 'Image URL', placeholder = 'https://i.imgur.com/example.jpg', required = true },
             { type = 'input', label = 'Description', placeholder = 'Evidence description', required = false },
@@ -73,7 +60,6 @@ if CAD.Config.Debug == true then
         local description = input[2] or 'Debug evidence'
         local evType = input[3] or 'PHOTO'
 
-        -- Call server to create evidence item
         local result = lib.callback.await('cad:debug:createEvidenceItem', false, {
             imageUrl = imageUrl,
             description = description,
@@ -93,5 +79,5 @@ if CAD.Config.Debug == true then
                 type = 'error',
             })
         end
-    end)
+    end, false)
 end
