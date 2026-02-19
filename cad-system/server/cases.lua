@@ -42,7 +42,7 @@ local function isoToEpoch(value)
         return nil
     end
 
-    local year, month, day, hour, minute, second = string.match(value, '^(%d+)%-(%d+)%-(%d+)T(%d+):(%d+):(%d+)Z$')
+    local year, month, day, hour, minute, second = string.match(value, '^(%d+)%-(%d+)%-(%d+)T(%d+):(%d+):(%d+)Z$') --this i take it from somewhere i think it was from a function from ox
     if not year then
         return nil
     end

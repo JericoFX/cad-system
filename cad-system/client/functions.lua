@@ -14,7 +14,7 @@ function CAD.Client.FormatCoords(coords)
     return string.format('%.2f, %.2f, %.2f', coords.x, coords.y, coords.z)
 end
 
-function CAD.Client.GetDirection(heading)
+function CAD.Client.GetDirection(heading) -- Aca lo saque de algun lugar tambien, 
     local directions = { 'N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW' }
     local index = math.floor((heading + 22.5) / 45) % 8
     return directions[index + 1]

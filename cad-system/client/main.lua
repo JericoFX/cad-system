@@ -1,4 +1,4 @@
-
+-- Some day i will finish the anotations
 
 CAD = CAD or {}
 CAD.Client = CAD.Client or {}
@@ -165,7 +165,7 @@ end
 local function playCardSwipeAnimation()
     local readerCfg = CAD.Config.Forensics and CAD.Config.Forensics.IdReader or {}
     local cardModelName = tostring(readerCfg.CardModel or 'prop_cs_swipe_card')
-    local ped = PlayerPedId()
+    local ped = cache.ped or PlayerPedId()
     if not ped or ped == 0 then
         return
     end

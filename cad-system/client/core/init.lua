@@ -1,4 +1,4 @@
-
+-- inicialmente iba a tener mas cores pero ta, da paja -- maybe later i will add support for others frameworks.
 
 CAD = CAD or {}
 CAD.Core = CAD.Core or {}

@@ -11,15 +11,13 @@ local mediaApiKey = tostring(GetConvar('CAD_MEDIA_API_KEY', ''))
 local mediaUploadUrl = tostring(GetConvar('CAD_MEDIA_UPLOAD_URL', ''))
 
 CAD.Config = {
-    -- Global debug toggle for developer-only helpers and test commands.
-    Debug = false,
 
-    -- Framework adapter used by identity/job resolution.
+    Debug = false,  -- Global debug toggle for developer-only helpers and test commands.
+
     Framework = {
         Preferred = 'qb-core',
     },
 
-    -- Module toggles. Enabled controls backend logic, ShowInUI controls visibility in NUI.
     Features = {
         Dispatch = {
             Enabled = true,
@@ -39,7 +37,6 @@ CAD.Config = {
         },
     },
 
-    -- CAD terminal access settings and fixed world terminals.
     UI = {
 
         Command = 'cad',
@@ -122,7 +119,6 @@ CAD.Config = {
         },
     },
 
-    -- Permission matrix and callback rate limits.
     Security = {
 
         AllowedJobs = {
@@ -151,7 +147,6 @@ CAD.Config = {
         },
     },
 
-    -- Case defaults and case list retention in replicated public state.
     Cases = {
 
         DefaultStatus = 'OPEN',
@@ -173,7 +168,6 @@ CAD.Config = {
         },
     },
 
-    -- Dispatch board behavior, SLA timings, and auto-assignment tuning.
     Dispatch = {
         Enabled = true,
 
@@ -275,7 +269,7 @@ CAD.Config = {
         },
     },
 
-    -- In-world CCTV settings used by the security camera module.
+    -- Cameras
     SecurityCameras = {
         Enabled = true,
         MaxInstallDistance = 12.0,
@@ -294,7 +288,7 @@ CAD.Config = {
         },
     },
 
-    -- Evidence staging and locker behavior.
+    -- Evidence
     Evidence = {
 
         MaxStagingPerOfficer = 60,
@@ -305,13 +299,13 @@ CAD.Config = {
         TicketItemName = 'cad_ticket',
     },
 
-    -- Fine/ticket policy.
+    -- Fine/tickets.
     Fines = {
 
         AllowCustomCode = false,
     },
 
-    -- EMS dashboard and alert lifecycle.
+    -- EMS.
     EMS = {
 
         AlertTTLSeconds = 1800,
@@ -345,7 +339,6 @@ CAD.Config = {
         },
     },
 
-    -- Forensic subsystem configuration: traces, blood workflow, toxicology, and readers.
     Forensics = {
 
         AutoCreateUnknownCase = true,
@@ -383,22 +376,11 @@ CAD.Config = {
             containerKey = 'forensics:cad_ems_blood_lab',
             slots = 200,
         },
-        -- Toxicology windows are inferred from ox_inventory item usage.
-        -- Data is stored on QBCore player metadata and copied into blood evidence snapshot.
         Toxicology = {
-            -- Master toggle for metadata/statebag toxicology tracking.
             Enabled = true,
-            -- Key inside PlayerData.metadata where active toxicology windows are stored.
             MetadataKey = 'cad_toxicology',
-            -- Replicated player statebag key with current active toxicology summary.
             StateBagKey = 'cad_toxicology',
-            -- Fallback duration when a tracked item does not define windowMs.
             DefaultWindowMs = 1800000,
-            -- Map of item name -> toxicology profile.
-            -- item key: exact ox_inventory item name
-            -- substance: label shown in blood snapshot
-            -- windowMs: how long it can be detected
-            -- severity: LOW | MEDIUM | HIGH | CRITICAL
             TrackedItems = {
                 weed_joint = {
                     substance = 'THC',
@@ -473,13 +455,9 @@ CAD.Config = {
         },
     },
 
-    -- Photo capture/upload providers and media item definitions.
     PhotoSystem = {
 
         Provider = 'screenshot-basic',
-
-        -- Upload routing by media type.
-        -- image is used by CAD camera captures right now.
         Upload = {
             MethodByType = {
                 image = 'server_proxy', -- server_proxy | client_direct
@@ -491,11 +469,8 @@ CAD.Config = {
 
         UploadAPI = {
 
-            -- Backward-compatible selector used as fallback when Upload.Service is not set.
             Type = mediaService,
 
-            -- Recommended for CAD evidence uploads.
-            -- With image = server_proxy, the API key stays server-side only.
             FiveManage = {
                 FormEndpoint = 'https://api.fivemanage.com/api/v3/file',
                 Base64Endpoint = 'https://api.fivemanage.com/api/v3/file/base64',
@@ -507,13 +482,11 @@ CAD.Config = {
                 Path = 'cad/photos',
             },
 
-            -- Direct upload target for screenshot-basic client uploads.
             Discord = {
                 Webhook = GetConvar('CAD_DISCORD_WEBHOOK', ''),
                 FieldName = 'files[]',
             },
 
-            -- Medal upload target (set endpoint/key if your Medal pipeline requires it).
             Medal = {
                 UploadUrl = mediaUploadUrl ~= '' and mediaUploadUrl or GetConvar('CAD_MEDAL_UPLOAD_URL', ''),
                 FieldName = 'file',
@@ -523,7 +496,6 @@ CAD.Config = {
                 ApiKeyQueryParam = 'apiKey',
             },
 
-            -- Generic endpoint fallback for custom media services.
             Custom = {
                 Endpoint = mediaUploadUrl,
                 FieldName = 'file',
