@@ -3,7 +3,7 @@ import { terminalActions } from '~/stores/terminalStore';
 import { cadState, cadActions } from '~/stores/cadStore';
 import { fetchNui } from '~/utils/fetchNui';
 import { t } from '~/utils/i18n';
-import type { Evidence } from '~/stores/cadStore';
+import type { Evidence, Person } from '~/stores/cadStore';
 import { Button, Input, Modal } from '~/components/ui';
 
 export function ForensicCollection() {
@@ -19,6 +19,10 @@ export function ForensicCollection() {
   const [requestReason, setRequestReason] = createSignal('');
   const [requestLocation, setRequestLocation] = createSignal('');
   const [isRequestingBlood, setIsRequestingBlood] = createSignal(false);
+  const [personSearchQuery, setPersonSearchQuery] = createSignal('');
+  const [personSearchLoading, setPersonSearchLoading] = createSignal(false);
+  const [personSearchResults, setPersonSearchResults] = createSignal<Person[]>([]);
+  const [selectedBloodPerson, setSelectedBloodPerson] = createSignal<Person | null>(null);
   const [bloodRequests, setBloodRequests] = createSignal<
     Array<{
       requestId: string;
@@ -96,6 +100,14 @@ export function ForensicCollection() {
   };
 
   const createBloodRequest = async () => {
+    const selectedPerson = selectedBloodPerson();
+    const selectedPersonName = selectedPerson
+      ? `${selectedPerson.firstName} ${selectedPerson.lastName}`.trim()
+      : '';
+    const resolvedCitizenId = (selectedPerson?.citizenid || requestCitizenId()).trim();
+    const resolvedPersonName = (selectedPersonName || requestPersonName()).trim();
+    const resolvedLocation = (requestLocation().trim() || selectedPerson?.address || '').trim();
+
     if (!caseId()) {
       terminalActions.addLine('Select an open case before requesting blood sample', 'error');
       return;
@@ -106,7 +118,7 @@ export function ForensicCollection() {
       return;
     }
 
-    if (!requestCitizenId().trim() && !requestPersonName().trim()) {
+    if (!resolvedCitizenId && !resolvedPersonName) {
       terminalActions.addLine('Provide citizen ID or person name', 'error');
       return;
     }
@@ -115,10 +127,10 @@ export function ForensicCollection() {
     try {
       const result = await fetchNui<{ ok: boolean; request?: { requestId?: string }; error?: string }>('cad:ems:createBloodRequest', {
         caseId: caseId(),
-        citizenId: requestCitizenId().trim() || undefined,
-        personName: requestPersonName().trim() || undefined,
+        citizenId: resolvedCitizenId || undefined,
+        personName: resolvedPersonName || undefined,
         reason: requestReason().trim(),
-        location: requestLocation().trim() || undefined,
+        location: resolvedLocation || undefined,
       });
 
       if (!result?.ok) {
@@ -128,11 +140,51 @@ export function ForensicCollection() {
 
       terminalActions.addLine(`✓ Blood sample request sent (${result.request?.requestId || 'BLOODREQ'})`, 'output');
       setRequestReason('');
+      setPersonSearchQuery('');
+      setPersonSearchResults([]);
       void loadBloodRequests();
     } catch (error) {
       terminalActions.addLine(`Failed to create blood request: ${error}`, 'error');
     } finally {
       setIsRequestingBlood(false);
+    }
+  };
+
+  const searchPersonsForBlood = async () => {
+    const query = personSearchQuery().trim();
+    if (!query) {
+      setPersonSearchResults([]);
+      return;
+    }
+
+    setPersonSearchLoading(true);
+    try {
+      const response = await fetchNui<{ ok: boolean; persons?: Person[]; error?: string }>('cad:lookup:searchPersons', {
+        query,
+        limit: 10,
+      });
+
+      if (!response?.ok) {
+        terminalActions.addLine(`Failed to search persons: ${response?.error || 'unknown_error'}`, 'error');
+        setPersonSearchResults([]);
+        return;
+      }
+
+      setPersonSearchResults(Array.isArray(response.persons) ? response.persons : []);
+    } catch (error) {
+      terminalActions.addLine(`Failed to search persons: ${error}`, 'error');
+      setPersonSearchResults([]);
+    } finally {
+      setPersonSearchLoading(false);
+    }
+  };
+
+  const selectPersonForBlood = (person: Person) => {
+    setSelectedBloodPerson(person);
+    setRequestCitizenId(person.citizenid || '');
+    setRequestPersonName(`${person.firstName} ${person.lastName}`.trim());
+    if (!requestLocation().trim() && person.address) {
+      setRequestLocation(person.address);
     }
   };
 
@@ -291,7 +343,7 @@ export function ForensicCollection() {
             <Show when={evidenceType() === 'FINGERPRINT'}>
               <div class="form-section">
                 <label class="form-label">{t('forensics.quality', undefined, { value: quality() })}</label>
-                <Input.Root type="range" class="dos-input" min="0" max="100" value={quality()} onInput={(e) => setQuality(parseInt(e.currentTarget.value))} />
+                <Input.Root type="range" class="dos-input dos-slider" min="0" max="100" value={quality()} onInput={(e) => setQuality(parseInt(e.currentTarget.value))} />
               </div>
             </Show>
 
@@ -344,12 +396,68 @@ export function ForensicCollection() {
             </div>
 
             <div class="form-section">
+              <label class="form-label">Search Person</label>
+              <div class="forensic-person-search-row">
+                <Input.Root
+                  type="text"
+                  class="dos-input"
+                  value={personSearchQuery()}
+                  onInput={(e) => setPersonSearchQuery(e.currentTarget.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      void searchPersonsForBlood();
+                    }
+                  }}
+                  placeholder="Citizen ID / name / SSN"
+                />
+                <Button.Root class="btn" onClick={() => void searchPersonsForBlood()} disabled={personSearchLoading()}>
+                  [{personSearchLoading() ? 'SEARCHING...' : 'SEARCH PERSON'}]
+                </Button.Root>
+              </div>
+
+              <Show when={selectedBloodPerson()}>
+                {(person) => (
+                  <div class="inventory-category" style={{ 'margin-top': '8px' }}>
+                    <strong>Selected:</strong> {person().firstName} {person().lastName} ({person().citizenid})
+                    <Show when={person().address}>
+                      <div>Address: {person().address}</div>
+                    </Show>
+                    <div style={{ 'margin-top': '6px' }}>
+                      <Button.Root class="btn" onClick={() => setSelectedBloodPerson(null)}>
+                        [CLEAR SELECTED]
+                      </Button.Root>
+                    </div>
+                  </div>
+                )}
+              </Show>
+
+              <Show when={personSearchResults().length > 0}>
+                <div class="forensic-person-results">
+                  <For each={personSearchResults()}>
+                    {(person) => (
+                      <button
+                        class={`forensic-person-result ${selectedBloodPerson()?.citizenid === person.citizenid ? 'selected' : ''}`}
+                        onClick={() => selectPersonForBlood(person)}
+                      >
+                        <span class="name">{person.firstName} {person.lastName}</span>
+                        <span class="meta">{person.citizenid}</span>
+                      </button>
+                    )}
+                  </For>
+                </div>
+              </Show>
+            </div>
+
+            <div class="form-section">
               <label class="form-label">Citizen ID</label>
               <Input.Root
                 type="text"
                 class="dos-input"
                 value={requestCitizenId()}
-                onInput={(e) => setRequestCitizenId(e.currentTarget.value)}
+                onInput={(e) => {
+                  setRequestCitizenId(e.currentTarget.value);
+                  setSelectedBloodPerson(null);
+                }}
                 placeholder="CID00001"
               />
             </div>
@@ -360,7 +468,10 @@ export function ForensicCollection() {
                 type="text"
                 class="dos-input"
                 value={requestPersonName()}
-                onInput={(e) => setRequestPersonName(e.currentTarget.value)}
+                onInput={(e) => {
+                  setRequestPersonName(e.currentTarget.value);
+                  setSelectedBloodPerson(null);
+                }}
                 placeholder="Full name"
               />
             </div>

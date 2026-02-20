@@ -17,7 +17,8 @@ export function initializePersonVehicleHandlers(): void {
     const eventName = action.replace('cad:req:', '');
     
     switch (eventName) {
-      case 'cad:searchPersons': {
+      case 'cad:searchPersons':
+      case 'cad:lookup:searchPersons': {
         const { query } = payload || {};
         let results = Object.values(mockPersons);
         
@@ -31,7 +32,12 @@ export function initializePersonVehicleHandlers(): void {
           );
         }
         
-        resolveRequest(requestId, results.slice(0, 20));
+        const rows = results.slice(0, 20);
+        if (eventName === 'cad:lookup:searchPersons') {
+          resolveRequest(requestId, { ok: true, persons: rows });
+        } else {
+          resolveRequest(requestId, rows);
+        }
         break;
       }
       

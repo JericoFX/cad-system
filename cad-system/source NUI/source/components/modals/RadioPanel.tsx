@@ -225,7 +225,7 @@ export function RadioPanel() {
                       radioActions.joinChannel(channelId);
                     }
                   }}
-                  class="frequency-slider"
+                  class="frequency-slider dos-slider"
                 />
                 <div class="frequency-markers">
                   <For each={Object.entries(frequencyMap)}>
@@ -444,7 +444,7 @@ export function RadioPanel() {
                   max="100"
                   value={radioState.chatterVolume}
                   onInput={(e) => radioActions.setChatterVolume(Number(e.currentTarget.value))}
-                  class="volume-slider"
+                  class="volume-slider dos-slider"
                 />
               </div>
 
