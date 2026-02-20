@@ -116,6 +116,7 @@ export function PropertyManager() {
                 <label>Radio: {propertyState.nearbyRadius}m</label>
                 <input
                   type="range"
+                  class="dos-slider"
                   min="10"
                   max="500"
                   value={propertyState.nearbyRadius}
