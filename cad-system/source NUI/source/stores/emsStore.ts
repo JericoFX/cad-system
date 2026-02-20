@@ -546,13 +546,40 @@ Time: ${new Date().toLocaleString()}`;
 };
 
 if (typeof window !== 'undefined') {
-  setInterval(() => {
-    localStorage.setItem('cad_ems', JSON.stringify({
+  let lastPersistedPayload = '';
+
+  const persistEmsState = () => {
+    const payload = JSON.stringify({
       patients: emsState.patients,
       inventory: emsState.inventory,
       units: emsState.units,
-    }));
+    });
+
+    if (payload === lastPersistedPayload) {
+      return;
+    }
+
+    localStorage.setItem('cad_ems', payload);
+    lastPersistedPayload = payload;
+  };
+
+  setInterval(() => {
+    if (document.hidden) {
+      return;
+    }
+
+    persistEmsState();
   }, 30000);
+
+  window.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      persistEmsState();
+    }
+  });
+
+  window.addEventListener('beforeunload', () => {
+    persistEmsState();
+  });
 
   const saved = localStorage.getItem('cad_ems');
   if (saved) {
@@ -563,6 +590,7 @@ if (typeof window !== 'undefined') {
         inventory: parsed.inventory || initialState.inventory,
         units: parsed.units || initialState.units,
       });
+      lastPersistedPayload = saved;
     } catch (e) {
       console.error('[EMS] Failed to load saved data:', e);
     }

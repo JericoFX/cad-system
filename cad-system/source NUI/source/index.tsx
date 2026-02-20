@@ -5,9 +5,6 @@ import { App } from './App';
 import { userActions } from './stores/userStore';
 import { featureActions } from './stores/featureStore';
 import { codeCatalogActions } from './stores/codeCatalogStore';
-import { appActions } from './stores/appStore';
-import { terminalActions, terminalState } from './stores/terminalStore';
-import { fetchNui } from './utils/fetchNui';
 import { UIProvider } from './components/ui';
 
 import { initNuiSystem } from './hooks/useNui';
@@ -25,37 +22,6 @@ if (root) {
 } else {
   console.error('[APP] Root element not found!');
 }
-
-const handleGlobalKeyDown = (e: KeyboardEvent) => {
-  if (e.key === 'Escape') {
-    if (
-      terminalState.activeModal === 'VEHICLE_CAD' &&
-      terminalState.isInPoliceVehicle
-    ) {
-      void fetchNui('cad:vehicle:setOpen', { open: false }).catch(() => {});
-      terminalActions.closeVehicleCAD();
-      return;
-    }
-
-    if (terminalState.isInPoliceVehicle) {
-      return;
-    }
-
-    if (terminalState.activeModal) {
-      terminalActions.setActiveModal(null);
-      return;
-    }
-
-    appActions.hide();
-
-    fetch('https://cad-system/closeUI', {
-      method: 'POST',
-      body: '{}',
-    }).catch(() => {});
-  }
-};
-
-window.addEventListener('keydown', handleGlobalKeyDown);
 
 void (async () => {
   try {

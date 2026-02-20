@@ -4,258 +4,43 @@ import {
   cadActions,
   cadState,
   type DispatchCall,
-  type DispatchUnit,
   type SecurityCamera,
 } from '~/stores/cadStore';
 import { radioActions } from '~/stores/radioStore';
 import { fetchNui } from '~/utils/fetchNui';
 import { useNui } from '~/hooks/useNui';
 import { Button, Modal } from '~/components/ui';
-
-type DispatchGuardError = {
-  ok: false;
-  error: string;
-};
-
-type CameraListResponse = {
-  ok: boolean;
-  cameras?: SecurityCamera[];
-  error?: string;
-};
-
-type CameraWatchResponse = {
-  ok: boolean;
-  camera?: SecurityCamera;
-  error?: string;
-};
-
-type CameraStatusResponse = {
-  ok: boolean;
-  camera?: SecurityCamera;
-  error?: string;
-};
-
-type CameraRemoveResponse = {
-  ok: boolean;
-  cameraId?: string;
-  error?: string;
-};
-
-type SlaLevel = 'ok' | 'warning' | 'breach';
-
-type PriorityThresholdMap = {
-  p1: number;
-  p2: number;
-  p3: number;
-  default: number;
-};
-
-type DispatchSettings = {
-  profileName: string;
-  refreshIntervalMs: number;
-  clockTickMs: number;
-  callTypeOptions: string[];
-  sla: {
-    enabled: boolean;
-    pending: {
-      warningMinutes: PriorityThresholdMap;
-      breachMinutes: PriorityThresholdMap;
-    };
-    active: {
-      warningMinutes: PriorityThresholdMap;
-      breachMinutes: PriorityThresholdMap;
-    };
-  };
-  autoAssignment: {
-    enabled: boolean;
-    distanceMetersPerPenaltyPoint: number;
-    unknownDistancePenalty: number;
-    servicePenalties: {
-      needsEmsButNotEms: number;
-      nonMedicalEms: number;
-    };
-  };
-};
-
-const DEFAULT_DISPATCH_SETTINGS: DispatchSettings = {
-  profileName: 'standard',
-  refreshIntervalMs: 8000,
-  clockTickMs: 15000,
-  callTypeOptions: ['GENERAL', '10-31', '10-50', '10-71', 'MEDICAL'],
-  sla: {
-    enabled: true,
-    pending: {
-      warningMinutes: { p1: 2, p2: 4, p3: 6, default: 6 },
-      breachMinutes: { p1: 4, p2: 8, p3: 12, default: 12 },
-    },
-    active: {
-      warningMinutes: { p1: 8, p2: 10, p3: 12, default: 12 },
-      breachMinutes: { p1: 15, p2: 20, p3: 25, default: 25 },
-    },
-  },
-  autoAssignment: {
-    enabled: true,
-    distanceMetersPerPenaltyPoint: 70,
-    unknownDistancePenalty: 15,
-    servicePenalties: {
-      needsEmsButNotEms: 40,
-      nonMedicalEms: 25,
-    },
-  },
-};
-
-const isGuardError = (value: unknown): value is DispatchGuardError => {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-
-  const record = value as Record<string, unknown>;
-  return record.ok === false && typeof record.error === 'string';
-};
-
-const isDispatchCall = (value: unknown): value is DispatchCall => {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-
-  return typeof (value as Record<string, unknown>).callId === 'string';
-};
-
-const cameraArrayToRecord = (items: SecurityCamera[]): Record<string, SecurityCamera> => {
-  const out: Record<string, SecurityCamera> = {};
-  for (let i = 0; i < items.length; i += 1) {
-    const camera = items[i];
-    if (!camera || !camera.cameraId) {
-      continue;
-    }
-
-    out[camera.cameraId] = camera;
-  }
-
-  return out;
-};
-
-const clampNumber = (value: unknown, fallback: number, min: number, max: number): number => {
-  const parsed = Number(value);
-  if (Number.isNaN(parsed)) {
-    return fallback;
-  }
-
-  return Math.max(min, Math.min(max, Math.floor(parsed)));
-};
-
-const normalizeThresholdMap = (
-  source: unknown,
-  fallback: PriorityThresholdMap
-): PriorityThresholdMap => {
-  const record = source && typeof source === 'object' ? (source as Record<string, unknown>) : {};
-  return {
-    p1: clampNumber(record.p1, fallback.p1, 1, 999),
-    p2: clampNumber(record.p2, fallback.p2, 1, 999),
-    p3: clampNumber(record.p3, fallback.p3, 1, 999),
-    default: clampNumber(record.default, fallback.default, 1, 999),
-  };
-};
-
-const normalizeDispatchSettings = (source: unknown): DispatchSettings => {
-  const record = source && typeof source === 'object' ? (source as Record<string, unknown>) : {};
-  const sla = record.sla && typeof record.sla === 'object'
-    ? (record.sla as Record<string, unknown>)
-    : {};
-  const pending = sla.pending && typeof sla.pending === 'object'
-    ? (sla.pending as Record<string, unknown>)
-    : {};
-  const active = sla.active && typeof sla.active === 'object'
-    ? (sla.active as Record<string, unknown>)
-    : {};
-  const autoAssignment = record.autoAssignment && typeof record.autoAssignment === 'object'
-    ? (record.autoAssignment as Record<string, unknown>)
-    : {};
-  const servicePenalties = autoAssignment.servicePenalties && typeof autoAssignment.servicePenalties === 'object'
-    ? (autoAssignment.servicePenalties as Record<string, unknown>)
-    : {};
-
-  const callTypeOptions = Array.isArray(record.callTypeOptions)
-    ? record.callTypeOptions
-        .filter((item): item is string => typeof item === 'string')
-        .map((item) => item.trim().toUpperCase())
-        .filter((item) => item.length > 0)
-    : DEFAULT_DISPATCH_SETTINGS.callTypeOptions;
-
-  return {
-    profileName:
-      typeof record.profileName === 'string' && record.profileName.trim().length
-        ? record.profileName.trim().toLowerCase()
-        : DEFAULT_DISPATCH_SETTINGS.profileName,
-    refreshIntervalMs: clampNumber(
-      record.refreshIntervalMs,
-      DEFAULT_DISPATCH_SETTINGS.refreshIntervalMs,
-      1000,
-      60000
-    ),
-    clockTickMs: clampNumber(record.clockTickMs, DEFAULT_DISPATCH_SETTINGS.clockTickMs, 1000, 60000),
-    callTypeOptions: callTypeOptions.length ? callTypeOptions : DEFAULT_DISPATCH_SETTINGS.callTypeOptions,
-    sla: {
-      enabled: sla.enabled !== false,
-      pending: {
-        warningMinutes: normalizeThresholdMap(
-          pending.warningMinutes,
-          DEFAULT_DISPATCH_SETTINGS.sla.pending.warningMinutes
-        ),
-        breachMinutes: normalizeThresholdMap(
-          pending.breachMinutes,
-          DEFAULT_DISPATCH_SETTINGS.sla.pending.breachMinutes
-        ),
-      },
-      active: {
-        warningMinutes: normalizeThresholdMap(
-          active.warningMinutes,
-          DEFAULT_DISPATCH_SETTINGS.sla.active.warningMinutes
-        ),
-        breachMinutes: normalizeThresholdMap(
-          active.breachMinutes,
-          DEFAULT_DISPATCH_SETTINGS.sla.active.breachMinutes
-        ),
-      },
-    },
-    autoAssignment: {
-      enabled: autoAssignment.enabled !== false,
-      distanceMetersPerPenaltyPoint: clampNumber(
-        autoAssignment.distanceMetersPerPenaltyPoint,
-        DEFAULT_DISPATCH_SETTINGS.autoAssignment.distanceMetersPerPenaltyPoint,
-        1,
-        10000
-      ),
-      unknownDistancePenalty: clampNumber(
-        autoAssignment.unknownDistancePenalty,
-        DEFAULT_DISPATCH_SETTINGS.autoAssignment.unknownDistancePenalty,
-        0,
-        1000
-      ),
-      servicePenalties: {
-        needsEmsButNotEms: clampNumber(
-          servicePenalties.needsEmsButNotEms,
-          DEFAULT_DISPATCH_SETTINGS.autoAssignment.servicePenalties.needsEmsButNotEms,
-          0,
-          1000
-        ),
-        nonMedicalEms: clampNumber(
-          servicePenalties.nonMedicalEms,
-          DEFAULT_DISPATCH_SETTINGS.autoAssignment.servicePenalties.nonMedicalEms,
-          0,
-          1000
-        ),
-      },
-    },
-  };
-};
-
-const getThresholdForPriority = (thresholds: PriorityThresholdMap, priority: number) => {
-  if (priority <= 1) return thresholds.p1;
-  if (priority === 2) return thresholds.p2;
-  if (priority >= 3) return thresholds.p3;
-  return thresholds.default;
-};
+import {
+  DEFAULT_DISPATCH_SETTINGS,
+  cameraArrayToRecord,
+  isDispatchCall,
+  isGuardError,
+  normalizeDispatchSettings,
+  type CameraListResponse,
+  type CameraRemoveResponse,
+  type CameraStatusResponse,
+  type CameraWatchResponse,
+  type DispatchGuardError,
+  type DispatchSettings,
+} from './dispatchTable.utils';
+import {
+  calculateDispatchMetrics,
+  filterAvailableDispatchUnits,
+  filterDispatchCalls,
+  formatCallAge,
+  getCallSlaLabel,
+  getCallSlaLevel,
+  getDispatchChannelForUnit,
+  getRecommendedUnit,
+  mapAssignedUnits,
+  priorityLabel,
+  selectDispatchCall,
+  sortCameraGrid,
+  sortDispatchCalls,
+} from './dispatchTable.selectors';
+import { DispatchCallCard } from './DispatchCallCard';
+import { DispatchCCTVGrid } from './DispatchCCTVGrid';
+import { DispatchUnitActionRow } from './DispatchUnitActionRow';
 
 export function DispatchTable() {
   const [selectedCallId, setSelectedCallId] = createSignal<string | null>(null);
@@ -290,34 +75,11 @@ export function DispatchTable() {
     setWatchingCameraId(null);
   });
 
-  const allCalls = createMemo(() =>
-    Object.values(cadState.dispatchCalls).sort((a, b) => {
-      if (a.status !== b.status) {
-        if (a.status === 'PENDING') return -1;
-        if (b.status === 'PENDING') return 1;
-        if (a.status === 'ACTIVE') return -1;
-        if (b.status === 'ACTIVE') return 1;
-      }
-
-      if (a.priority !== b.priority) {
-        return a.priority - b.priority;
-      }
-
-      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-    })
-  );
+  const allCalls = createMemo(() => sortDispatchCalls(Object.values(cadState.dispatchCalls)));
 
   const allUnits = createMemo(() => Object.values(cadState.dispatchUnits));
 
-  const cameraGrid = createMemo(() =>
-    Object.values(cadState.securityCameras).sort((a, b) => {
-      if (a.cameraNumber !== b.cameraNumber) {
-        return a.cameraNumber - b.cameraNumber;
-      }
-
-      return a.cameraId.localeCompare(b.cameraId);
-    })
-  );
+  const cameraGrid = createMemo(() => sortCameraGrid(Object.values(cadState.securityCameras)));
 
   const activeWatchedCamera = createMemo(() => {
     const cameraId = watchingCameraId();
@@ -328,238 +90,32 @@ export function DispatchTable() {
     return cadState.securityCameras[cameraId] || null;
   });
 
-  const metrics = createMemo(() => {
-    const calls = allCalls();
-    const units = allUnits();
-    const pending = calls.filter((call) => call.status === 'PENDING').length;
-    const active = calls.filter((call) => call.status === 'ACTIVE').length;
-    const available = units.filter((unit) => unit.status === 'AVAILABLE').length;
-    const busy = units.filter((unit) => unit.status === 'BUSY').length;
-    return {
-      pending,
-      active,
-      available,
-      busy,
-    };
-  });
+  const metrics = createMemo(() => calculateDispatchMetrics(allCalls(), allUnits()));
 
-  const visibleCalls = createMemo(() => {
-    const query = searchQuery().trim().toLowerCase();
-    const status = statusFilter();
-    const priority = priorityFilter();
-
-    return allCalls().filter((call) => {
-      if (status !== 'ALL' && call.status !== status) {
-        return false;
-      }
-
-      if (priority !== 'ALL' && String(call.priority) !== priority) {
-        return false;
-      }
-
-      if (!query) {
-        return true;
-      }
-
-      const haystack = [call.callId, call.title, call.location || '', call.description || '', call.type]
-        .join(' ')
-        .toLowerCase();
-      return haystack.includes(query);
-    });
-  });
-
-  const selectedCall = createMemo(() => {
-    const visible = visibleCalls();
-    const callId = selectedCallId();
-    if (callId) {
-      const selectedFromVisible = visible.find((call) => call.callId === callId);
-      if (selectedFromVisible) {
-        return selectedFromVisible;
-      }
-    }
-
-    return visible[0] || null;
-  });
-
-  const availableUnits = createMemo(() =>
-    allUnits().filter((unit) => {
-      if (unit.status !== 'AVAILABLE') {
-        return false;
-      }
-
-      const typeFilter = unitTypeFilter();
-      if (typeFilter === 'ALL') {
-        return true;
-      }
-
-      return String(unit.type || '').toUpperCase() === typeFilter;
-    })
+  const visibleCalls = createMemo(() =>
+    filterDispatchCalls(allCalls(), searchQuery(), statusFilter(), priorityFilter())
   );
 
-  const selectedCallAssignedUnits = createMemo(() => {
-    const call = selectedCall();
-    if (!call) {
-      return [] as DispatchUnit[];
-    }
+  const selectedCall = createMemo(() => selectDispatchCall(visibleCalls(), selectedCallId()));
 
-    return Object.keys(call.assignedUnits)
-      .map((unitId) => cadState.dispatchUnits[unitId])
-      .filter((unit): unit is DispatchUnit => Boolean(unit));
-  });
+  const availableUnits = createMemo(() => filterAvailableDispatchUnits(allUnits(), unitTypeFilter()));
 
-  const getCallAgeMinutes = (iso: string) => {
-    const createdAt = new Date(iso).getTime();
-    if (Number.isNaN(createdAt)) {
-      return 0;
-    }
+  const selectedCallAssignedUnits = createMemo(() => mapAssignedUnits(selectedCall(), cadState.dispatchUnits));
 
-    return Math.max(0, Math.floor((nowMs() - createdAt) / 60000));
-  };
+  const getCallSlaLevelFor = (call: DispatchCall) =>
+    getCallSlaLevel(call, dispatchSettings(), nowMs());
 
-  const getCallSlaLevel = (call: DispatchCall): SlaLevel => {
-    const settings = dispatchSettings();
-    if (!settings.sla.enabled) {
-      return 'ok';
-    }
+  const getCallSlaLabelFor = (call: DispatchCall) => getCallSlaLabel(getCallSlaLevelFor(call));
 
-    if (call.status === 'CLOSED') {
-      return 'ok';
-    }
+  const recommendedUnit = createMemo(() =>
+    getRecommendedUnit(selectedCall(), dispatchSettings(), allUnits())
+  );
 
-    const ageMinutes = getCallAgeMinutes(call.createdAt);
-    if (call.status === 'PENDING') {
-      const warningAt = getThresholdForPriority(settings.sla.pending.warningMinutes, call.priority);
-      const breachAt = getThresholdForPriority(settings.sla.pending.breachMinutes, call.priority);
-      if (ageMinutes >= breachAt) return 'breach';
-      if (ageMinutes >= warningAt) return 'warning';
-      return 'ok';
-    }
-
-    if (call.status === 'ACTIVE') {
-      const warningAt = getThresholdForPriority(settings.sla.active.warningMinutes, call.priority);
-      const breachAt = getThresholdForPriority(settings.sla.active.breachMinutes, call.priority);
-      if (ageMinutes >= breachAt) return 'breach';
-      if (ageMinutes >= warningAt) return 'warning';
-      return 'ok';
-    }
-
-    return 'ok';
-  };
-
-  const getCallSlaLabel = (call: DispatchCall) => {
-    const level = getCallSlaLevel(call);
-    if (level === 'breach') return 'SLA BREACH';
-    if (level === 'warning') return 'SLA WARNING';
-    return 'SLA OK';
-  };
-
-  const isMedicalCall = (call: DispatchCall) => {
-    const haystack = `${call.type} ${call.title} ${call.description || ''}`.toUpperCase();
-    return (
-      haystack.includes('EMS') ||
-      haystack.includes('MEDICAL') ||
-      haystack.includes('INJUR') ||
-      haystack.includes('AMBUL') ||
-      haystack.includes('UNCONSCIOUS')
-    );
-  };
-
-  const isEmsUnit = (unit: DispatchUnit) => {
-    const unitType = String(unit.type || '').toUpperCase();
-    return unitType.includes('EMS') || unitType.includes('AMBULANCE') || unitType.includes('MEDIC');
-  };
-
-  const recommendedUnit = createMemo(() => {
-    // Tip rapido: si no hay unit libre o la call ya cerro, no hacemos nada papu.
-    const call = selectedCall();
-    const settings = dispatchSettings();
-    if (!call || call.status === 'CLOSED') {
-      return null;
-    }
-
-    if (!settings.autoAssignment.enabled) {
-      return null;
-    }
-
-    const candidates = allUnits().filter((unit) => unit.status === 'AVAILABLE');
-    if (!candidates.length) {
-      return null;
-    }
-
-    const wantsEms = isMedicalCall(call);
-    const callCoords = call.coordinates;
-
-    const scored = candidates
-      .map((unit) => {
-        const ems = isEmsUnit(unit);
-        const servicePenalty = wantsEms
-          ? (ems ? 0 : settings.autoAssignment.servicePenalties.needsEmsButNotEms)
-          : (ems ? settings.autoAssignment.servicePenalties.nonMedicalEms : 0);
-
-        let distance = 0;
-        let distancePenalty = settings.autoAssignment.unknownDistancePenalty;
-        if (callCoords && unit.location) {
-          const dx = unit.location.x - callCoords.x;
-          const dy = unit.location.y - callCoords.y;
-          const dz = unit.location.z - callCoords.z;
-          distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-          distancePenalty = Math.floor(distance / settings.autoAssignment.distanceMetersPerPenaltyPoint);
-        }
-
-        return {
-          unit,
-          distance,
-          score: servicePenalty + distancePenalty,
-        };
-      })
-      .sort((a, b) => {
-        if (a.score !== b.score) {
-          return a.score - b.score;
-        }
-
-        return a.unit.unitId.localeCompare(b.unit.unitId);
-      });
-
-    const best = scored[0];
-    const reason =
-      callCoords && best.unit.location
-        ? `Closest ${wantsEms ? 'EMS' : 'field'} unit`
-        : `Best ${wantsEms ? 'EMS-role' : 'patrol-role'} match`;
-
-    return {
-      unit: best.unit,
-      distance: best.distance,
-      reason,
-    };
-  });
-
-  const formatAge = (iso: string) => {
-    const createdAt = new Date(iso).getTime();
-    if (Number.isNaN(createdAt)) {
-      return 'N/A';
-    }
-
-    const minutes = Math.max(0, Math.floor((nowMs() - createdAt) / 60000));
-    if (minutes < 1) return '<1m';
-    if (minutes < 60) return `${minutes}m`;
-    const hours = Math.floor(minutes / 60);
-    const rem = minutes % 60;
-    return `${hours}h ${rem}m`;
-  };
-
-  const priorityLabel = (priority: number) => {
-    if (priority === 1) return 'HIGH';
-    if (priority === 2) return 'MED';
-    return 'LOW';
-  };
+  const formatAge = (iso: string) => formatCallAge(iso, nowMs());
 
   const getCaseActionLabel = (callId: string) => {
     const linkedCase = Object.values(cadState.cases).find((caseItem) => caseItem.linkedCallId === callId);
     return linkedCase ? 'OPEN CASE' : 'CREATE CASE';
-  };
-
-  const getDispatchChannelForUnit = (unit: DispatchUnit) => {
-    return isEmsUnit(unit) ? 'CH-3' : 'CH-2';
   };
 
   const notifyCallToChannels = (call: DispatchCall, unitIds: string[], prefix = 'Assignment') => {
@@ -1055,32 +611,15 @@ export function DispatchTable() {
             <div class="dispatch-v2-call-list">
               <For each={visibleCalls()}>
                 {(call) => (
-                  <button
-                    class={`dispatch-v2-call-card sla-${getCallSlaLevel(call)} ${selectedCall()?.callId === call.callId ? 'is-selected' : ''}`}
-                    onClick={() => setSelectedCallId(call.callId)}
-                  >
-                    <div class="dispatch-v2-call-card-header">
-                      <div style={{ display: 'flex', 'align-items': 'center', gap: '6px' }}>
-                        <span class={`dispatch-v2-priority priority-${priorityLabel(call.priority).toLowerCase()}`}>
-                          {priorityLabel(call.priority)}
-                        </span>
-                        <span class={`dispatch-v2-sla-badge sla-${getCallSlaLevel(call)}`}>
-                          {getCallSlaLabel(call)}
-                        </span>
-                      </div>
-                      <span class="dispatch-v2-call-id">{call.callId}</span>
-                    </div>
-                    <div class="dispatch-v2-call-title">{call.title}</div>
-                    <div class="dispatch-v2-call-meta">
-                      <span>{call.type}</span>
-                      <span>{call.location || 'No location'}</span>
-                    </div>
-                    <div class="dispatch-v2-call-meta">
-                      <span>{call.status}</span>
-                      <span>{Object.keys(call.assignedUnits).length} units</span>
-                      <span>{formatAge(call.createdAt)}</span>
-                    </div>
-                  </button>
+                  <DispatchCallCard
+                    call={call}
+                    selected={selectedCall()?.callId === call.callId}
+                    onSelect={setSelectedCallId}
+                    getSlaLevel={getCallSlaLevelFor}
+                    getSlaLabel={getCallSlaLabelFor}
+                    formatAge={formatAge}
+                    priorityLabel={priorityLabel}
+                  />
                 )}
               </For>
               <Show when={visibleCalls().length === 0}>
@@ -1096,54 +635,17 @@ export function DispatchTable() {
                 <>
                   <div class="empty-state">Select a call to manage</div>
                   <div class="dispatch-v2-section-title">CCTV GRID ({cameraGrid().length})</div>
-                  <div class="dispatch-cctv-toolbar">
-                    <Button.Root class="btn" onClick={() => void refreshCameraGrid()} disabled={cameraLoading()}>
-                      [{cameraLoading() ? 'REFRESHING...' : 'REFRESH CCTV'}]
-                    </Button.Root>
-                    <Show when={watchingCameraId()}>
-                      <Button.Root class="btn btn-warning" onClick={() => void stopWatchingCamera()}>
-                        [STOP VIEW]
-                      </Button.Root>
-                    </Show>
-                  </div>
-                  <div class="dispatch-cctv-grid">
-                    <For each={cameraGrid()}>
-                      {(camera) => (
-                        <div class={`dispatch-cctv-card ${watchingCameraId() === camera.cameraId ? 'is-viewing' : ''}`}>
-                          <div class="dispatch-cctv-card-header">
-                            <strong>CAM #{formatCameraNumber(camera.cameraNumber)}</strong>
-                            <span class={`dispatch-cctv-status status-${camera.status.toLowerCase()}`}>
-                              {camera.status}
-                            </span>
-                          </div>
-                          <div class="dispatch-cctv-card-title">{camera.label || `Camera ${formatCameraNumber(camera.cameraNumber)}`}</div>
-                          <div class="dispatch-cctv-card-meta">{camera.street || 'Unknown street'}</div>
-                          <div class="dispatch-cctv-card-meta">{camera.zone || 'No zone'}</div>
-                          <div class="dispatch-cctv-card-actions">
-                            <Button.Root
-                              class="btn btn-primary"
-                              disabled={camera.status !== 'ACTIVE'}
-                              onClick={() => void watchCamera(camera.cameraId)}
-                            >
-                              [VER]
-                            </Button.Root>
-                            <Button.Root
-                              class="btn"
-                              onClick={() => void setCameraStatus(camera.cameraId, camera.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE')}
-                            >
-                              [{camera.status === 'ACTIVE' ? 'DISABLE' : 'ENABLE'}]
-                            </Button.Root>
-                            <Button.Root class="btn btn-danger" onClick={() => void removeCamera(camera)}>
-                              [REMOVE]
-                            </Button.Root>
-                          </div>
-                        </div>
-                      )}
-                    </For>
-                    <Show when={cameraGrid().length === 0}>
-                      <div class="empty-state">No security cameras installed yet</div>
-                    </Show>
-                  </div>
+                  <DispatchCCTVGrid
+                    cameras={cameraGrid()}
+                    cameraLoading={cameraLoading()}
+                    watchingCameraId={watchingCameraId()}
+                    formatCameraNumber={formatCameraNumber}
+                    onRefresh={() => void refreshCameraGrid()}
+                    onStopView={() => void stopWatchingCamera()}
+                    onWatch={(cameraId) => void watchCamera(cameraId)}
+                    onToggleStatus={(cameraId, status) => void setCameraStatus(cameraId, status)}
+                    onRemove={(camera) => void removeCamera(camera)}
+                  />
                 </>
               }
             >
@@ -1152,7 +654,7 @@ export function DispatchTable() {
                 return (
                   <>
                     <div class="dispatch-v2-section-title">INCIDENT WORKSPACE</div>
-                    <div class={`dispatch-v2-incident-card sla-${getCallSlaLevel(call)}`}>
+                    <div class={`dispatch-v2-incident-card sla-${getCallSlaLevelFor(call)}`}>
                       <div class="dispatch-v2-incident-top">
                         <div>
                           <strong>{call.callId}</strong> - {call.title}
@@ -1167,8 +669,8 @@ export function DispatchTable() {
                         <span>Opened: {formatAge(call.createdAt)} ago</span>
                       </div>
                       <div class="dispatch-v2-incident-row">
-                        <span class={`dispatch-v2-sla-badge sla-${getCallSlaLevel(call)}`}>
-                          {getCallSlaLabel(call)}
+                        <span class={`dispatch-v2-sla-badge sla-${getCallSlaLevelFor(call)}`}>
+                          {getCallSlaLabelFor(call)}
                         </span>
                       </div>
                       <div class="dispatch-v2-incident-row">
@@ -1201,15 +703,13 @@ export function DispatchTable() {
                     <div class="dispatch-v2-assigned-list">
                       <For each={selectedCallAssignedUnits()}>
                         {(unit) => (
-                          <div class="dispatch-v2-unit-row">
-                            <div>
-                              <strong>{unit.unitId}</strong> {unit.name}
-                              <div class="dispatch-v2-unit-sub">{unit.type} - {unit.status}</div>
-                            </div>
-                            <Button.Root class="btn btn-warning" onClick={() => void unassignUnit(unit.unitId, call.callId)}>
-                              [RELEASE]
-                            </Button.Root>
-                          </div>
+                          <DispatchUnitActionRow
+                            unit={unit}
+                            subtitle={`${unit.type} - ${unit.status}`}
+                            actionLabel="RELEASE"
+                            actionClass="btn btn-warning"
+                            onAction={() => void unassignUnit(unit.unitId, call.callId)}
+                          />
                         )}
                       </For>
                       <Show when={selectedCallAssignedUnits().length === 0}>
@@ -1239,19 +739,14 @@ export function DispatchTable() {
                     <div class="dispatch-v2-available-list">
                       <For each={availableUnits()}>
                         {(unit) => (
-                          <div class="dispatch-v2-unit-row">
-                            <div>
-                              <strong>{unit.unitId}</strong> {unit.name}
-                              <div class="dispatch-v2-unit-sub">{unit.type}</div>
-                            </div>
-                            <Button.Root
-                              class="btn btn-primary"
-                              onClick={() => void assignUnitToCall(unit.unitId, call.callId)}
-                              disabled={call.status === 'CLOSED'}
-                            >
-                              [ASSIGN]
-                            </Button.Root>
-                          </div>
+                          <DispatchUnitActionRow
+                            unit={unit}
+                            subtitle={`${unit.type}`}
+                            actionLabel="ASSIGN"
+                            actionClass="btn btn-primary"
+                            actionDisabled={call.status === 'CLOSED'}
+                            onAction={() => void assignUnitToCall(unit.unitId, call.callId)}
+                          />
                         )}
                       </For>
                       <Show when={availableUnits().length === 0}>
@@ -1260,59 +755,17 @@ export function DispatchTable() {
                     </div>
 
                     <div class="dispatch-v2-section-title">CCTV GRID ({cameraGrid().length})</div>
-                    <div class="dispatch-cctv-toolbar">
-                      <Button.Root class="btn" onClick={() => void refreshCameraGrid()} disabled={cameraLoading()}>
-                        [{cameraLoading() ? 'REFRESHING...' : 'REFRESH CCTV'}]
-                      </Button.Root>
-                      <Show when={watchingCameraId()}>
-                        <Button.Root class="btn btn-warning" onClick={() => void stopWatchingCamera()}>
-                          [STOP VIEW]
-                        </Button.Root>
-                      </Show>
-                    </div>
-                    <div class="dispatch-cctv-grid">
-                      <For each={cameraGrid()}>
-                        {(camera) => (
-                          <div class={`dispatch-cctv-card ${watchingCameraId() === camera.cameraId ? 'is-viewing' : ''}`}>
-                            <div class="dispatch-cctv-card-header">
-                              <strong>CAM #{formatCameraNumber(camera.cameraNumber)}</strong>
-                              <span class={`dispatch-cctv-status status-${camera.status.toLowerCase()}`}>
-                                {camera.status}
-                              </span>
-                            </div>
-                            <div class="dispatch-cctv-card-title">{camera.label || `Camera ${formatCameraNumber(camera.cameraNumber)}`}</div>
-                            <div class="dispatch-cctv-card-meta">{camera.street || 'Unknown street'}</div>
-                            <div class="dispatch-cctv-card-meta">{camera.zone || 'No zone'}</div>
-                            <div class="dispatch-cctv-card-actions">
-                              <Button.Root
-                                class="btn btn-primary"
-                                disabled={camera.status !== 'ACTIVE'}
-                                onClick={() => void watchCamera(camera.cameraId)}
-                              >
-                                [VER]
-                              </Button.Root>
-                              <Button.Root
-                                class="btn"
-                                onClick={() =>
-                                  void setCameraStatus(
-                                    camera.cameraId,
-                                    camera.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE'
-                                  )
-                                }
-                              >
-                                [{camera.status === 'ACTIVE' ? 'DISABLE' : 'ENABLE'}]
-                              </Button.Root>
-                              <Button.Root class="btn btn-danger" onClick={() => void removeCamera(camera)}>
-                                [REMOVE]
-                              </Button.Root>
-                            </div>
-                          </div>
-                        )}
-                      </For>
-                      <Show when={cameraGrid().length === 0}>
-                        <div class="empty-state">No security cameras installed yet</div>
-                      </Show>
-                    </div>
+                    <DispatchCCTVGrid
+                      cameras={cameraGrid()}
+                      cameraLoading={cameraLoading()}
+                      watchingCameraId={watchingCameraId()}
+                      formatCameraNumber={formatCameraNumber}
+                      onRefresh={() => void refreshCameraGrid()}
+                      onStopView={() => void stopWatchingCamera()}
+                      onWatch={(cameraId) => void watchCamera(cameraId)}
+                      onToggleStatus={(cameraId, status) => void setCameraStatus(cameraId, status)}
+                      onRemove={(camera) => void removeCamera(camera)}
+                    />
                   </>
                 );
               }}

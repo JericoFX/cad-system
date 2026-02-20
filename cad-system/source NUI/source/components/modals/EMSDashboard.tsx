@@ -5,6 +5,8 @@ import { emsState, emsActions, Patient, PatientCondition } from '~/stores/emsSto
 import { notificationActions } from '~/stores/notificationStore';
 import { fetchNui } from '~/utils/fetchNui';
 import { Button, Input, Modal, Tabs, Textarea } from '~/components/ui';
+import { EmsPatientCard } from './EmsPatientCard';
+import { EmsTreatmentCard } from './EmsTreatmentCard';
 
 type BloodSampleStatus = 'PENDING' | 'ACKNOWLEDGED' | 'IN_PROGRESS' | 'COMPLETED' | 'DECLINED' | 'CANCELLED';
 
@@ -591,30 +593,14 @@ export function EMSDashboard() {
             <div class="patients-list">
               <For each={filteredPatients()}>
                 {(patient) => (
-                  <div 
-                    class={`patient-card ${patient.condition.toLowerCase()} priority-${patient.triagePriority}`}
-                    onClick={() => setSelectedPatient(patient)}
-                  >
-                    <div class="patient-header">
-                      <span class="patient-id">{patient.patientId}</span>
-                      <span 
-                        class="patient-priority"
-                        style={{ color: getPriorityColor(patient.triagePriority) }}
-                      >
-                        [P{patient.triagePriority}]
-                      </span>
-                      <span 
-                        class="patient-condition"
-                        style={{ color: getConditionColor(patient.condition) }}
-                      >
-                        [{patient.condition}]
-                      </span>
-                      <span class="patient-time">{formatDate(patient.triagedAt)}</span>
-                    </div>
-                    <div class="patient-name">{patient.name}</div>
-                    <div class="patient-complaint">{patient.chiefComplaint}</div>
-                    <div class="patient-status-badge">{patient.status}</div>
-                  </div>
+                  <EmsPatientCard
+                    patient={patient}
+                    selected={selectedPatient()?.patientId === patient.patientId}
+                    getPriorityColor={getPriorityColor}
+                    getConditionColor={getConditionColor}
+                    formatDate={formatDate}
+                    onSelect={setSelectedPatient}
+                  />
                 )}
               </For>
             </div>
@@ -630,31 +616,12 @@ export function EMSDashboard() {
             
             <For each={inTreatmentPatients()}>
               {(patient) => (
-                <div class="treatment-card">
-                  <div class="treatment-header">
-                    <span class="patient-name">{patient.name}</span>
-                    <span 
-                      class="condition-badge"
-                      style={{ color: getConditionColor(patient.condition) }}
-                    >
-                      P{patient.triagePriority} - {patient.condition}
-                    </span>
-                  </div>
-                  <div class="treatment-info">
-                    <p><strong>ID:</strong> {patient.patientId}</p>
-                    <p><strong>Chief Complaint:</strong> {patient.chiefComplaint}</p>
-                    <p><strong>Admitted:</strong> {formatDate(patient.admittedAt || patient.triagedAt)}</p>
-                    <p><strong>Treatments:</strong> {patient.treatments.length}</p>
-                  </div>
-                  <div class="treatment-actions">
-                    <Button.Root 
-                      class="btn btn-success"
-                      onClick={() => dischargePatient(patient)}
-                    >
-                      [DISCHARGE]
-                    </Button.Root>
-                  </div>
-                </div>
+                <EmsTreatmentCard
+                  patient={patient}
+                  getConditionColor={getConditionColor}
+                  formatDate={formatDate}
+                  onDischarge={dischargePatient}
+                />
               )}
             </For>
           </Show>
