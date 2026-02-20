@@ -624,6 +624,21 @@ export const newsActions = {
 };
 
 if (typeof window !== 'undefined') {
+  let lastPersistedPayload = '';
+
+  const persistNewsState = () => {
+    const payload = JSON.stringify({
+      articles: newsState.articles,
+    });
+
+    if (payload === lastPersistedPayload) {
+      return;
+    }
+
+    localStorage.setItem('cad_news', payload);
+    lastPersistedPayload = payload;
+  };
+
   const loadFromLocalStorage = () => {
     const saved = localStorage.getItem('cad_news');
     if (!saved) {
@@ -633,6 +648,7 @@ if (typeof window !== 'undefined') {
     try {
       const parsed = JSON.parse(saved);
       setNewsState('articles', parsed.articles || {});
+      lastPersistedPayload = saved;
 
       const articles = parsed.articles as Record<string, NewsArticle>;
       Object.values(articles || {}).forEach((article) => {
@@ -651,10 +667,22 @@ if (typeof window !== 'undefined') {
       loadFromLocalStorage();
     }
   })();
-  
+
+  window.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      persistNewsState();
+    }
+  });
+
+  window.addEventListener('beforeunload', () => {
+    persistNewsState();
+  });
+
   setInterval(() => {
-    localStorage.setItem('cad_news', JSON.stringify({
-      articles: newsState.articles
-    }));
+    if (document.hidden) {
+      return;
+    }
+
+    persistNewsState();
   }, 30000);
 }

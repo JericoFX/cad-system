@@ -151,7 +151,21 @@ function cleanupExpiredChannels() {
   });
 }
 
-setInterval(cleanupExpiredChannels, 60000);
+setInterval(() => {
+  if (typeof document !== 'undefined' && document.hidden) {
+    return;
+  }
+
+  const hasTemporaryChannels = Object.values(radioState.channels).some(
+    (channel) => channel.type === 'TEMPORARY'
+  );
+
+  if (!hasTemporaryChannels) {
+    return;
+  }
+
+  cleanupExpiredChannels();
+}, 60000);
 
 export const radioActions = {
   setCurrentUser(user: RadioUser) {

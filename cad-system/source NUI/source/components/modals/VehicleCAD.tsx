@@ -14,7 +14,10 @@ import {
   type VehicleQuickLock,
 } from '~/stores/terminalStore';
 import { fetchNui } from '~/utils/fetchNui';
-import { Button, Input, Modal, Tabs, Textarea } from '~/components/ui';
+import { Button, Modal, Tabs } from '~/components/ui';
+import { EntitySearchToolbar } from './EntitySearchToolbar';
+import { EntityNoteEditor } from './EntityNoteEditor';
+import { ImportantNotesListSection } from './ImportantNotesListSection';
 
 type ScanResult = {
   plate: string;
@@ -739,25 +742,13 @@ export function VehicleCAD() {
 
         <div style={{ flex: '1', overflow: 'auto', padding: '10px' }}>
           <Show when={tab() === 'vehicle'}>
-            <div class='search-toolbar'>
-              <Input.Root
-                type='text'
-                class='dos-input'
-                value={vehicleQuery()}
-                onInput={(e) => setVehicleQuery(e.currentTarget.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') void searchVehicles(vehicleQuery());
-                }}
-                placeholder='Plate / owner / model'
-              />
-              <Button.Root
-                class='btn'
-                onClick={() => void searchVehicles(vehicleQuery())}
-                disabled={loadingSearch()}
-              >
-                [SEARCH]
-              </Button.Root>
-            </div>
+            <EntitySearchToolbar
+              query={vehicleQuery()}
+              placeholder='Plate / owner / model'
+              loading={loadingSearch()}
+              onQueryChange={setVehicleQuery}
+              onSearch={() => void searchVehicles(vehicleQuery())}
+            />
 
             <div class='search-content'>
               <div class='search-results-panel'>
@@ -817,63 +808,28 @@ export function VehicleCAD() {
                     </div>
                   </div>
 
-                  <div style={{ 'margin-top': '10px' }}>
-                    <Textarea.Root
-                      class='dos-textarea'
-                      rows={3}
-                      value={noteContent()}
-                      onInput={(e) => setNoteContent(e.currentTarget.value)}
-                      placeholder='Vehicle note...'
-                    />
-                    <div
-                      style={{
-                        display: 'flex',
-                        gap: '8px',
-                        'margin-top': '6px',
-                        'align-items': 'center',
-                      }}
-                    >
-                      <Button.Root
-                        class='btn'
-                        onClick={() => setImportantNote(!importantNote())}
-                      >
-                        [{importantNote() ? 'X' : ' '}] IMPORTANT
-                      </Button.Root>
-                      <Button.Root
-                        class='btn btn-primary'
-                        onClick={() =>
-                          void addNote('VEHICLE', selectedVehicle()!.plate)
-                        }
-                      >
-                        [SAVE VEHICLE NOTE]
-                      </Button.Root>
-                    </div>
-                  </div>
+                  <EntityNoteEditor
+                    content={noteContent()}
+                    important={importantNote()}
+                    placeholder='Vehicle note...'
+                    saveLabel='SAVE VEHICLE NOTE'
+                    onContentChange={setNoteContent}
+                    onToggleImportant={() => setImportantNote(!importantNote())}
+                    onSave={() => void addNote('VEHICLE', selectedVehicle()!.plate)}
+                  />
                 </Show>
               </div>
             </div>
           </Show>
 
           <Show when={tab() === 'person'}>
-            <div class='search-toolbar'>
-              <Input.Root
-                type='text'
-                class='dos-input'
-                value={personQuery()}
-                onInput={(e) => setPersonQuery(e.currentTarget.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') void searchPersons(personQuery());
-                }}
-                placeholder='Citizen ID / first / last'
-              />
-              <Button.Root
-                class='btn'
-                onClick={() => void searchPersons(personQuery())}
-                disabled={loadingSearch()}
-              >
-                [SEARCH]
-              </Button.Root>
-            </div>
+            <EntitySearchToolbar
+              query={personQuery()}
+              placeholder='Citizen ID / first / last'
+              loading={loadingSearch()}
+              onQueryChange={setPersonQuery}
+              onSearch={() => void searchPersons(personQuery())}
+            />
 
             <div class='search-content'>
               <div class='search-results-panel'>
@@ -932,38 +888,15 @@ export function VehicleCAD() {
                     </div>
                   </div>
 
-                  <div style={{ 'margin-top': '10px' }}>
-                    <Textarea.Root
-                      class='dos-textarea'
-                      rows={3}
-                      value={noteContent()}
-                      onInput={(e) => setNoteContent(e.currentTarget.value)}
-                      placeholder='Person note...'
-                    />
-                    <div
-                      style={{
-                        display: 'flex',
-                        gap: '8px',
-                        'margin-top': '6px',
-                        'align-items': 'center',
-                      }}
-                    >
-                      <Button.Root
-                        class='btn'
-                        onClick={() => setImportantNote(!importantNote())}
-                      >
-                        [{importantNote() ? 'X' : ' '}] IMPORTANT
-                      </Button.Root>
-                      <Button.Root
-                        class='btn btn-primary'
-                        onClick={() =>
-                          void addNote('PERSON', selectedPerson()!.citizenid)
-                        }
-                      >
-                        [SAVE PERSON NOTE]
-                      </Button.Root>
-                    </div>
-                  </div>
+                  <EntityNoteEditor
+                    content={noteContent()}
+                    important={importantNote()}
+                    placeholder='Person note...'
+                    saveLabel='SAVE PERSON NOTE'
+                    onContentChange={setNoteContent}
+                    onToggleImportant={() => setImportantNote(!importantNote())}
+                    onSave={() => void addNote('PERSON', selectedPerson()!.citizenid)}
+                  />
                 </Show>
               </div>
             </div>
@@ -971,63 +904,19 @@ export function VehicleCAD() {
 
           <Show when={tab() === 'notes'}>
             <div class='dispatch-grid'>
-              <div class='dispatch-section'>
-                <h3>VEHICLE IMPORTANT NOTES</h3>
-                <Show
-                  when={!loadingNotes()}
-                  fallback={<div class='dispatch-empty'>Loading...</div>}
-                >
-                  <For each={vehicleNotes()}>
-                    {(note) => (
-                      <div class='dispatch-item'>
-                        <div class='dispatch-item-header'>
-                          <span class='dispatch-item-title'>
-                            {note.important ? 'IMPORTANT' : 'NOTE'}
-                          </span>
-                          <span>
-                            {new Date(note.timestamp).toLocaleString()}
-                          </span>
-                        </div>
-                        <div class='dispatch-item-meta'>{note.content}</div>
-                      </div>
-                    )}
-                  </For>
-                  <Show when={vehicleNotes().length === 0}>
-                    <div class='dispatch-empty'>
-                      No notes for selected vehicle.
-                    </div>
-                  </Show>
-                </Show>
-              </div>
+              <ImportantNotesListSection
+                title='VEHICLE IMPORTANT NOTES'
+                notes={vehicleNotes()}
+                loading={loadingNotes()}
+                emptyMessage='No notes for selected vehicle.'
+              />
 
-              <div class='dispatch-section'>
-                <h3>PERSON IMPORTANT NOTES</h3>
-                <Show
-                  when={!loadingNotes()}
-                  fallback={<div class='dispatch-empty'>Loading...</div>}
-                >
-                  <For each={personNotes()}>
-                    {(note) => (
-                      <div class='dispatch-item'>
-                        <div class='dispatch-item-header'>
-                          <span class='dispatch-item-title'>
-                            {note.important ? 'IMPORTANT' : 'NOTE'}
-                          </span>
-                          <span>
-                            {new Date(note.timestamp).toLocaleString()}
-                          </span>
-                        </div>
-                        <div class='dispatch-item-meta'>{note.content}</div>
-                      </div>
-                    )}
-                  </For>
-                  <Show when={personNotes().length === 0}>
-                    <div class='dispatch-empty'>
-                      No notes for selected person.
-                    </div>
-                  </Show>
-                </Show>
-              </div>
+              <ImportantNotesListSection
+                title='PERSON IMPORTANT NOTES'
+                notes={personNotes()}
+                loading={loadingNotes()}
+                emptyMessage='No notes for selected person.'
+              />
 
               <div class='dispatch-section'>
                 <h3>RECENT STOP LOG</h3>
