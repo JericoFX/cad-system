@@ -1,7 +1,7 @@
 // Extended types for mock system
 // These extend or complement the types in ~/stores/cadStore
 
-import type { DispatchUnit } from '~/stores/cadStore';
+import type { DispatchUnit, SecurityCamera } from '~/stores/cadStore';
 
 // EMS Types
 export interface EMSUnit extends DispatchUnit {
@@ -91,6 +91,7 @@ export interface Scenario {
     traces: Record<string, ForensicTrace>;
     alerts: EMSAlert[];
     bloodRequests: Record<string, BloodSampleRequest>;
+    securityCameras?: Record<string, SecurityCamera>;
     fines: Record<string, any>;
     warrants: Record<string, any>;
     criminalRecords?: Record<string, any[]>;

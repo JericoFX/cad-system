@@ -1,10 +1,11 @@
-import type { DispatchCall, DispatchUnit } from '~/stores/cadStore';
+import type { DispatchCall, DispatchUnit, SecurityCamera } from '~/stores/cadStore';
 import { generateId, randomChoice, randomCoords } from '../data/generators';
 import { LOCATIONS } from '../data/generators';
 import { resolveRequest } from '../core/eventBus';
 
 let mockCalls: Record<string, DispatchCall> = {};
 let mockUnits: Record<string, DispatchUnit> = {};
+let mockSecurityCameras: Record<string, SecurityCamera> = {};
 
 export function initializeDispatchHandlers(): void {
   window.addEventListener('message', (event) => {
@@ -52,6 +53,85 @@ export function initializeDispatchHandlers(): void {
       
       case 'cad:getDispatchUnits': {
         resolveRequest(requestId, Object.values(mockUnits));
+        break;
+      }
+
+      case 'cad:cameras:getNextNumber': {
+        const cameraNumbers = Object.values(mockSecurityCameras).map((camera) => camera.cameraNumber || 0);
+        const highest = cameraNumbers.length > 0 ? Math.max(...cameraNumbers) : 0;
+        resolveRequest(requestId, { ok: true, nextNumber: highest + 1 });
+        break;
+      }
+
+      case 'cad:cameras:list': {
+        const cameras = Object.values(mockSecurityCameras).sort((a, b) => a.cameraNumber - b.cameraNumber);
+        resolveRequest(requestId, { ok: true, cameras });
+        break;
+      }
+
+      case 'cad:cameras:get': {
+        const { cameraId } = payload || {};
+        const camera = cameraId ? mockSecurityCameras[cameraId] : undefined;
+        if (!camera) {
+          resolveRequest(requestId, { ok: false, error: 'camera_not_found' });
+          return;
+        }
+
+        resolveRequest(requestId, { ok: true, camera });
+        break;
+      }
+
+      case 'cad:cameras:watch': {
+        const { cameraId } = payload || {};
+        const camera = cameraId ? mockSecurityCameras[cameraId] : undefined;
+        if (!camera) {
+          resolveRequest(requestId, { ok: false, error: 'camera_not_found' });
+          return;
+        }
+
+        if (camera.status !== 'ACTIVE') {
+          resolveRequest(requestId, { ok: false, error: 'camera_disabled' });
+          return;
+        }
+
+        resolveRequest(requestId, { ok: true, camera });
+        break;
+      }
+
+      case 'cad:cameras:stopWatch': {
+        resolveRequest(requestId, { ok: true });
+        break;
+      }
+
+      case 'cad:cameras:setStatus': {
+        const { cameraId, status } = payload || {};
+        const camera = cameraId ? mockSecurityCameras[cameraId] : undefined;
+        if (!camera) {
+          resolveRequest(requestId, { ok: false, error: 'camera_not_found' });
+          return;
+        }
+
+        if (status !== 'ACTIVE' && status !== 'DISABLED') {
+          resolveRequest(requestId, { ok: false, error: 'invalid_status' });
+          return;
+        }
+
+        camera.status = status;
+        camera.updatedAt = new Date().toISOString();
+        resolveRequest(requestId, { ok: true, camera });
+        break;
+      }
+
+      case 'cad:cameras:remove': {
+        const { cameraId } = payload || {};
+        const camera = cameraId ? mockSecurityCameras[cameraId] : undefined;
+        if (!camera) {
+          resolveRequest(requestId, { ok: false, error: 'camera_not_found' });
+          return;
+        }
+
+        delete mockSecurityCameras[cameraId];
+        resolveRequest(requestId, { ok: true, cameraId });
         break;
       }
       
@@ -170,6 +250,10 @@ export function setMockUnits(units: Record<string, DispatchUnit>): void {
   mockUnits = { ...units };
 }
 
+export function setMockSecurityCameras(cameras: Record<string, SecurityCamera>): void {
+  mockSecurityCameras = { ...cameras };
+}
+
 export function getMockCalls(): Record<string, DispatchCall> {
   return mockCalls;
 }
@@ -178,9 +262,14 @@ export function getMockUnits(): Record<string, DispatchUnit> {
   return mockUnits;
 }
 
+export function getMockSecurityCameras(): Record<string, SecurityCamera> {
+  return mockSecurityCameras;
+}
+
 export function clearMockDispatch(): void {
   mockCalls = {};
   mockUnits = {};
+  mockSecurityCameras = {};
 }
 
 export function addMockCall(call: DispatchCall): void {
@@ -189,4 +278,8 @@ export function addMockCall(call: DispatchCall): void {
 
 export function addMockUnit(unit: DispatchUnit): void {
   mockUnits[unit.unitId] = unit;
+}
+
+export function addMockSecurityCamera(camera: SecurityCamera): void {
+  mockSecurityCameras[camera.cameraId] = camera;
 }

@@ -1,4 +1,4 @@
-import { createSignal, createMemo, For, Show } from 'solid-js';
+import { createSignal, createMemo, For, Show, onMount } from 'solid-js';
 import { terminalActions } from '~/stores/terminalStore';
 import { cadState, cadActions } from '~/stores/cadStore';
 import { fetchNui } from '~/utils/fetchNui';
@@ -7,11 +7,32 @@ import type { Evidence } from '~/stores/cadStore';
 import { Button, Input, Modal } from '~/components/ui';
 
 export function ForensicCollection() {
+  const [activePanel, setActivePanel] = createSignal<'collect' | 'blood'>('collect');
   const [evidenceType, setEvidenceType] = createSignal('FINGERPRINT');
   const [description, setDescription] = createSignal('');
   const [isCollecting, setIsCollecting] = createSignal(false);
   const [collectedEvidence, setCollectedEvidence] = createSignal<Evidence | null>(null);
   const [caseId, setCaseId] = createSignal('');
+
+  const [requestCitizenId, setRequestCitizenId] = createSignal('');
+  const [requestPersonName, setRequestPersonName] = createSignal('');
+  const [requestReason, setRequestReason] = createSignal('');
+  const [requestLocation, setRequestLocation] = createSignal('');
+  const [isRequestingBlood, setIsRequestingBlood] = createSignal(false);
+  const [bloodRequests, setBloodRequests] = createSignal<
+    Array<{
+      requestId: string;
+      caseId?: string;
+      citizenId?: string;
+      personName: string;
+      reason: string;
+      location?: string;
+      status: 'PENDING' | 'ACKNOWLEDGED' | 'IN_PROGRESS' | 'COMPLETED' | 'DECLINED' | 'CANCELLED';
+      requestedAt: string;
+      requestedByName?: string;
+      notes?: string;
+    }>
+  >([]);
   
   const [bloodType, setBloodType] = createSignal('O+');
   const [caliber, setCaliber] = createSignal('9mm');
@@ -33,6 +54,91 @@ export function ForensicCollection() {
   const openCases = createMemo(() => 
     Object.values(cadState.cases).filter(c => c.status === 'OPEN')
   );
+
+  const activeBloodRequests = createMemo(() =>
+    bloodRequests().filter((request) =>
+      request.status !== 'COMPLETED' && request.status !== 'DECLINED' && request.status !== 'CANCELLED'
+    )
+  );
+
+  const bloodStatusColor = (status: string) => {
+    if (status === 'PENDING') return '#ffaa00';
+    if (status === 'ACKNOWLEDGED') return '#00ffff';
+    if (status === 'IN_PROGRESS') return '#00aaff';
+    if (status === 'COMPLETED') return '#00ff00';
+    return '#ff5555';
+  };
+
+  const loadBloodRequests = async () => {
+    try {
+      const response = await fetchNui<{ ok: boolean; requests?: unknown[]; error?: string }>('cad:ems:getBloodRequests', {});
+      if (!response?.ok) {
+        terminalActions.addLine(`Failed to load blood requests: ${response?.error || 'unknown_error'}`, 'error');
+        return;
+      }
+
+      const rows = Array.isArray(response.requests) ? response.requests : [];
+      setBloodRequests(rows as Array<{
+        requestId: string;
+        caseId?: string;
+        citizenId?: string;
+        personName: string;
+        reason: string;
+        location?: string;
+        status: 'PENDING' | 'ACKNOWLEDGED' | 'IN_PROGRESS' | 'COMPLETED' | 'DECLINED' | 'CANCELLED';
+        requestedAt: string;
+        requestedByName?: string;
+        notes?: string;
+      }>);
+    } catch (error) {
+      terminalActions.addLine(`Failed to load blood requests: ${error}`, 'error');
+    }
+  };
+
+  const createBloodRequest = async () => {
+    if (!caseId()) {
+      terminalActions.addLine('Select an open case before requesting blood sample', 'error');
+      return;
+    }
+
+    if (!requestReason().trim()) {
+      terminalActions.addLine('Blood request reason is required', 'error');
+      return;
+    }
+
+    if (!requestCitizenId().trim() && !requestPersonName().trim()) {
+      terminalActions.addLine('Provide citizen ID or person name', 'error');
+      return;
+    }
+
+    setIsRequestingBlood(true);
+    try {
+      const result = await fetchNui<{ ok: boolean; request?: { requestId?: string }; error?: string }>('cad:ems:createBloodRequest', {
+        caseId: caseId(),
+        citizenId: requestCitizenId().trim() || undefined,
+        personName: requestPersonName().trim() || undefined,
+        reason: requestReason().trim(),
+        location: requestLocation().trim() || undefined,
+      });
+
+      if (!result?.ok) {
+        terminalActions.addLine(`Failed to create blood request: ${result?.error || 'unknown_error'}`, 'error');
+        return;
+      }
+
+      terminalActions.addLine(`✓ Blood sample request sent (${result.request?.requestId || 'BLOODREQ'})`, 'output');
+      setRequestReason('');
+      void loadBloodRequests();
+    } catch (error) {
+      terminalActions.addLine(`Failed to create blood request: ${error}`, 'error');
+    } finally {
+      setIsRequestingBlood(false);
+    }
+  };
+
+  onMount(() => {
+    void loadBloodRequests();
+  });
 
   const handleCollect = async () => {
     if (!caseId()) {
@@ -93,96 +199,229 @@ export function ForensicCollection() {
         </div>
         
         <div class="collection-form">
-          <div class="form-section">
-            <label class="form-label">{t('forensics.selectCase')}</label>
-            <select
-              class="dos-input"
-              value={caseId()}
-              onChange={(e) => setCaseId(e.currentTarget.value)}
-            >
-              <option value="">{t('forensics.selectOpenCase')}</option>
-              <For each={openCases()}>
-                {(c) => (
-                  <option value={c.caseId}>
-                    {c.caseId} - {c.title}
-                  </option>
-                )}
-              </For>
-            </select>
+          <div class="form-actions" style={{ 'justify-content': 'flex-start', gap: '8px' }}>
+            <Button.Root class={activePanel() === 'collect' ? 'btn btn-primary' : 'btn'} onClick={() => setActivePanel('collect')}>
+              [COLLECT EVIDENCE]
+            </Button.Root>
+            <Button.Root class={activePanel() === 'blood' ? 'btn btn-primary' : 'btn'} onClick={() => setActivePanel('blood')}>
+              [BLOOD REQUESTS]
+            </Button.Root>
+            <Button.Root class="btn" onClick={() => void loadBloodRequests()}>
+              [REFRESH REQUESTS]
+            </Button.Root>
+            <span class="inventory-category" style={{ 'align-self': 'center' }}>
+              Active requests: {activeBloodRequests().length}
+            </span>
           </div>
-          
-          <div class="form-section">
-            <label class="form-label">{t('forensics.evidenceType')}</label>
-            <div class="evidence-type-grid">
-              <For each={evidenceTypes}>
-                {(type) => (
-                  <button
-                    class={`type-btn ${evidenceType() === type.value ? 'selected' : ''}`}
-                    onClick={() => setEvidenceType(type.value)}
-                  >
-                    <span class="icon">{type.icon}</span>
-                    <span class="label">{type.label}</span>
-                  </button>
-                )}
-              </For>
-            </div>
-          </div>
-          
-          <Show when={evidenceType() === 'BLOOD'}>
+
+          <Show when={activePanel() === 'collect'}>
             <div class="form-section">
-              <label class="form-label">{t('forensics.bloodType')}</label>
-              <select class="dos-input" value={bloodType()} onChange={(e) => setBloodType(e.currentTarget.value)}>
-                <option value="A+">A+</option>
-                <option value="A-">A-</option>
-                <option value="B+">B+</option>
-                <option value="B-">B-</option>
-                <option value="AB+">AB+</option>
-                <option value="AB-">AB-</option>
-                <option value="O+">O+</option>
-                <option value="O-">O-</option>
+              <label class="form-label">{t('forensics.selectCase')}</label>
+              <select
+                class="dos-input"
+                value={caseId()}
+                onChange={(e) => setCaseId(e.currentTarget.value)}
+              >
+                <option value="">{t('forensics.selectOpenCase')}</option>
+                <For each={openCases()}>
+                  {(c) => (
+                    <option value={c.caseId}>
+                      {c.caseId} - {c.title}
+                    </option>
+                  )}
+                </For>
               </select>
             </div>
-          </Show>
-          
-          <Show when={evidenceType() === 'CASING' || evidenceType() === 'BULLET'}>
+
             <div class="form-section">
-              <label class="form-label">{t('forensics.caliber')}</label>
-              <select class="dos-input" value={caliber()} onChange={(e) => setCaliber(e.currentTarget.value)}>
-                <option value="9mm">9mm</option>
-                <option value=".45">.45 ACP</option>
-                <option value=".44">.44 Magnum</option>
-                <option value=".357">.357 Magnum</option>
-                <option value="12gauge">12 Gauge</option>
-                <option value="5.56">5.56 NATO</option>
-                <option value="7.62">7.62 NATO</option>
+              <label class="form-label">{t('forensics.evidenceType')}</label>
+              <div class="evidence-type-grid">
+                <For each={evidenceTypes}>
+                  {(type) => (
+                    <button
+                      class={`type-btn ${evidenceType() === type.value ? 'selected' : ''}`}
+                      onClick={() => setEvidenceType(type.value)}
+                    >
+                      <span class="icon">{type.icon}</span>
+                      <span class="label">{type.label}</span>
+                    </button>
+                  )}
+                </For>
+              </div>
+            </div>
+
+            <Show when={evidenceType() === 'BLOOD'}>
+              <div class="form-section">
+                <label class="form-label">{t('forensics.bloodType')}</label>
+                <select class="dos-input" value={bloodType()} onChange={(e) => setBloodType(e.currentTarget.value)}>
+                  <option value="A+">A+</option>
+                  <option value="A-">A-</option>
+                  <option value="B+">B+</option>
+                  <option value="B-">B-</option>
+                  <option value="AB+">AB+</option>
+                  <option value="AB-">AB-</option>
+                  <option value="O+">O+</option>
+                  <option value="O-">O-</option>
+                </select>
+              </div>
+            </Show>
+
+            <Show when={evidenceType() === 'CASING' || evidenceType() === 'BULLET'}>
+              <div class="form-section">
+                <label class="form-label">{t('forensics.caliber')}</label>
+                <select class="dos-input" value={caliber()} onChange={(e) => setCaliber(e.currentTarget.value)}>
+                  <option value="9mm">9mm</option>
+                  <option value=".45">.45 ACP</option>
+                  <option value=".44">.44 Magnum</option>
+                  <option value=".357">.357 Magnum</option>
+                  <option value="12gauge">12 Gauge</option>
+                  <option value="5.56">5.56 NATO</option>
+                  <option value="7.62">7.62 NATO</option>
+                </select>
+              </div>
+            </Show>
+
+            <Show when={evidenceType() === 'FIBERS'}>
+              <div class="form-section">
+                <label class="form-label">{t('forensics.fiberColor')}</label>
+                <Input.Root type="text" class="dos-input" value={fiberColor()} onInput={(e) => setFiberColor(e.currentTarget.value)} />
+              </div>
+            </Show>
+
+            <Show when={evidenceType() === 'FINGERPRINT'}>
+              <div class="form-section">
+                <label class="form-label">{t('forensics.quality', undefined, { value: quality() })}</label>
+                <Input.Root type="range" class="dos-input" min="0" max="100" value={quality()} onInput={(e) => setQuality(parseInt(e.currentTarget.value))} />
+              </div>
+            </Show>
+
+            <div class="form-section">
+              <label class="form-label">{t('forensics.description')}</label>
+              <textarea
+                class="dos-input"
+                rows={3}
+                value={description()}
+                onInput={(e) => setDescription(e.currentTarget.value)}
+                placeholder={t('forensics.descriptionPlaceholder')}
+              />
+            </div>
+
+            <div class="form-actions">
+              <Button.Root class="btn btn-primary" onClick={handleCollect} disabled={isCollecting() || !caseId()}>
+                {isCollecting() ? t('forensics.collecting') : t('forensics.collect')}
+              </Button.Root>
+              <Button.Root class="btn" onClick={closeModal}>{t('forensics.cancel')}</Button.Root>
+            </div>
+
+            <Show when={collectedEvidence()}>
+              {(evidence) => (
+                <div class="collection-success">
+                  <h3>{t('forensics.collected')}</h3>
+                  <div class="evidence-id">{evidence().evidenceId}</div>
+                  <div class="evidence-details">
+                    <div>Type: {evidence().evidenceType}</div>
+                    <div>Case: {evidence().caseId}</div>
+                    <div>{t('forensics.timeLabel')}: {getEvidenceTimeLabel(evidence())}</div>
+                  </div>
+                </div>
+              )}
+            </Show>
+          </Show>
+
+          <Show when={activePanel() === 'blood'}>
+            <div class="form-section">
+              <label class="form-label">Link to Case</label>
+              <select class="dos-input" value={caseId()} onChange={(e) => setCaseId(e.currentTarget.value)}>
+                <option value="">Select open case</option>
+                <For each={openCases()}>
+                  {(c) => (
+                    <option value={c.caseId}>
+                      {c.caseId} - {c.title}
+                    </option>
+                  )}
+                </For>
               </select>
             </div>
-          </Show>
-          
-          <Show when={evidenceType() === 'FIBERS'}>
+
             <div class="form-section">
-              <label class="form-label">{t('forensics.fiberColor')}</label>
-              <Input.Root type="text" class="dos-input" value={fiberColor()} onInput={(e) => setFiberColor(e.currentTarget.value)} />
+              <label class="form-label">Citizen ID</label>
+              <Input.Root
+                type="text"
+                class="dos-input"
+                value={requestCitizenId()}
+                onInput={(e) => setRequestCitizenId(e.currentTarget.value)}
+                placeholder="CID00001"
+              />
+            </div>
+
+            <div class="form-section">
+              <label class="form-label">Person Name</label>
+              <Input.Root
+                type="text"
+                class="dos-input"
+                value={requestPersonName()}
+                onInput={(e) => setRequestPersonName(e.currentTarget.value)}
+                placeholder="Full name"
+              />
+            </div>
+
+            <div class="form-section">
+              <label class="form-label">Pickup Location</label>
+              <Input.Root
+                type="text"
+                class="dos-input"
+                value={requestLocation()}
+                onInput={(e) => setRequestLocation(e.currentTarget.value)}
+                placeholder="Hospital / station / scene"
+              />
+            </div>
+
+            <div class="form-section">
+              <label class="form-label">Request Reason</label>
+              <textarea
+                class="dos-input"
+                rows={3}
+                value={requestReason()}
+                onInput={(e) => setRequestReason(e.currentTarget.value)}
+                placeholder="Why is the blood sample required?"
+              />
+            </div>
+
+            <div class="form-actions">
+              <Button.Root class="btn btn-primary" onClick={() => void createBloodRequest()} disabled={isRequestingBlood() || !caseId()}>
+                [{isRequestingBlood() ? 'REQUESTING...' : 'REQUEST BLOOD SAMPLE'}]
+              </Button.Root>
+              <Button.Root class="btn" onClick={() => void loadBloodRequests()}>
+                [REFRESH]
+              </Button.Root>
+            </div>
+
+            <div class="form-section">
+              <label class="form-label">Recent Requests</label>
+              <For each={bloodRequests()}>
+                {(request) => (
+                  <div class="inventory-category" style={{ 'margin-bottom': '8px' }}>
+                    <div>
+                      <strong>{request.requestId}</strong> - {request.personName || 'UNKNOWN'}
+                    </div>
+                    <div>
+                      <span style={{ color: bloodStatusColor(request.status) }}>{request.status}</span>
+                      {' '}| Case: {request.caseId || 'UNLINKED'} | {new Date(request.requestedAt).toLocaleString()}
+                    </div>
+                    <Show when={request.reason}>
+                      <div>Reason: {request.reason}</div>
+                    </Show>
+                    <Show when={request.notes}>
+                      <div>Notes: {request.notes}</div>
+                    </Show>
+                  </div>
+                )}
+              </For>
+              <Show when={bloodRequests().length === 0}>
+                <div class="inventory-category">No blood requests yet.</div>
+              </Show>
             </div>
           </Show>
-          
-          <Show when={evidenceType() === 'FINGERPRINT'}>
-            <div class="form-section">
-              <label class="form-label">{t('forensics.quality', undefined, { value: quality() })}</label>
-              <Input.Root type="range" class="dos-input" min="0" max="100" value={quality()} onInput={(e) => setQuality(parseInt(e.currentTarget.value))} />
-            </div>
-          </Show>
-          
-          <div class="form-section">
-            <label class="form-label">{t('forensics.description')}</label>
-            <textarea
-              class="dos-input"
-              rows={3}
-              value={description()}
-              onInput={(e) => setDescription(e.currentTarget.value)}
-              placeholder={t('forensics.descriptionPlaceholder')}
-            />
-          </div>
 
           <div class="form-section">
             <label class="form-label">{t('forensics.workflowTitle')}</label>
@@ -191,27 +430,6 @@ export function ForensicCollection() {
             <div class="inventory-category">{t('forensics.workflow3')}</div>
             <div class="inventory-category">{t('forensics.workflow4')}</div>
           </div>
-          
-          <div class="form-actions">
-            <Button.Root class="btn btn-primary" onClick={handleCollect} disabled={isCollecting() || !caseId()}>
-              {isCollecting() ? t('forensics.collecting') : t('forensics.collect')}
-            </Button.Root>
-            <Button.Root class="btn" onClick={closeModal}>{t('forensics.cancel')}</Button.Root>
-          </div>
-          
-          <Show when={collectedEvidence()}>
-            {(evidence) => (
-              <div class="collection-success">
-                <h3>{t('forensics.collected')}</h3>
-                <div class="evidence-id">{evidence().evidenceId}</div>
-                <div class="evidence-details">
-                  <div>Type: {evidence().evidenceType}</div>
-                  <div>Case: {evidence().caseId}</div>
-                  <div>{t('forensics.timeLabel')}: {getEvidenceTimeLabel(evidence())}</div>
-                </div>
-              </div>
-            )}
-          </Show>
         </div>
       </div>
     </Modal.Root>

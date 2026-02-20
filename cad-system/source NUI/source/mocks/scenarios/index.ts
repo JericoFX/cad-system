@@ -11,6 +11,8 @@ import { drugBustScenario } from './drugBustScenario';
 import { violentCrimeScenario } from './violentCrimeScenario';
 import { accidentSceneScenario } from './accidentSceneScenario';
 import { evidenceCollectionScenario } from './evidenceCollectionScenario';
+import { cctvGridScenario } from './cctvGridScenario';
+import { forensicLabRequestsScenario } from './forensicLabRequestsScenario';
 
 import { vehicleCompactScenario } from './vehicleCompactScenario';
 
@@ -28,6 +30,8 @@ export const ALL_SCENARIOS: Scenario[] = [
   violentCrimeScenario,
   accidentSceneScenario,
   evidenceCollectionScenario,
+  cctvGridScenario,
+  forensicLabRequestsScenario,
 ];
 
 export function getScenarioById(id: string): Scenario | undefined {
@@ -51,3 +55,5 @@ export { violentCrimeScenario };
 export { accidentSceneScenario };
 export { evidenceCollectionScenario };
 export { vehicleCompactScenario };
+export { cctvGridScenario };
+export { forensicLabRequestsScenario };

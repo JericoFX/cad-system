@@ -3,6 +3,7 @@ import {
   setMockCases, 
   setMockCalls, 
   setMockUnits,
+  setMockSecurityCameras,
   setMockEmsUnits,
   setMockEmsAlerts,
   setMockBloodRequests,
@@ -83,6 +84,9 @@ export async function loadScenario(scenario: Scenario): Promise<void> {
       cadActions.updateDispatchUnit(unit.unitId, unit);
     });
   }
+
+  setMockSecurityCameras(scenario.data.securityCameras || {});
+  cadActions.setSecurityCameras(scenario.data.securityCameras || {});
   
   // Load EMS Data
   if (scenario.data.alerts) {
