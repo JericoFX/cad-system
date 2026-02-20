@@ -93,7 +93,7 @@ local function sanitizeCategory(value)
     return 'COMMUNITY'
 end
 
-local function sanitizeArticle(payload, identity)
+local function sanitizeArticle(payload, identity, existingArticle)
     if type(payload) ~= 'table' then
         return nil, 'invalid_article_payload'
     end
@@ -128,11 +128,15 @@ local function sanitizeArticle(payload, identity)
     local publishedAt = CAD.Server.SanitizeString(snapshot.publishedAt, 32)
     snapshot.publishedAt = publishedAt ~= '' and publishedAt or nil
 
-    local createdAt = CAD.Server.SanitizeString(snapshot.createdAt, 32)
-    snapshot.createdAt = createdAt ~= '' and createdAt or CAD.Server.ToIso()
+    local nowIso = CAD.Server.ToIso()
+    local existingCreatedAt = CAD.Server.SanitizeString(existingArticle and existingArticle.createdAt, 32)
+    if existingCreatedAt ~= '' then
+        snapshot.createdAt = existingCreatedAt
+    else
+        snapshot.createdAt = nowIso
+    end
 
-    local updatedAt = CAD.Server.SanitizeString(snapshot.updatedAt, 32)
-    snapshot.updatedAt = updatedAt ~= '' and updatedAt or CAD.Server.ToIso()
+    snapshot.updatedAt = nowIso
 
     snapshot.category = sanitizeCategory(snapshot.category)
     snapshot.priority = clampPriority(snapshot.priority)
@@ -262,12 +266,15 @@ local function upsertNewsArticle(source, payload)
 
     payload = type(payload) == 'table' and payload or {}
     local articlePayload = type(payload.article) == 'table' and payload.article or payload
-    local article, articleErr = sanitizeArticle(articlePayload, identity)
+    local requestedArticleId = CAD.Server.SanitizeString(articlePayload and articlePayload.articleId, 64)
+    local existing = requestedArticleId ~= '' and CAD.State.News.Articles[requestedArticleId] or nil
+
+    local article, articleErr = sanitizeArticle(articlePayload, identity, existing)
     if not article then
         return { ok = false, error = articleErr or 'invalid_article_payload' }
     end
 
-    local existing = CAD.State.News.Articles[article.articleId]
+    existing = existing or CAD.State.News.Articles[article.articleId]
     if existing and existing.author and existing.author.id and existing.author.id ~= identity.identifier and not identity.isAdmin then
         return { ok = false, error = 'not_owner' }
     end

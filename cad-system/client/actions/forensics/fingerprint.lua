@@ -22,8 +22,8 @@ end
 
 local function isCrimeContext()
     local calls = CAD.State.Dispatch.Calls or {}
-    for i = 1, #calls do
-        if calls[i].status == 'ACTIVE' then
+    for _, call in pairs(calls) do
+        if type(call) == 'table' and call.status == 'ACTIVE' then
             return true
         end
     end

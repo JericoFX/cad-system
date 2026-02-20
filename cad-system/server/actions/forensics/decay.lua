@@ -48,6 +48,11 @@ CreateThread(function()
                 goto continue
             end
 
+            if visibility <= 0.01 or quality <= 0 then
+                evidences.blood[bloodId] = nil
+                goto continue
+            end
+
             local currentVisibility = tonumber(blood.visibility) or 1.0
             local currentQuality = tonumber(blood.quality) or 100
 
@@ -90,6 +95,11 @@ CreateThread(function()
             local currentVisibility = tonumber(fp.visibility) or 1.0
             local currentQuality = tonumber(fp.quality) or 100
 
+            if visibility <= 0.01 or quality <= 0 then
+                evidences.fingerprints[fpId] = nil
+                goto continueFingerprint
+            end
+
             if visibility < currentVisibility or quality < currentQuality then
                 evidences.fingerprints[fpId] = {
                     id = fp.id,
@@ -129,6 +139,11 @@ CreateThread(function()
 
             local currentVisibility = tonumber(casing.visibility) or 1.0
             local currentQuality = tonumber(casing.quality) or 100
+
+            if visibility <= 0.01 or quality <= 0 then
+                evidences.casings[casingId] = nil
+                goto continueCasing
+            end
 
             if visibility < currentVisibility or quality < currentQuality then
                 evidences.casings[casingId] = {

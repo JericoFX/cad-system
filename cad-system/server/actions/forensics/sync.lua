@@ -38,10 +38,7 @@ local function ensureEvidenceState()
 end
 
 CreateThread(function()
-    while true do
-        Wait(1000)
-        ensureEvidenceState()
-    end
+    ensureEvidenceState()
 end)
 
 RegisterNetEvent('cad:forensic:sync', function(evidenceType, ownerId, ...)
@@ -53,8 +50,8 @@ RegisterNetEvent('cad:forensic:sync', function(evidenceType, ownerId, ...)
     if not evidenceConfig then return end
 
     local inActiveCrime = false
-    for _, call in ipairs(CAD.State.Dispatch.Calls or {}) do
-        if call.status == 'ACTIVE' then
+    for _, call in pairs(CAD.State.Dispatch.Calls or {}) do
+        if type(call) == 'table' and call.status == 'ACTIVE' then
             inActiveCrime = true
             break
         end
