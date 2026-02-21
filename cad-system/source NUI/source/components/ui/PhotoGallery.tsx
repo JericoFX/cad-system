@@ -1,6 +1,5 @@
 import { JSX, mergeProps, splitProps, For, Show } from 'solid-js';
 import { cn } from '~/utils/cn';
-import { useUIContext } from './UIContext';
 import { viewerActions } from '~/stores/viewerStore';
 
 export interface PhotoGalleryProps {
@@ -12,7 +11,6 @@ export interface PhotoGalleryProps {
 }
 
 function PhotoGallery(props: PhotoGalleryProps) {
-  const ui = useUIContext();
   const merged = mergeProps(
     {
       maxPhotos: 3,

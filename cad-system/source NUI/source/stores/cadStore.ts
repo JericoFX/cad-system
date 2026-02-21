@@ -1,4 +1,12 @@
 import { createStore } from 'solid-js/store';
+import { 
+  updateEntity, 
+  addToArray, 
+  createTransferEvent, 
+  createAnalysisRequestEvent,
+  createAnalysisCompletionEvent,
+  createSearchFilter
+} from '~/utils/storeHelpers';
 
 export interface Case {
   caseId: string;
@@ -420,41 +428,15 @@ export const cadActions = {
     );
   },
   transferEvidence: (caseId: string, evidenceId: string, fromOfficer: string, toOfficer: string, notes?: string) => {
-    const event: CustodyEvent = {
-      eventId: `CUSTODY_${Date.now()}`,
-      evidenceId,
-      eventType: 'TRANSFERRED',
-      fromOfficer,
-      toOfficer,
-      notes: notes || `Transferred from ${fromOfficer} to ${toOfficer}`,
-      timestamp: new Date().toISOString(),
-      recordedBy: fromOfficer,
-    };
+    const event = createTransferEvent(evidenceId, fromOfficer, toOfficer, notes);
     cadActions.addCustodyEvent(caseId, evidenceId, event);
   },
   analyzeEvidence: (caseId: string, evidenceId: string, analystId: string, location: string, notes?: string) => {
-    const event: CustodyEvent = {
-      eventId: `CUSTODY_${Date.now()}`,
-      evidenceId,
-      eventType: 'ANALYZED',
-      toOfficer: analystId,
-      location,
-      notes: notes || 'Sent for analysis',
-      timestamp: new Date().toISOString(),
-      recordedBy: analystId,
-    };
+    const event = createAnalysisCompletionEvent(evidenceId, analystId, location, notes);
     cadActions.addCustodyEvent(caseId, evidenceId, event);
   },
   requestEvidenceAnalysis: (caseId: string, evidenceId: string, requestedBy: string, notes?: string) => {
-    const event: CustodyEvent = {
-      eventId: `CUSTODY_${Date.now()}`,
-      evidenceId,
-      eventType: 'SUBMITTED',
-      toOfficer: 'FORENSICS_LAB',
-      notes: notes || 'Submitted for forensic analysis',
-      timestamp: new Date().toISOString(),
-      recordedBy: requestedBy,
-    };
+    const event = createAnalysisRequestEvent(evidenceId, requestedBy, notes);
     cadActions.addCustodyEvent(caseId, evidenceId, event);
   },
   getEvidenceCustodyChain: (caseId: string, evidenceId: string): CustodyEvent[] => {
@@ -463,32 +445,23 @@ export const cadActions = {
   },
   
   searchCases: (query: string) => {
-    const lowerQuery = query.toLowerCase();
-    return Object.values(cadState.cases).filter(c => 
-      c.caseId.toLowerCase().includes(lowerQuery) ||
-      c.title.toLowerCase().includes(lowerQuery) ||
-      (c.personName && c.personName.toLowerCase().includes(lowerQuery)) ||
-      (c.personId && c.personId.toLowerCase().includes(lowerQuery))
-    );
+    const searchFilter = createSearchFilter<Case>(['caseId', 'title', 'personName', 'personId']);
+    return searchFilter(Object.values(cadState.cases), query);
   },
   
   setPersons: (persons: Record<string, Person>) => setCADState('persons', persons),
   addPerson: (person: Person) => setCADState('persons', person.citizenid, { ...person, notes: person.notes || [] }),
   updatePerson: (citizenid: string, data: Partial<Person>) => {
-    setCADState('persons', citizenid, (prev) => ({ ...prev, ...data, lastUpdated: new Date().toISOString() }));
+    updateEntity(setCADState, 'persons', citizenid, data);
   },
   addPersonNote: (citizenid: string, note: EntityNote) => {
-    setCADState('persons', citizenid, (prev) => ({
-      ...prev,
-      notes: [...(prev?.notes || []), note],
-      lastUpdated: new Date().toISOString(),
-    }));
+    addToArray(setCADState, 'persons', citizenid, 'notes', note);
   },
   
   setVehicles: (vehicles: Record<string, Vehicle>) => setCADState('vehicles', vehicles),
   addVehicle: (vehicle: Vehicle) => setCADState('vehicles', vehicle.plate, { ...vehicle, notes: vehicle.notes || [] }),
   updateVehicle: (plate: string, data: Partial<Vehicle>) => {
-    setCADState('vehicles', plate, (prev) => ({ ...prev, ...data }));
+    updateEntity(setCADState, 'vehicles', plate, data);
   },
   addPersonPhoto: (citizenid: string, photoUrl: string) => {
     setCADState('persons', citizenid, (prev) => {
@@ -521,6 +494,10 @@ export const cadActions = {
       const { [fineId]: _, ...rest } = prev;
       return rest;
     });
+  },
+  
+  addVehicleNote: (plate: string, note: EntityNote) => {
+    addToArray(setCADState, 'vehicles', plate, 'notes', note);
   },
   
   setCriminalRecords: (records: Record<string, CriminalRecord>) => setCADState('criminalRecords', records),

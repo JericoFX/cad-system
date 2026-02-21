@@ -244,7 +244,7 @@ export function BoloManager() {
                 
                 <Show when={bolo.photos && bolo.photos.length > 0}>
                   <div class="bolo-photos" style={{ 'margin-top': '8px', 'padding-top': '8px', 'border-top': '1px solid var(--terminal-border-dim)' }}>
-                    <PhotoGallery photos={bolo.photos} maxPhotos={1} />
+                    <PhotoGallery photos={bolo.photos || []} maxPhotos={1} />
                   </div>
                 </Show>
 

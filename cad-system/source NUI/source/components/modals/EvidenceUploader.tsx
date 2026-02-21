@@ -341,7 +341,7 @@ export function EvidenceUploader() {
             <Text.Root
               as='div'
               class='target-context-indicator'
-              tone='info'
+              tone='system'
               style={{ 'font-size': '12px', 'margin-top': '4px' }}
             >
               Uploading as standalone evidence (will be added to staging)
