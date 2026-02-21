@@ -266,6 +266,260 @@ function CAD.Database.EnsureSchema()
         )
     ]])
 
+    execute([[
+        CREATE TABLE IF NOT EXISTS cad_terminals (
+            terminal_id VARCHAR(64) PRIMARY KEY,
+            label VARCHAR(128) NOT NULL,
+            coords LONGTEXT NOT NULL,
+            radius FLOAT NOT NULL DEFAULT 1.25,
+            enabled TINYINT NOT NULL DEFAULT 1,
+            metadata LONGTEXT NULL,
+            created_by VARCHAR(128) NULL,
+            created_by_name VARCHAR(128) NULL,
+            created_at VARCHAR(32) NOT NULL,
+            updated_at VARCHAR(32) NOT NULL,
+            KEY idx_terminals_enabled (enabled)
+        )
+    ]])
+
+    execute([[
+        CREATE TABLE IF NOT EXISTS cad_terminal_jobs (
+            id BIGINT AUTO_INCREMENT PRIMARY KEY,
+            terminal_id VARCHAR(64) NOT NULL,
+            job_name VARCHAR(64) NOT NULL,
+            UNIQUE KEY uq_terminal_job (terminal_id, job_name),
+            KEY idx_terminal_jobs_terminal (terminal_id)
+        )
+    ]])
+
+    execute([[
+        CREATE TABLE IF NOT EXISTS cad_terminal_readers (
+            reader_id VARCHAR(64) PRIMARY KEY,
+            terminal_id VARCHAR(64) NOT NULL,
+            label VARCHAR(128) NOT NULL,
+            coords LONGTEXT NOT NULL,
+            rotation LONGTEXT NULL,
+            interaction_distance FLOAT NOT NULL DEFAULT 1.6,
+            slots INT NOT NULL DEFAULT 5,
+            read_slot INT NOT NULL DEFAULT 1,
+            weight INT NOT NULL DEFAULT 2000,
+            strict_allowed_items TINYINT NOT NULL DEFAULT 0,
+            allowed_items LONGTEXT NULL,
+            enabled TINYINT NOT NULL DEFAULT 1,
+            metadata LONGTEXT NULL,
+            created_by VARCHAR(128) NULL,
+            created_by_name VARCHAR(128) NULL,
+            created_at VARCHAR(32) NOT NULL,
+            updated_at VARCHAR(32) NOT NULL,
+            UNIQUE KEY uq_reader_terminal (terminal_id),
+            KEY idx_readers_enabled (enabled),
+            KEY idx_readers_terminal (terminal_id)
+        )
+    ]])
+
+    execute([[
+        CREATE TABLE IF NOT EXISTS cad_terminal_reader_jobs (
+            id BIGINT AUTO_INCREMENT PRIMARY KEY,
+            reader_id VARCHAR(64) NOT NULL,
+            job_name VARCHAR(64) NOT NULL,
+            UNIQUE KEY uq_reader_job (reader_id, job_name),
+            KEY idx_reader_jobs_reader (reader_id)
+        )
+    ]])
+
+    execute([[
+        CREATE TABLE IF NOT EXISTS cad_terminal_lockers (
+            locker_id VARCHAR(64) PRIMARY KEY,
+            terminal_id VARCHAR(64) NOT NULL,
+            label VARCHAR(128) NOT NULL,
+            coords LONGTEXT NOT NULL,
+            rotation LONGTEXT NULL,
+            interaction_distance FLOAT NOT NULL DEFAULT 1.6,
+            slots INT NOT NULL DEFAULT 200,
+            weight INT NOT NULL DEFAULT 500000,
+            enabled TINYINT NOT NULL DEFAULT 1,
+            metadata LONGTEXT NULL,
+            created_by VARCHAR(128) NULL,
+            created_by_name VARCHAR(128) NULL,
+            created_at VARCHAR(32) NOT NULL,
+            updated_at VARCHAR(32) NOT NULL,
+            KEY idx_lockers_terminal (terminal_id),
+            KEY idx_lockers_enabled (enabled)
+        )
+    ]])
+
+    execute([[
+        CREATE TABLE IF NOT EXISTS cad_terminal_locker_jobs (
+            id BIGINT AUTO_INCREMENT PRIMARY KEY,
+            locker_id VARCHAR(64) NOT NULL,
+            job_name VARCHAR(64) NOT NULL,
+            UNIQUE KEY uq_locker_job (locker_id, job_name),
+            KEY idx_locker_jobs_locker (locker_id)
+        )
+    ]])
+
+    execute([[
+        CREATE TABLE IF NOT EXISTS cad_forensic_labs (
+            lab_id VARCHAR(64) PRIMARY KEY,
+            name VARCHAR(128) NOT NULL,
+            coords LONGTEXT NOT NULL,
+            radius FLOAT NOT NULL DEFAULT 10.0,
+            enabled TINYINT NOT NULL DEFAULT 1,
+            metadata LONGTEXT NULL,
+            created_by VARCHAR(128) NULL,
+            created_by_name VARCHAR(128) NULL,
+            created_at VARCHAR(32) NOT NULL,
+            updated_at VARCHAR(32) NOT NULL,
+            KEY idx_forensic_labs_enabled (enabled)
+        )
+    ]])
+
+    execute([[
+        CREATE TABLE IF NOT EXISTS cad_forensic_lab_jobs (
+            id BIGINT AUTO_INCREMENT PRIMARY KEY,
+            lab_id VARCHAR(64) NOT NULL,
+            job_name VARCHAR(64) NOT NULL,
+            UNIQUE KEY uq_lab_job (lab_id, job_name),
+            KEY idx_lab_jobs_lab (lab_id)
+        )
+    ]])
+
+    execute([[
+        CREATE TABLE IF NOT EXISTS cad_runtime_config (
+            config_key VARCHAR(128) PRIMARY KEY,
+            config_value LONGTEXT NOT NULL,
+            updated_by VARCHAR(128) NULL,
+            updated_at VARCHAR(32) NOT NULL
+        )
+    ]])
+
+    execute([[
+        CREATE TABLE IF NOT EXISTS cad_terminals (
+            terminal_id VARCHAR(64) PRIMARY KEY,
+            label VARCHAR(128) NOT NULL,
+            coords LONGTEXT NOT NULL,
+            radius FLOAT NOT NULL DEFAULT 1.25,
+            enabled TINYINT NOT NULL DEFAULT 1,
+            metadata LONGTEXT NULL,
+            created_by VARCHAR(128) NULL,
+            created_by_name VARCHAR(128) NULL,
+            created_at VARCHAR(32) NOT NULL,
+            updated_at VARCHAR(32) NOT NULL,
+            KEY idx_terminals_enabled (enabled)
+        )
+    ]])
+
+    execute([[
+        CREATE TABLE IF NOT EXISTS cad_terminal_jobs (
+            id BIGINT AUTO_INCREMENT PRIMARY KEY,
+            terminal_id VARCHAR(64) NOT NULL,
+            job_name VARCHAR(64) NOT NULL,
+            UNIQUE KEY uq_terminal_job (terminal_id, job_name),
+            KEY idx_terminal_jobs_terminal (terminal_id)
+        )
+    ]])
+
+    execute([[
+        CREATE TABLE IF NOT EXISTS cad_terminal_readers (
+            reader_id VARCHAR(64) PRIMARY KEY,
+            terminal_id VARCHAR(64) NOT NULL,
+            label VARCHAR(128) NOT NULL,
+            coords LONGTEXT NOT NULL,
+            rotation LONGTEXT NULL,
+            interaction_distance FLOAT NOT NULL DEFAULT 1.6,
+            slots INT NOT NULL DEFAULT 5,
+            read_slot INT NOT NULL DEFAULT 1,
+            weight INT NOT NULL DEFAULT 2000,
+            strict_allowed_items TINYINT NOT NULL DEFAULT 0,
+            allowed_items LONGTEXT NULL,
+            enabled TINYINT NOT NULL DEFAULT 1,
+            metadata LONGTEXT NULL,
+            created_by VARCHAR(128) NULL,
+            created_by_name VARCHAR(128) NULL,
+            created_at VARCHAR(32) NOT NULL,
+            updated_at VARCHAR(32) NOT NULL,
+            UNIQUE KEY uq_reader_terminal (terminal_id),
+            KEY idx_readers_enabled (enabled),
+            KEY idx_readers_terminal (terminal_id)
+        )
+    ]])
+
+    execute([[
+        CREATE TABLE IF NOT EXISTS cad_terminal_reader_jobs (
+            id BIGINT AUTO_INCREMENT PRIMARY KEY,
+            reader_id VARCHAR(64) NOT NULL,
+            job_name VARCHAR(64) NOT NULL,
+            UNIQUE KEY uq_reader_job (reader_id, job_name),
+            KEY idx_reader_jobs_reader (reader_id)
+        )
+    ]])
+
+    execute([[
+        CREATE TABLE IF NOT EXISTS cad_terminal_lockers (
+            locker_id VARCHAR(64) PRIMARY KEY,
+            terminal_id VARCHAR(64) NOT NULL,
+            label VARCHAR(128) NOT NULL,
+            coords LONGTEXT NOT NULL,
+            rotation LONGTEXT NULL,
+            interaction_distance FLOAT NOT NULL DEFAULT 1.6,
+            slots INT NOT NULL DEFAULT 200,
+            weight INT NOT NULL DEFAULT 500000,
+            enabled TINYINT NOT NULL DEFAULT 1,
+            metadata LONGTEXT NULL,
+            created_by VARCHAR(128) NULL,
+            created_by_name VARCHAR(128) NULL,
+            created_at VARCHAR(32) NOT NULL,
+            updated_at VARCHAR(32) NOT NULL,
+            KEY idx_lockers_terminal (terminal_id),
+            KEY idx_lockers_enabled (enabled)
+        )
+    ]])
+
+    execute([[
+        CREATE TABLE IF NOT EXISTS cad_terminal_locker_jobs (
+            id BIGINT AUTO_INCREMENT PRIMARY KEY,
+            locker_id VARCHAR(64) NOT NULL,
+            job_name VARCHAR(64) NOT NULL,
+            UNIQUE KEY uq_locker_job (locker_id, job_name),
+            KEY idx_locker_jobs_locker (locker_id)
+        )
+    ]])
+
+    execute([[
+        CREATE TABLE IF NOT EXISTS cad_forensic_labs (
+            lab_id VARCHAR(64) PRIMARY KEY,
+            name VARCHAR(128) NOT NULL,
+            coords LONGTEXT NOT NULL,
+            radius FLOAT NOT NULL DEFAULT 10.0,
+            enabled TINYINT NOT NULL DEFAULT 1,
+            metadata LONGTEXT NULL,
+            created_by VARCHAR(128) NULL,
+            created_by_name VARCHAR(128) NULL,
+            created_at VARCHAR(32) NOT NULL,
+            updated_at VARCHAR(32) NOT NULL,
+            KEY idx_forensic_labs_enabled (enabled)
+        )
+    ]])
+
+    execute([[
+        CREATE TABLE IF NOT EXISTS cad_forensic_lab_jobs (
+            id BIGINT AUTO_INCREMENT PRIMARY KEY,
+            lab_id VARCHAR(64) NOT NULL,
+            job_name VARCHAR(64) NOT NULL,
+            UNIQUE KEY uq_lab_job (lab_id, job_name),
+            KEY idx_lab_jobs_lab (lab_id)
+        )
+    ]])
+
+    execute([[
+        CREATE TABLE IF NOT EXISTS cad_runtime_config (
+            config_key VARCHAR(128) PRIMARY KEY,
+            config_value LONGTEXT NOT NULL,
+            updated_by VARCHAR(128) NULL,
+            updated_at VARCHAR(32) NOT NULL
+        )
+    ]])
+
     execute([[SET GLOBAL event_scheduler = ON]])
 
     execute([[

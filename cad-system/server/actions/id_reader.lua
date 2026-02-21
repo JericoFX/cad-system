@@ -399,18 +399,6 @@ local function normalizeDocumentPayload(itemName, metadata, sourceSlot)
     }
 end
 
-local function getTerminalById(terminalId)
-    local points = CAD.Config.UI.AccessPoints or {}
-    for i = 1, #points do
-        local point = points[i]
-        if point.id == terminalId then
-            return point
-        end
-    end
-
-    return nil
-end
-
 local function isVehicleEndpointId(value)
     return type(value) == 'string' and value:sub(1, 8) == 'vehicle:'
 end
@@ -538,16 +526,15 @@ local function resolveVehicleReaderContext(source, payload, officer, rawTerminal
     return terminalId, context, readerConfig, nil
 end
 
-local function normalizeReaderConfig(terminal)
+local function normalizeReaderConfig(terminal, reader)
     local global = CAD.Config.Forensics and CAD.Config.Forensics.IdReader or {}
-    local reader = terminal.idReader
     if type(reader) ~= 'table' or reader.enabled ~= true then
         return nil
     end
 
     local stashId = reader.stashId
     if type(stashId) ~= 'string' or stashId == '' then
-        stashId = ('cad_id_reader_%s'):format(terminal.id or 'terminal')
+        stashId = ('cad_id_reader_%s'):format(reader.readerId or terminal.terminalId or terminal.id or 'terminal')
     end
 
     local slotCount = tonumber(reader.slots) or tonumber(global.SlotCount) or 5
@@ -555,12 +542,13 @@ local function normalizeReaderConfig(terminal)
 
     return {
         stashId = stashId,
-        label = reader.label or ('ID Reader - %s'):format(terminal.label or terminal.id or 'Terminal'),
+        label = reader.label or ('ID Reader - %s'):format(terminal.label or terminal.terminalId or terminal.id or 'Terminal'),
         slots = math.max(1, math.floor(slotCount)),
         weight = tonumber(reader.weight) or 2000,
         readSlot = math.max(1, math.floor(readSlot)),
         allowedItems = type(reader.allowedItems) == 'table' and reader.allowedItems or {},
-        strictAllowedItems = global.StrictAllowedItems == true,
+        strictAllowedItems = reader.strictAllowedItems == true or global.StrictAllowedItems == true,
+        readerId = reader.readerId,
     }
 end
 
@@ -643,15 +631,43 @@ local function resolveReaderContext(source, payload, officer)
         return resolveVehicleReaderContext(source, payload, officer, terminalId)
     end
 
-    local terminal = getTerminalById(terminalId)
-    if not terminal then
+    if not CAD.Topology or not CAD.Topology.ResolveReaderContext then
+        return nil, nil, nil, {
+            ok = false,
+            error = 'topology_unavailable',
+        }
+    end
+
+    local terminal, reader, topologyErr = CAD.Topology.ResolveReaderContext(officer, terminalId)
+    if topologyErr == 'terminal_not_found' then
         return nil, nil, nil, {
             ok = false,
             error = 'terminal_not_found',
         }
     end
 
-    local readerConfig = normalizeReaderConfig(terminal)
+    if topologyErr == 'forbidden' then
+        return nil, nil, nil, {
+            ok = false,
+            error = 'forbidden',
+        }
+    end
+
+    if topologyErr == 'reader_not_enabled' then
+        return nil, nil, nil, {
+            ok = false,
+            error = 'reader_not_enabled',
+        }
+    end
+
+    if not terminal or not reader then
+        return nil, nil, nil, {
+            ok = false,
+            error = topologyErr or 'reader_not_enabled',
+        }
+    end
+
+    local readerConfig = normalizeReaderConfig(terminal, reader)
     if not readerConfig then
         return nil, nil, nil, {
             ok = false,

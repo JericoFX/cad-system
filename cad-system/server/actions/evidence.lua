@@ -10,95 +10,110 @@ local function evidenceVirtualEnabled()
     return cfg.UseVirtualContainer ~= false and CAD.VirtualContainer ~= nil
 end
 
-local function getTerminalById(terminalId)
-    local points = CAD.Config.UI.AccessPoints or {}
-    for i = 1, #points do
-        local point = points[i]
-        if point.id == terminalId then
-            return point
-        end
-    end
-
-    return nil
-end
-
-local function hasTerminalAccess(officer, terminal)
-    if not terminal.jobs or #terminal.jobs == 0 then
-        return true
-    end
-
-    if officer.isAdmin then
-        return true
-    end
-
-    for i = 1, #terminal.jobs do
-        if terminal.jobs[i] == officer.job then
-            return true
-        end
-    end
-
-    return false
-end
-
-local function normalizeContainerConfig(terminal)
-    local container = terminal.evidenceContainer
-    if type(container) ~= 'table' or container.enabled ~= true then
+local function normalizeContainerConfig(terminal, locker)
+    if type(locker) ~= 'table' or locker.enabled ~= true then
         return nil
     end
 
     local global = CAD.Config.Evidence or {}
-    local slots = tonumber(container.slots) or tonumber(global.VirtualContainerSlotCount) or 200
+    local slots = tonumber(locker.slots) or tonumber(global.VirtualContainerSlotCount) or 200
 
     return {
         slots = math.max(1, math.floor(slots)),
-        label = tostring(container.label or ('Evidence Locker - %s'):format(terminal.label or terminal.id or 'Terminal')),
+        label = tostring(locker.label or ('Evidence Locker - %s'):format(terminal.label or terminal.terminalId or 'Terminal')),
+        lockerId = locker.lockerId,
+        terminalId = terminal.terminalId,
     }
 end
 
 local function resolveContainerContext(payload, officer)
-    local terminalId = CAD.Server.SanitizeString(payload and payload.terminalId, 64)
-    if terminalId == '' then
-        return nil, nil, nil, {
+    if not CAD.Topology or not CAD.Topology.ResolveLockerContext then
+        return nil, nil, nil, nil, {
+            ok = false,
+            error = 'topology_unavailable',
+        }
+    end
+
+    local terminal, locker, topologyErr = CAD.Topology.ResolveLockerContext(officer, payload)
+    if topologyErr == 'terminal_id_required' then
+        return nil, nil, nil, nil, {
             ok = false,
             error = 'terminal_id_required',
         }
     end
 
-    local terminal = getTerminalById(terminalId)
-    if not terminal then
-        return nil, nil, nil, {
+    if topologyErr == 'terminal_not_found' then
+        return nil, nil, nil, nil, {
             ok = false,
             error = 'terminal_not_found',
         }
     end
 
-    local containerConfig = normalizeContainerConfig(terminal)
-    if not containerConfig then
-        return nil, nil, nil, {
+    if topologyErr == 'locker_not_found' then
+        return nil, nil, nil, nil, {
             ok = false,
-            error = 'container_not_enabled',
+            error = 'locker_not_found',
         }
     end
 
-    if not hasTerminalAccess(officer, terminal) then
-        return nil, nil, nil, {
+    if topologyErr == 'forbidden' then
+        return nil, nil, nil, nil, {
             ok = false,
             error = 'forbidden',
         }
     end
 
-    return terminalId, terminal, containerConfig, nil
+    if topologyErr == 'container_not_enabled' or not locker then
+        return nil, nil, nil, nil, {
+            ok = false,
+            error = 'container_not_enabled',
+        }
+    end
+
+    local terminalId = tostring(terminal and terminal.terminalId or '')
+    if terminalId == '' then
+        return nil, nil, nil, nil, {
+            ok = false,
+            error = 'terminal_not_found',
+        }
+    end
+
+    local lockerId = tostring(locker and locker.lockerId or '')
+    if lockerId == '' then
+        return nil, nil, nil, nil, {
+            ok = false,
+            error = 'locker_not_found',
+        }
+    end
+
+    local containerConfig = normalizeContainerConfig(terminal, locker)
+    if not containerConfig then
+        return nil, nil, nil, nil, {
+            ok = false,
+            error = 'container_not_enabled',
+        }
+    end
+
+    return terminalId, lockerId, terminal, containerConfig, nil
 end
 
-local function getContainerKey(terminalId)
-    return ('terminal:%s:evidence'):format(terminalId)
+local function getContainerKey(lockerId)
+    return ('locker:%s:evidence'):format(lockerId)
 end
 
-local function ensureVirtualEvidenceContainer(terminalId, containerConfig)
-    local containerKey = getContainerKey(terminalId)
+local function ensureVirtualEvidenceContainer(lockerId, terminalId, containerConfig)
+    local containerKey = getContainerKey(lockerId)
+    local endpointId = lockerId ~= '' and lockerId or terminalId
+    local endpointRef = terminalId ~= '' and ('%s:%s'):format(terminalId, lockerId) or lockerId
+    local labelRef = containerConfig.label or lockerId
+
+    if endpointId == '' then
+        return nil, 'locker_not_found'
+    end
+
     local container, ensureErr = CAD.VirtualContainer.Ensure(containerKey, {
         containerType = 'evidence',
-        endpointId = terminalId,
+        endpointId = endpointRef ~= '' and endpointRef or endpointId,
         slotCount = containerConfig.slots,
         readSlot = 1,
         strictAllowedItems = false,
@@ -106,6 +121,10 @@ local function ensureVirtualEvidenceContainer(terminalId, containerConfig)
 
     if not container then
         return nil, ensureErr or 'container_not_ready'
+    end
+
+    if container.label == nil or container.label == '' then
+        container.label = labelRef
     end
 
     return container
@@ -245,12 +264,12 @@ lib.callback.register('cad:evidence:container:list', CAD.Auth.WithGuard('default
         }
     end
 
-    local terminalId, _, containerConfig, errorResponse = resolveContainerContext(payload, officer)
+    local terminalId, lockerId, _, containerConfig, errorResponse = resolveContainerContext(payload, officer)
     if errorResponse then
         return errorResponse
     end
 
-    local container, containerErr = ensureVirtualEvidenceContainer(terminalId, containerConfig)
+    local container, containerErr = ensureVirtualEvidenceContainer(lockerId, terminalId, containerConfig)
     if not container then
         return {
             ok = false,
@@ -261,6 +280,7 @@ lib.callback.register('cad:evidence:container:list', CAD.Auth.WithGuard('default
     return {
         ok = true,
         terminalId = terminalId,
+        lockerId = lockerId,
         containerKey = container.containerKey,
         slotCount = container.slotCount,
         slots = CAD.VirtualContainer.List(container.containerKey),
@@ -284,12 +304,12 @@ lib.callback.register('cad:evidence:container:store', CAD.Auth.WithGuard('heavy'
         }
     end
 
-    local terminalId, _, containerConfig, errorResponse = resolveContainerContext(payload, officer)
+    local terminalId, lockerId, _, containerConfig, errorResponse = resolveContainerContext(payload, officer)
     if errorResponse then
         return errorResponse
     end
 
-    local container, containerErr = ensureVirtualEvidenceContainer(terminalId, containerConfig)
+    local container, containerErr = ensureVirtualEvidenceContainer(lockerId, terminalId, containerConfig)
     if not container then
         return {
             ok = false,
@@ -370,6 +390,7 @@ lib.callback.register('cad:evidence:container:store', CAD.Auth.WithGuard('heavy'
     return {
         ok = true,
         terminalId = terminalId,
+        lockerId = lockerId,
         containerKey = container.containerKey,
         slot = targetSlot,
         stagingId = stagingId,
@@ -386,12 +407,12 @@ lib.callback.register('cad:evidence:container:pull', CAD.Auth.WithGuard('heavy',
 
     payload = type(payload) == 'table' and payload or {}
 
-    local terminalId, _, containerConfig, errorResponse = resolveContainerContext(payload, officer)
+    local terminalId, lockerId, _, containerConfig, errorResponse = resolveContainerContext(payload, officer)
     if errorResponse then
         return errorResponse
     end
 
-    local container, containerErr = ensureVirtualEvidenceContainer(terminalId, containerConfig)
+    local container, containerErr = ensureVirtualEvidenceContainer(lockerId, terminalId, containerConfig)
     if not container then
         return {
             ok = false,
@@ -437,6 +458,7 @@ lib.callback.register('cad:evidence:container:pull', CAD.Auth.WithGuard('heavy',
     return {
         ok = true,
         terminalId = terminalId,
+        lockerId = lockerId,
         containerKey = container.containerKey,
         slot = targetSlot,
         staging = staged,

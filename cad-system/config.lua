@@ -1,5 +1,3 @@
-
-
 CAD = CAD or {}
 
 local mediaService = string.lower(tostring(GetConvar('CAD_MEDIA_SERVICE', 'fivemanage')))
@@ -12,7 +10,7 @@ local mediaUploadUrl = tostring(GetConvar('CAD_MEDIA_UPLOAD_URL', ''))
 
 CAD.Config = {
 
-    Debug = false,  -- Global debug toggle for developer-only helpers and test commands.
+    Debug = false, -- Global debug toggle for developer-only helpers and test commands.
 
     Framework = {
         Preferred = 'qb-core',

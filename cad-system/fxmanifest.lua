@@ -41,6 +41,7 @@ client_scripts {
     'client/actions/forensics/target.lua',
 
     'client/actions/security_cameras.lua',
+    'client/actions/admin_cad.lua',
     'client/actions/vehicle_cad.lua',
 
     'client/shared/sounds.lua'
@@ -54,6 +55,7 @@ server_scripts {
     'server/infra/database.lua',
     'server/auth/officers.lua',
     'server/auth/auth.lua',
+    'server/actions/topology.lua',
     'server/actions/virtual_container.lua',
     'server/actions/cases.lua',
     'server/actions/evidence.lua',

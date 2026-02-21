@@ -41,7 +41,7 @@ local function canIngestNow(sourceName)
 end
 
 local function isForensicsEnabled()
-    return CAD.IsFeatureEnabled('Forensics') and CAD.Config.ForensicLabs.Enabled ~= false
+    return CAD.IsFeatureEnabled('Forensics')
 end
 
 local function isInLab(source)
@@ -49,30 +49,17 @@ local function isInLab(source)
         return false
     end
 
-    local ped = GetPlayerPed(source)
-    if not ped or ped <= 0 then
+    if not CAD.Topology or not CAD.Topology.IsOfficerInLab then
         return false
     end
 
-    local coords = GetEntityCoords(ped)
     local officer = CAD.Auth.GetOfficerData(source)
     if not officer then
         return false
     end
 
-    for i = 1, #CAD.Config.ForensicLabs.Locations do
-        local lab = CAD.Config.ForensicLabs.Locations[i]
-        local distance = #(coords - lab.coords)
-        if distance <= lab.radius then
-            for j = 1, #lab.jobs do
-                if lab.jobs[j] == officer.job then
-                    return true
-                end
-            end
-        end
-    end
-
-    return false
+    local inLab = CAD.Topology.IsOfficerInLab(source, officer)
+    return inLab == true
 end
 
 local function canHandleWorldTrace(source)
@@ -1087,5 +1074,19 @@ exports('IsPlayerInLab', function(playerId)
 end)
 
 exports('GetLabLocations', function()
-    return CAD.Config.ForensicLabs.Locations
+    if not CAD.Topology or not CAD.Topology.GetAllLabs then
+        return {}
+    end
+
+    local out = {}
+    local labs = CAD.Topology.GetAllLabs()
+    for i = 1, #labs do
+        out[#out + 1] = {
+            name = labs[i].name,
+            coords = labs[i].coords,
+            radius = labs[i].radius,
+            jobs = labs[i].jobs,
+        }
+    end
+    return out
 end)

@@ -11,13 +11,24 @@ local function nearbyLab()
     local ped = cache.ped or PlayerPedId()
     if not ped or ped == 0 then return nil end
 
+    local snapshot = CAD.Client and CAD.Client.GetTopologySnapshot and CAD.Client.GetTopologySnapshot() or nil
+    local labs = snapshot and snapshot.labs or {}
     local coords = GetEntityCoords(ped)
-    for i = 1, #CAD.Config.ForensicLabs.Locations do
-        local lab = CAD.Config.ForensicLabs.Locations[i]
-        if #(coords - lab.coords) <= lab.radius then
-            return lab
+    for i = 1, #labs do
+        local lab = labs[i]
+        if lab and lab.coords and lab.coords.x and lab.coords.y and lab.coords.z then
+            local point = vector3(lab.coords.x, lab.coords.y, lab.coords.z)
+            local radius = tonumber(lab.radius) or 10.0
+            if #(coords - point) <= radius then
+                return {
+                    name = lab.name or ('Lab %s'):format(i),
+                    coords = point,
+                    radius = radius,
+                }
+            end
         end
     end
+
     return nil
 end
 

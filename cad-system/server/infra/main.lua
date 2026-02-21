@@ -199,6 +199,10 @@ local function bootstrapFromDatabase()
         end
     end
 
+    if CAD.Topology and CAD.Topology.LoadFromDatabase then
+        CAD.Topology.LoadFromDatabase()
+    end
+
     local virtualSlots = 0
     if CAD.VirtualContainer and CAD.VirtualContainer.LoadFromDatabase then
         virtualSlots = tonumber(CAD.VirtualContainer.LoadFromDatabase()) or 0

@@ -14,6 +14,12 @@ local readerActionBusy = false
 local lockerActionBusy = false
 local dispatchPublicRev = -1
 local casesPublicRev = -1
+local topologySnapshot = {
+    rev = 0,
+    terminals = {},
+    labs = {},
+}
+local zoneInitialized = false
 
 ---@class DispatchPublicStatePayload
 ---@field rev integer
@@ -58,24 +64,36 @@ local function normalizeTerminal(point, index)
         return nil
     end
 
-    local terminalId = point.id or ('terminal_%s'):format(index)
+    local terminalId = point.terminalId or point.id or ('terminal_%s'):format(index)
+    local reader = type(point.reader) == 'table' and point.reader or (type(point.idReader) == 'table' and point.idReader or nil)
+    local lockers = type(point.lockers) == 'table' and point.lockers or {}
     local container = type(point.evidenceContainer) == 'table' and point.evidenceContainer or nil
-    local reader = type(point.idReader) == 'table' and point.idReader or nil
+    local hasContainer = #lockers > 0 or (container and container.enabled == true) or false
 
     return {
         terminalId = terminalId,
         label = point.label or ('CAD Terminal %s'):format(index),
-        coords = point.coords,
+        coords = asVector3(point.coords),
         radius = point.radius or 1.25,
-        hasContainer = container and container.enabled == true or false,
+        hasContainer = hasContainer,
+        lockers = lockers,
+        defaultLockerId = point.defaultLockerId,
         container = container,
-        hasReader = reader and reader.enabled == true or false,
+        hasReader = point.hasReader == true or (reader and reader.enabled == true) or false,
         reader = reader,
     }
 end
 
 local function setActiveTerminal(point, index)
     activeTerminalContext = normalizeTerminal(point, index)
+end
+
+function CAD.Client.GetTopologySnapshot()
+    return topologySnapshot
+end
+
+local function getTerminalPoints()
+    return type(topologySnapshot.terminals) == 'table' and topologySnapshot.terminals or {}
 end
 
 local function getNearestTerminal()
@@ -85,7 +103,7 @@ local function getNearestTerminal()
     end
 
     local coords = GetEntityCoords(ped)
-    local points = CAD.Config.UI.AccessPoints or {}
+    local points = getTerminalPoints()
     local nearest, nearestDistance = nil, nil
 
     for i = 1, #points do
@@ -108,7 +126,7 @@ local function getReaderCoords(point)
         return nil
     end
 
-    local reader = type(point.idReader) == 'table' and point.idReader or nil
+    local reader = type(point.reader) == 'table' and point.reader or (type(point.idReader) == 'table' and point.idReader or nil)
     if not reader then
         return asVector3(point.coords)
     end
@@ -128,19 +146,19 @@ local function getReaderCoords(point)
 end
 
 local function getReaderDistance(point)
-    local reader = type(point.idReader) == 'table' and point.idReader or {}
+    local reader = type(point.reader) == 'table' and point.reader or (type(point.idReader) == 'table' and point.idReader or {})
     local globalCfg = CAD.Config.Forensics and CAD.Config.Forensics.IdReader or {}
     return tonumber(reader.interactionDistance) or tonumber(globalCfg.InteractionDistance) or 1.6
 end
 
-local function getLockerCoords(point)
-    if type(point) ~= 'table' then
+local function getLockerCoords(locker, point)
+    if type(locker) ~= 'table' then
         return nil
     end
 
-    local container = type(point.evidenceContainer) == 'table' and point.evidenceContainer or nil
-    if not container then
-        return asVector3(point.coords)
+    local container = locker
+    if not container.coords and type(point) == 'table' then
+        container = type(point.evidenceContainer) == 'table' and point.evidenceContainer or locker
     end
 
     local absolute = asVector3(container.interactionCoords) or asVector3(container.coords)
@@ -157,8 +175,8 @@ local function getLockerCoords(point)
     return base
 end
 
-local function getLockerDistance(point)
-    local container = type(point.evidenceContainer) == 'table' and point.evidenceContainer or {}
+local function getLockerDistance(locker, point)
+    local container = type(locker) == 'table' and locker or (type(point) == 'table' and type(point.evidenceContainer) == 'table' and point.evidenceContainer or {})
     return tonumber(container.interactionDistance) or tonumber(container.radius) or 1.6
 end
 
@@ -357,8 +375,8 @@ local function openReaderActionMenu(point, index)
         return
     end
 
-    local reader = type(point.idReader) == 'table' and point.idReader or nil
-    if not reader or reader.enabled ~= true then
+    local reader = type(point.reader) == 'table' and point.reader or (type(point.idReader) == 'table' and point.idReader or nil)
+    if not reader then
         return
     end
 
@@ -384,7 +402,7 @@ local function openReaderActionMenu(point, index)
     end
 
     local action = menu[1]
-    local terminalId = point.id or ('terminal_%s'):format(index)
+    local terminalId = point.terminalId or point.id or ('terminal_%s'):format(index)
     local expectedSlot = tonumber(reader.readSlot) or 1
 
     if action == 'insert' then
@@ -398,9 +416,10 @@ local function openReaderActionMenu(point, index)
     readerActionBusy = false
 end
 
-local function performLockerRefresh(terminalId)
+local function performLockerRefresh(terminalId, lockerId)
     local response = lib.callback.await('cad:evidence:container:list', false, {
         terminalId = terminalId,
+        lockerId = lockerId,
     })
 
     if not response or not response.ok then
@@ -422,7 +441,7 @@ local function performLockerRefresh(terminalId)
     return response
 end
 
-local function performLockerStore(terminalId)
+local function performLockerStore(terminalId, lockerId)
     local staging = lib.callback.await('cad:getStagingEvidence', false)
     local items = type(staging) == 'table' and staging or {}
 
@@ -467,6 +486,7 @@ local function performLockerStore(terminalId)
 
     local response = lib.callback.await('cad:evidence:container:store', false, {
         terminalId = terminalId,
+        lockerId = lockerId,
         stagingId = tostring(input[1]),
         slot = tonumber(input[2]) or 0,
     })
@@ -487,9 +507,10 @@ local function performLockerStore(terminalId)
     })
 end
 
-local function performLockerPull(terminalId)
+local function performLockerPull(terminalId, lockerId)
     local listResponse = lib.callback.await('cad:evidence:container:list', false, {
         terminalId = terminalId,
+        lockerId = lockerId,
     })
 
     if not listResponse or not listResponse.ok then
@@ -536,6 +557,7 @@ local function performLockerPull(terminalId)
 
     local response = lib.callback.await('cad:evidence:container:pull', false, {
         terminalId = terminalId,
+        lockerId = lockerId,
         slot = tonumber(input[1]),
     })
 
@@ -555,13 +577,21 @@ local function performLockerPull(terminalId)
     })
 end
 
-local function openLockerActionMenu(point, index)
+local function openLockerActionMenu(point, index, locker)
     if lockerActionBusy or not canUseCad then
         return
     end
 
-    local container = type(point.evidenceContainer) == 'table' and point.evidenceContainer or nil
-    if not container or container.enabled ~= true or not isVirtualEvidenceEnabled() then
+    local containers = type(point.lockers) == 'table' and point.lockers or {}
+    local container = locker
+    if not container and #containers > 0 then
+        container = containers[1]
+    end
+    if not container and type(point.evidenceContainer) == 'table' then
+        container = point.evidenceContainer
+    end
+
+    if not container or not isVirtualEvidenceEnabled() then
         return
     end
 
@@ -587,14 +617,15 @@ local function openLockerActionMenu(point, index)
     end
 
     local action = menu[1]
-    local terminalId = point.id or ('terminal_%s'):format(index)
+    local terminalId = point.terminalId or point.id or ('terminal_%s'):format(index)
+    local lockerId = container.lockerId
 
     if action == 'store' then
-        performLockerStore(terminalId)
+        performLockerStore(terminalId, lockerId)
     elseif action == 'pull' then
-        performLockerPull(terminalId)
+        performLockerPull(terminalId, lockerId)
     else
-        performLockerRefresh(terminalId)
+        performLockerRefresh(terminalId, lockerId)
     end
 
     lockerActionBusy = false
@@ -605,60 +636,118 @@ local function refreshAccess()
     canUseCad = data ~= nil
 end
 
+local function fetchTopologySnapshot(quiet)
+    local response = lib.callback.await('cad:topology:getSnapshot', false, {})
+    if response and response.ok and type(response.snapshot) == 'table' then
+        local snapshot = response.snapshot
+        topologySnapshot = {
+            rev = tonumber(snapshot.rev) or 0,
+            terminals = type(snapshot.terminals) == 'table' and snapshot.terminals or {},
+            labs = type(snapshot.labs) == 'table' and snapshot.labs or {},
+        }
+        return true
+    end
+
+    if not quiet then
+        lib.notify({
+            title = 'CAD',
+            description = ('Topology unavailable: %s'):format(response and response.error or 'unknown_error'),
+            type = 'error',
+        })
+    end
+
+    return false
+end
+
+local function clearTargetZones()
+    if not useTargetAccess or GetResourceState('ox_target') ~= 'started' then
+        accessZoneIds = {}
+        readerZoneIds = {}
+        lockerZoneIds = {}
+        return
+    end
+
+    for i = 1, #accessZoneIds do
+        pcall(function()
+            exports.ox_target:removeZone(accessZoneIds[i])
+        end)
+    end
+
+    for i = 1, #readerZoneIds do
+        pcall(function()
+            exports.ox_target:removeZone(readerZoneIds[i])
+        end)
+    end
+
+    for i = 1, #lockerZoneIds do
+        pcall(function()
+            exports.ox_target:removeZone(lockerZoneIds[i])
+        end)
+    end
+
+    accessZoneIds = {}
+    readerZoneIds = {}
+    lockerZoneIds = {}
+end
+
 local function setupAccessZones()
-    local points = CAD.Config.UI.AccessPoints or {}
+    local points = getTerminalPoints()
 
     if useTargetAccess then
         for i = 1, #points do
-            local point = points[i]
-            local zoneName = ('cad_access_%s'):format(i)
-            local zoneId = exports.ox_target:addSphereZone({
-                name = zoneName,
-                coords = point.coords,
-                radius = point.radius or 1.25,
-                debug = CAD.Config.Debug == true,
-                options = {
-                    {
-                        name = ('%s_option'):format(zoneName),
-                        icon = 'fa-solid fa-desktop',
-                        label = ('Abrir CAD (%s)'):format(point.label or 'Terminal'),
-                        canInteract = function()
-                            return canUseCad
-                        end,
-                        onSelect = function()
-                            setActiveTerminal(point, i)
-                            CAD.Client.SetUIState(true)
-                        end,
+            local point = normalizeTerminal(points[i], i)
+            if point and point.coords then
+                local zoneName = ('cad_access_%s'):format(point.terminalId or i)
+                local zoneId = exports.ox_target:addSphereZone({
+                    name = zoneName,
+                    coords = point.coords,
+                    radius = point.radius or 1.25,
+                    debug = CAD.Config.Debug == true,
+                    options = {
+                        {
+                            name = ('%s_option'):format(zoneName),
+                            icon = 'fa-solid fa-desktop',
+                            label = ('Abrir CAD (%s)'):format(point.label or 'Terminal'),
+                            canInteract = function()
+                                return canUseCad
+                            end,
+                            onSelect = function()
+                                setActiveTerminal(point, i)
+                                CAD.Client.SetUIState(true)
+                            end,
+                        },
                     },
-                },
-            })
-            accessZoneIds[#accessZoneIds + 1] = zoneId
+                })
+                accessZoneIds[#accessZoneIds + 1] = zoneId
+            end
         end
         return
     end
 
     for i = 1, #points do
-        local point = points[i]
-        lib.zones.sphere({
-            coords = point.coords,
-            radius = point.radius or 1.25,
-            onEnter = function()
-                lib.showTextUI(('[E] %s'):format(point.label or 'CAD PC'))
-            end,
-            inside = function()
-                if IsControlJustPressed(0, 38) then
-                    if canUseCad then
-                        setActiveTerminal(point, i)
-                        CAD.Client.SetUIState(true)
-                    else
-                        lib.notify({ title = 'CAD', description = 'No tienes acceso al CAD', type = 'error' })
+        local point = normalizeTerminal(points[i], i)
+        if point and point.coords then
+            lib.zones.sphere({
+                coords = point.coords,
+                radius = point.radius or 1.25,
+                onEnter = function()
+                    lib.showTextUI(('[E] %s'):format(point.label or 'CAD PC'))
+                end,
+                inside = function()
+                    if IsControlJustPressed(0, 38) then
+                        if canUseCad then
+                            setActiveTerminal(point, i)
+                            CAD.Client.SetUIState(true)
+                        else
+                            lib.notify({ title = 'CAD', description = 'No tienes acceso al CAD', type = 'error' })
+                        end
                     end
-                end
-            end,
-            onExit = function()
-                lib.hideTextUI()
-            end,
-        })
+                end,
+                onExit = function()
+                    lib.hideTextUI()
+                end,
+            })
+        end
     end
 end
 
@@ -667,17 +756,17 @@ local function setupReaderZones()
         return
     end
 
-    local points = CAD.Config.UI.AccessPoints or {}
+    local points = getTerminalPoints()
     for i = 1, #points do
-        local point = points[i]
-        local reader = type(point.idReader) == 'table' and point.idReader or nil
-        if reader and reader.enabled == true then
+        local point = normalizeTerminal(points[i], i)
+        local reader = point and type(point.reader) == 'table' and point.reader or nil
+        if point and reader and point.hasReader then
             local index = i
-            local terminalId = point.id or ('terminal_%s'):format(index)
+            local terminalId = point.terminalId or ('terminal_%s'):format(index)
             local coords = getReaderCoords(point)
             if coords then
                 local radius = math.max(0.7, getReaderDistance(point))
-                local zoneName = ('cad_reader_%s'):format(index)
+                local zoneName = ('cad_reader_%s'):format(point.terminalId or index)
 
                 if useTargetAccess then
                     local zoneId = exports.ox_target:addSphereZone({
@@ -758,17 +847,20 @@ local function setupLockerZones()
         return
     end
 
-    local points = CAD.Config.UI.AccessPoints or {}
+    local points = getTerminalPoints()
     for i = 1, #points do
-        local point = points[i]
-        local container = type(point.evidenceContainer) == 'table' and point.evidenceContainer or nil
-        if container and container.enabled == true then
+        local point = normalizeTerminal(points[i], i)
+        local lockers = point and type(point.lockers) == 'table' and point.lockers or {}
+
+        for l = 1, #lockers do
+            local container = lockers[l]
             local index = i
-            local terminalId = point.id or ('terminal_%s'):format(index)
-            local coords = getLockerCoords(point)
+            local terminalId = point.terminalId or ('terminal_%s'):format(index)
+            local lockerId = container.lockerId
+            local coords = getLockerCoords(container, point)
             if coords then
-                local radius = math.max(0.7, getLockerDistance(point))
-                local zoneName = ('cad_locker_%s'):format(index)
+                local radius = math.max(0.7, getLockerDistance(container, point))
+                local zoneName = ('cad_locker_%s_%s'):format(point.terminalId or index, lockerId or l)
 
                 if useTargetAccess then
                     local zoneId = exports.ox_target:addSphereZone({
@@ -780,42 +872,42 @@ local function setupLockerZones()
                             {
                                 name = ('%s_store'):format(zoneName),
                                 icon = 'fa-solid fa-box-archive',
-                                label = ('Guardar evidencia (%s)'):format(point.label or 'Locker'),
+                                label = ('Guardar evidencia (%s)'):format(container.label or point.label or 'Locker'),
                                 canInteract = function()
                                     return canUseCad and not lockerActionBusy
                                 end,
                                 onSelect = function()
                                     lockerActionBusy = true
                                     setActiveTerminal(point, index)
-                                    performLockerStore(terminalId)
+                                    performLockerStore(terminalId, lockerId)
                                     lockerActionBusy = false
                                 end,
                             },
                             {
                                 name = ('%s_pull'):format(zoneName),
                                 icon = 'fa-solid fa-box-open',
-                                label = ('Sacar evidencia (%s)'):format(point.label or 'Locker'),
+                                label = ('Sacar evidencia (%s)'):format(container.label or point.label or 'Locker'),
                                 canInteract = function()
                                     return canUseCad and not lockerActionBusy
                                 end,
                                 onSelect = function()
                                     lockerActionBusy = true
                                     setActiveTerminal(point, index)
-                                    performLockerPull(terminalId)
+                                    performLockerPull(terminalId, lockerId)
                                     lockerActionBusy = false
                                 end,
                             },
                             {
                                 name = ('%s_refresh'):format(zoneName),
                                 icon = 'fa-solid fa-arrows-rotate',
-                                label = ('Ver locker (%s)'):format(point.label or 'Locker'),
+                                label = ('Ver locker (%s)'):format(container.label or point.label or 'Locker'),
                                 canInteract = function()
                                     return canUseCad and not lockerActionBusy
                                 end,
                                 onSelect = function()
                                     lockerActionBusy = true
                                     setActiveTerminal(point, index)
-                                    performLockerRefresh(terminalId)
+                                    performLockerRefresh(terminalId, lockerId)
                                     lockerActionBusy = false
                                 end,
                             },
@@ -827,11 +919,11 @@ local function setupLockerZones()
                         coords = coords,
                         radius = radius,
                         onEnter = function()
-                            lib.showTextUI(('[H] %s'):format((point.label or 'Evidence Locker') .. ' - Locker'))
+                            lib.showTextUI(('[H] %s'):format((container.label or point.label or 'Evidence Locker') .. ' - Locker'))
                         end,
                         inside = function()
                             if IsControlJustPressed(0, 74) then
-                                openLockerActionMenu(point, index)
+                                openLockerActionMenu(point, index, container)
                             end
                         end,
                         onExit = function()
@@ -842,6 +934,21 @@ local function setupLockerZones()
             end
         end
     end
+end
+
+local function rebuildTopologyZones(force)
+    if not useTargetAccess and zoneInitialized then
+        return
+    end
+
+    if useTargetAccess then
+        clearTargetZones()
+    end
+
+    setupAccessZones()
+    setupReaderZones()
+    setupLockerZones()
+    zoneInitialized = true
 end
 
 local function setupFrameworkBridge()
@@ -934,6 +1041,17 @@ function CAD.Client.SetUIState(open)
                 location = activeTerminalContext and activeTerminalContext.coords or nil,
                 hasContainer = activeTerminalContext and activeTerminalContext.hasContainer or false,
                 hasReader = activeTerminalContext and activeTerminalContext.hasReader or false,
+                lockerIds = (function()
+                    local ids = {}
+                    local lockers = activeTerminalContext and activeTerminalContext.lockers or {}
+                    for i = 1, #lockers do
+                        if lockers[i].lockerId then
+                            ids[#ids + 1] = lockers[i].lockerId
+                        end
+                    end
+                    return ids
+                end)(),
+                defaultLockerId = activeTerminalContext and activeTerminalContext.defaultLockerId or nil,
             }
         })
 
@@ -971,6 +1089,23 @@ if type(AddStateBagChangeHandler) == 'function' then
     end)
 end
 
+RegisterNetEvent('cad:client:topologyUpdated')
+AddEventHandler('cad:client:topologyUpdated', function(payload)
+    if type(payload) == 'table' and type(payload.snapshot) == 'table' then
+        local snapshot = payload.snapshot
+        topologySnapshot = {
+            rev = tonumber(snapshot.rev) or 0,
+            terminals = type(snapshot.terminals) == 'table' and snapshot.terminals or {},
+            labs = type(snapshot.labs) == 'table' and snapshot.labs or {},
+        }
+        rebuildTopologyZones(true)
+    else
+        if fetchTopologySnapshot(true) then
+            rebuildTopologyZones(true)
+        end
+    end
+end)
+
 function CAD.Client.GetComputerContext()
     if not activeTerminalContext then
         local nearest = getNearestTerminal()
@@ -991,6 +1126,17 @@ function CAD.Client.GetComputerContext()
         terminalId = activeTerminalContext.terminalId,
         label = activeTerminalContext.label,
         hasContainer = activeTerminalContext.hasContainer,
+        lockerIds = (function()
+            local ids = {}
+            local lockers = type(activeTerminalContext.lockers) == 'table' and activeTerminalContext.lockers or {}
+            for i = 1, #lockers do
+                if lockers[i].lockerId then
+                    ids[#ids + 1] = lockers[i].lockerId
+                end
+            end
+            return ids
+        end)(),
+        defaultLockerId = activeTerminalContext.defaultLockerId,
         container = activeTerminalContext.container,
         hasReader = activeTerminalContext.hasReader,
         reader = activeTerminalContext.reader,
@@ -1038,14 +1184,13 @@ end)
 CreateThread(function()
     Wait(1000)
     refreshAccess()
+    fetchTopologySnapshot(true)
 
     local mode = tostring((CAD.Config.UI.AccessMode or 'auto')):lower()
     useTargetAccess = mode ~= 'zone' and GetResourceState('ox_target') == 'started'
 
     setupFrameworkBridge()
-    setupAccessZones()
-    setupReaderZones()
-    setupLockerZones()
+    rebuildTopologyZones(true)
 end)
 
 CreateThread(function()
@@ -1074,23 +1219,7 @@ AddEventHandler('onResourceStop', function(resourceName)
     end
 
     if useTargetAccess and GetResourceState('ox_target') == 'started' then
-        for i = 1, #accessZoneIds do
-            pcall(function()
-                exports.ox_target:removeZone(accessZoneIds[i])
-            end)
-        end
-
-        for i = 1, #readerZoneIds do
-            pcall(function()
-                exports.ox_target:removeZone(readerZoneIds[i])
-            end)
-        end
-
-        for i = 1, #lockerZoneIds do
-            pcall(function()
-                exports.ox_target:removeZone(lockerZoneIds[i])
-            end)
-        end
+        clearTargetZones()
     end
 
     lib.hideTextUI()
