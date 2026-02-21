@@ -6,23 +6,12 @@ import { Button, Input, Modal, Tabs, Textarea } from '~/components/ui';
 
 export function PersonSearch() {
   const [searchQuery, setSearchQuery] = createSignal('');
+  const [searchResults, setSearchResults] = createSignal<Person[]>([]);
   const [selectedPerson, setSelectedPerson] = createSignal<Person | null>(null);
   const [activeTab, setActiveTab] = createSignal<'info' | 'vehicles' | 'records' | 'warrants' | 'notes'>('info');
   const [newPersonNote, setNewPersonNote] = createSignal('');
   const [showBloodRequestModal, setShowBloodRequestModal] = createSignal(false);
   const [bloodRequestReason, setBloodRequestReason] = createSignal('Forensic blood sample request');
-
-  const searchResults = createMemo(() => {
-    const query = searchQuery().toLowerCase();
-    if (!query) return [];
-    
-    return Object.values(cadState.persons).filter(p => 
-      p.firstName.toLowerCase().includes(query) ||
-      p.lastName.toLowerCase().includes(query) ||
-      p.citizenid.toLowerCase().includes(query) ||
-      p.ssn.includes(query)
-    );
-  });
 
   const personVehicles = createMemo(() => {
     const person = selectedPerson();
@@ -62,7 +51,20 @@ export function PersonSearch() {
   };
 
   const handleSearch = () => {
-    if (!searchQuery().trim()) return;
+    const query = searchQuery().trim().toLowerCase();
+    if (!query) {
+      setSearchResults([]);
+      return;
+    }
+    
+    const results = Object.values(cadState.persons).filter(p => 
+      p.firstName.toLowerCase().includes(query) ||
+      p.lastName.toLowerCase().includes(query) ||
+      p.citizenid.toLowerCase().includes(query) ||
+      p.ssn.includes(query)
+    );
+    
+    setSearchResults(results);
   };
 
   onMount(() => {

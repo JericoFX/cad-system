@@ -5,22 +5,10 @@ import { Button, Input, Modal, Tabs, Textarea } from '~/components/ui';
 
 export function VehicleSearch() {
   const [searchQuery, setSearchQuery] = createSignal('');
+  const [searchResults, setSearchResults] = createSignal<Vehicle[]>([]);
   const [selectedVehicle, setSelectedVehicle] = createSignal<Vehicle | null>(null);
   const [activeTab, setActiveTab] = createSignal<'info' | 'owner' | 'notes'>('info');
   const [newVehicleNote, setNewVehicleNote] = createSignal('');
-
-  const searchResults = createMemo(() => {
-    const query = searchQuery().toLowerCase();
-    if (!query) return [];
-    
-    return Object.values(cadState.vehicles).filter(v => 
-      v.plate.toLowerCase().includes(query) ||
-      v.model.toLowerCase().includes(query) ||
-      v.make.toLowerCase().includes(query) ||
-      v.vin.toLowerCase().includes(query) ||
-      v.ownerName.toLowerCase().includes(query)
-    );
-  });
 
   const closeModal = () => {
     terminalActions.setActiveModal(null);
@@ -36,6 +24,24 @@ export function VehicleSearch() {
     if (!vehicle) return [];
     return (vehicle.notes || []).slice().sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   });
+
+  const handleSearch = () => {
+    const query = searchQuery().trim().toLowerCase();
+    if (!query) {
+      setSearchResults([]);
+      return;
+    }
+    
+    const results = Object.values(cadState.vehicles).filter(v => 
+      v.plate.toLowerCase().includes(query) ||
+      v.model.toLowerCase().includes(query) ||
+      v.make.toLowerCase().includes(query) ||
+      v.vin.toLowerCase().includes(query) ||
+      v.ownerName.toLowerCase().includes(query)
+    );
+    
+    setSearchResults(results);
+  };
 
   const addVehicleNote = () => {
     const vehicle = selectedVehicle();
@@ -113,8 +119,12 @@ export function VehicleSearch() {
               class="dos-input search-input"
               value={searchQuery()}
               onInput={(e) => setSearchQuery(e.currentTarget.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
               placeholder="Enter plate, model, or owner name..."
             />
+            <Button.Root class="btn btn-primary" onClick={handleSearch}>
+              [SEARCH]
+            </Button.Root>
           </div>
           <Show when={searchResults().length > 0}>
             <div class="search-stats">
