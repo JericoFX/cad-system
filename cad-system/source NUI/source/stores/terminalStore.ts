@@ -2,6 +2,7 @@ import { createStore } from 'solid-js/store';
 import { generateMiniBoot } from '~/utils/ascii';
 import { featureActions } from './featureStore';
 import { hackerActions, hackerEffects } from './hackerStore';
+import { batchUpdates } from '~/utils/batchUpdates';
 
 export interface TerminalLine {
   id: string;
@@ -124,8 +125,10 @@ export const terminalActions = {
       return;
     }
 
-    setTerminalState('modalData', data ?? null);
-    setTerminalState('activeModal', modal);
+    batchUpdates(
+      () => setTerminalState('modalData', data ?? null),
+      () => setTerminalState('activeModal', modal)
+    );
     
     // Emit hacker command when modal opens
     if (modal) {

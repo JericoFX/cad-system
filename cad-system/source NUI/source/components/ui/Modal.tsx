@@ -21,6 +21,8 @@ export interface ModalRootProps extends ParentProps {
   overlayStyle?: JSX.CSSProperties;
   contentStyle?: JSX.CSSProperties;
   overlayAttributes?: Omit<JSX.HTMLAttributes<HTMLDivElement>, 'class' | 'style' | 'onClick'>;
+  ariaLabelledBy?: string;
+  ariaDescribedBy?: string;
 }
 
 export type ModalProps = ModalRootProps;
@@ -35,6 +37,8 @@ export function ModalRoot(props: ModalRootProps) {
     'overlayStyle',
     'contentStyle',
     'overlayAttributes',
+    'ariaLabelledBy',
+    'ariaDescribedBy',
     'children',
   ]);
 
@@ -53,6 +57,10 @@ export function ModalRoot(props: ModalRootProps) {
             local.onClose?.();
           }
         }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={local.ariaLabelledBy}
+        aria-describedby={local.ariaDescribedBy}
       >
         <Show
           when={local.useContentWrapper !== false}
@@ -134,6 +142,7 @@ export function ModalFooter(props: ParentProps<{ class?: string; style?: JSX.CSS
 export interface ModalCloseProps extends JSX.ButtonHTMLAttributes<HTMLButtonElement> {
   label?: string;
   useHeaderClass?: boolean;
+  ariaLabel?: string;
 }
 
 export function ModalClose(props: ModalCloseProps) {
@@ -144,6 +153,7 @@ export function ModalClose(props: ModalCloseProps) {
     'class',
     'children',
     'useHeaderClass',
+    'ariaLabel',
   ]);
 
   const content = () => {
@@ -161,6 +171,7 @@ export function ModalClose(props: ModalCloseProps) {
       {...buttonProps}
       class={cn(local.useHeaderClass === false ? 'btn' : 'modal-close', local.class)}
       onClick={() => context.onClose?.()}
+      aria-label={local.ariaLabel || 'Close modal'}
     >
       <Show when={content()}>{content()}</Show>
     </button>

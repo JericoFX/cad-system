@@ -11,6 +11,10 @@ export interface UIButtonProps extends JSX.ButtonHTMLAttributes<HTMLButtonElemen
   uppercase?: boolean;
   variant?: ButtonVariant;
   size?: ButtonSize;
+  ariaLabel?: string;
+  ariaPressed?: boolean;
+  ariaExpanded?: boolean;
+  ariaControls?: string;
 }
 
 function getVariantClass(variant: ButtonVariant, size: ButtonSize) {
@@ -48,6 +52,10 @@ export function UIButton(props: UIButtonProps) {
     'size',
     'class',
     'children',
+    'ariaLabel',
+    'ariaPressed',
+    'ariaExpanded',
+    'ariaControls',
   ]);
 
   const labelOptions = ui.buttonLabelOptions;
@@ -74,6 +82,10 @@ export function UIButton(props: UIButtonProps) {
         getVariantClass(local.variant, local.size),
         local.class
       )}
+      aria-label={local.ariaLabel}
+      aria-pressed={local.ariaPressed}
+      aria-expanded={local.ariaExpanded}
+      aria-controls={local.ariaControls}
     >
       <Show when={content()}>{content()}</Show>
     </button>
