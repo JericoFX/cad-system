@@ -838,6 +838,27 @@ export function EvidenceManager() {
                     [DELETE]
                   </Button.Root>
                 </Show>
+                <Show when={selectedEvidence() && (selectedEvidence()!.evidenceType === 'BIOLOGICAL' || selectedEvidence()!.evidenceType === 'DNA' || selectedEvidence()!.evidenceType === 'BLOOD')}>
+                  <Button.Root 
+                    class="btn btn-primary" 
+                    style={{ 'background-color': '#ff00ff', 'border-color': '#ff00ff' }}
+                    onClick={() => {
+                      const ev = selectedEvidence()!;
+                      const evidenceId = ('stagingId' in ev) ? (ev as StagingEvidence).stagingId : (ev as Evidence).evidenceId;
+                      const caseId = currentCase()?.caseId;
+                      
+                      if (!caseId) {
+                        terminalActions.addLine('No active case selected', 'error');
+                        return;
+                      }
+                      
+                      cadActions.requestEvidenceAnalysis(caseId, evidenceId, 'OFFICER_001', 'Requested forensic analysis');
+                      terminalActions.addLine(`Analysis request submitted for evidence ${evidenceId}`, 'output');
+                    }}
+                  >
+                    [REQUEST ANALYSIS]
+                  </Button.Root>
+                </Show>
               </div>
             </div>
           </Show>

@@ -2,6 +2,7 @@ import { createSignal, createMemo, For, Show, onMount } from 'solid-js';
 import { terminalActions, terminalState } from '~/stores/terminalStore';
 import { cadState, cadActions, type Vehicle } from '~/stores/cadStore';
 import { Button, Input, Modal, Tabs, Textarea } from '~/components/ui';
+import { PhotoGallery } from '~/components/ui/PhotoGallery';
 
 export function VehicleSearch() {
   const [searchQuery, setSearchQuery] = createSignal('');
@@ -240,6 +241,28 @@ export function VehicleSearch() {
                         </span>
                       </div>
                     </Show>
+                  </div>
+                  
+                  <Show when={selectedVehicle()!.photos && selectedVehicle()!.photos!.length > 0}>
+                    <div class="photo-section" style={{ 'margin-top': '20px', padding: '10px 0', 'border-top': '1px solid var(--terminal-border)' }}>
+                      <h4 style={{ color: 'var(--terminal-system-bright)', 'margin-bottom': '10px' }}>Photos</h4>
+                      <PhotoGallery photos={selectedVehicle()!.photos!} />
+                    </div>
+                  </Show>
+                  
+                  <div class="vehicle-actions" style={{ 'margin-top': '15px' }}>
+                    <Button.Root 
+                      class="btn"
+                      onClick={() => {
+                        terminalActions.setActiveModal('UPLOAD', { 
+                          vehiclePlate: selectedVehicle()!.plate,
+                          vehicleInfo: `${selectedVehicle()!.year} ${selectedVehicle()!.make} ${selectedVehicle()!.model}`,
+                          type: 'photo'
+                        });
+                      }}
+                    >
+                      [UPLOAD PHOTO]
+                    </Button.Root>
                   </div>
                 </Show>
 

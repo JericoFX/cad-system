@@ -66,5 +66,8 @@ export type { UILabelProps } from './Label';
 export { Text, UIText } from './Text';
 export type { TextComponent, UITextProps } from './Text';
 
+export { PhotoGallery } from './PhotoGallery';
+export type { PhotoGalleryProps } from './PhotoGallery';
+
 export { UIProvider, useUIContext } from './UIContext';
 export type { UiContextValue, UiLabelOptions, UIProviderProps } from './UIContext';

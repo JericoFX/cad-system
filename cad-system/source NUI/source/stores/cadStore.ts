@@ -137,6 +137,7 @@ export interface Person {
   eyeColor?: string;
   hairColor?: string;
   photo?: string;
+  photos?: string[];
   flags?: string[];
   createdAt: string;
   lastUpdated: string;
@@ -161,6 +162,7 @@ export interface Vehicle {
   flags: string[];
   createdAt: string;
   notes?: EntityNote[];
+  photos?: string[];
 }
 
 export interface Fine {
@@ -245,6 +247,7 @@ export interface BOLO {
   issuedAt: string;
   priority: 'LOW' | 'MEDIUM' | 'HIGH';
   active: boolean;
+  photos?: string[];
 }
 
 interface CADState {
@@ -442,15 +445,15 @@ export const cadActions = {
     };
     cadActions.addCustodyEvent(caseId, evidenceId, event);
   },
-  submitEvidence: (caseId: string, evidenceId: string, submittedBy: string, notes?: string) => {
+  requestEvidenceAnalysis: (caseId: string, evidenceId: string, requestedBy: string, notes?: string) => {
     const event: CustodyEvent = {
       eventId: `CUSTODY_${Date.now()}`,
       evidenceId,
       eventType: 'SUBMITTED',
-      fromOfficer: submittedBy,
-      notes: notes || 'Submitted for legal proceedings',
+      toOfficer: 'FORENSICS_LAB',
+      notes: notes || 'Submitted for forensic analysis',
       timestamp: new Date().toISOString(),
-      recordedBy: submittedBy,
+      recordedBy: requestedBy,
     };
     cadActions.addCustodyEvent(caseId, evidenceId, event);
   },
@@ -487,11 +490,25 @@ export const cadActions = {
   updateVehicle: (plate: string, data: Partial<Vehicle>) => {
     setCADState('vehicles', plate, (prev) => ({ ...prev, ...data }));
   },
-  addVehicleNote: (plate: string, note: EntityNote) => {
-    setCADState('vehicles', plate, (prev) => ({
-      ...prev,
-      notes: [...(prev?.notes || []), note],
-    }));
+  addPersonPhoto: (citizenid: string, photoUrl: string) => {
+    setCADState('persons', citizenid, (prev) => {
+      const photos = prev?.photos || [];
+      return {
+        ...prev,
+        photos: [...photos, photoUrl],
+        lastUpdated: new Date().toISOString(),
+      };
+    });
+  },
+  
+  addVehiclePhoto: (plate: string, photoUrl: string) => {
+    setCADState('vehicles', plate, (prev) => {
+      const photos = prev?.photos || [];
+      return {
+        ...prev,
+        photos: [...photos, photoUrl],
+      };
+    });
   },
   
   setFines: (fines: Record<string, Fine>) => setCADState('fines', fines),

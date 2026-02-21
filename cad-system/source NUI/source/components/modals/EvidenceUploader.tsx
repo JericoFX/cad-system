@@ -85,7 +85,15 @@ export function EvidenceUploader() {
   const [uploadSuccess, setUploadSuccess] = createSignal(false);
 
   onMount(() => {
-    const modalData = (terminalState.modalData as { caseId?: string } | null) || null;
+    const modalData = (terminalState.modalData as { 
+      caseId?: string; 
+      personId?: string; 
+      personName?: string;
+      vehiclePlate?: string;
+      vehicleInfo?: string;
+      type?: string;
+    } | null) || null;
+    
     if (modalData?.caseId && cadState.cases[modalData.caseId]) {
       setTargetCaseId(modalData.caseId);
       return;
@@ -95,6 +103,11 @@ export function EvidenceUploader() {
     if (preselectedId && cadState.cases[preselectedId]) {
       setTargetCaseId(preselectedId);
       delete (window as any).__evidenceTargetCaseId;
+    }
+    
+    // Set evidence type based on upload context
+    if (modalData?.type === 'photo') {
+      setEvidenceType('PHOTO');
     }
   });
 
@@ -206,6 +219,13 @@ export function EvidenceUploader() {
       }
 
       const caseId = targetCaseId();
+      const modalData = (terminalState.modalData as { 
+        personId?: string; 
+        personName?: string;
+        vehiclePlate?: string;
+        vehicleInfo?: string;
+        type?: string;
+      } | null) || null;
       
       if (caseId) {
         const evidence: Evidence = {
@@ -250,6 +270,21 @@ export function EvidenceUploader() {
             terminalActions.addLine(`URL: ${finalUrl}`, 'output');
           } else {
             terminalActions.addLine(`File: ${selectedFile()?.name}`, 'output');
+          }
+          
+          // If this is a photo upload for a person or vehicle, associate it
+          if (evidenceType() === 'PHOTO' && modalData?.type === 'photo') {
+            const photoUrl = uploadMode() === 'url' ? finalUrl : (evidenceData.url as string);
+            
+            if (modalData.personId) {
+              // Handle person photo association
+              cadActions.addPersonPhoto(modalData.personId, photoUrl);
+              terminalActions.addLine(`Photo associated with person: ${modalData.personName || modalData.personId}`, 'output');
+            } else if (modalData.vehiclePlate) {
+              // Handle vehicle photo association
+              cadActions.addVehiclePhoto(modalData.vehiclePlate, photoUrl);
+              terminalActions.addLine(`Photo associated with vehicle: ${modalData.vehicleInfo || modalData.vehiclePlate}`, 'output');
+            }
           }
         }
       }
@@ -300,6 +335,16 @@ export function EvidenceUploader() {
               style={{ 'font-size': '12px', 'margin-top': '4px' }}
             >
               Target Case: {targetCaseId()} (Will attach directly)
+            </Text.Root>
+          </Show>
+          <Show when={!targetCaseId()}>
+            <Text.Root
+              as='div'
+              class='target-context-indicator'
+              tone='info'
+              style={{ 'font-size': '12px', 'margin-top': '4px' }}
+            >
+              Uploading as standalone evidence (will be added to staging)
             </Text.Root>
           </Show>
           <Modal.Close />

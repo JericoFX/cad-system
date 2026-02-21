@@ -4,6 +4,7 @@ import { cadState, cadActions } from '~/stores/cadStore';
 import { userActions } from '~/stores/userStore';
 import type { BOLO } from '~/stores/cadStore';
 import { Button, Input, Modal, Select, Tabs, Textarea } from '~/components/ui';
+import { PhotoGallery } from '~/components/ui/PhotoGallery';
 
 export function BoloManager() {
   const [activeTab, setActiveTab] = createSignal<'all' | 'person' | 'vehicle'>('all');
@@ -240,6 +241,12 @@ export function BoloManager() {
                   </span>
                   <span class="bolo-id">{bolo.boloId.substring(0, 12)}</span>
                 </div>
+                
+                <Show when={bolo.photos && bolo.photos.length > 0}>
+                  <div class="bolo-photos" style={{ 'margin-top': '8px', 'padding-top': '8px', 'border-top': '1px solid var(--terminal-border-dim)' }}>
+                    <PhotoGallery photos={bolo.photos} maxPhotos={1} />
+                  </div>
+                </Show>
 
                 <div class="bolo-main">
                   <div class="bolo-identifier">{bolo.identifier}</div>
