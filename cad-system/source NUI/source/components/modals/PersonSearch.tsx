@@ -1,6 +1,7 @@
 import { createSignal, createMemo, For, Show, onMount } from 'solid-js';
 import { terminalActions, terminalState } from '~/stores/terminalStore';
 import { cadState, cadActions, type Person } from '~/stores/cadStore';
+import { $personsArray, $vehiclesArray, $criminalRecordsArray, $warrantsArray } from '~/stores/storeSelectors';
 import { fetchNui } from '~/utils/fetchNui';
 import { Button, Input, Modal, Tabs, Textarea } from '~/components/ui';
 import { PhotoGallery } from '~/components/ui/PhotoGallery';
@@ -17,19 +18,19 @@ export function PersonSearch() {
   const personVehicles = createMemo(() => {
     const person = selectedPerson();
     if (!person) return [];
-    return Object.values(cadState.vehicles).filter(v => v.ownerId === person.citizenid);
+    return $vehiclesArray().filter(v => v.ownerId === person.citizenid);
   });
 
   const personRecords = createMemo(() => {
     const person = selectedPerson();
     if (!person) return [];
-    return Object.values(cadState.criminalRecords).filter(r => r.citizenid === person.citizenid);
+    return $criminalRecordsArray().filter(r => r.citizenid === person.citizenid);
   });
 
   const personWarrants = createMemo(() => {
     const person = selectedPerson();
     if (!person) return [];
-    return Object.values(cadState.warrants).filter(w => w.citizenid === person.citizenid && w.active);
+    return $warrantsArray().filter(w => w.citizenid === person.citizenid && w.active);
   });
 
   const personNotes = createMemo(() => {
@@ -58,7 +59,7 @@ export function PersonSearch() {
       return;
     }
     
-    const results = Object.values(cadState.persons).filter(p => 
+    const results = $personsArray().filter(p => 
       p.firstName.toLowerCase().includes(query) ||
       p.lastName.toLowerCase().includes(query) ||
       p.citizenid.toLowerCase().includes(query) ||
@@ -83,7 +84,7 @@ export function PersonSearch() {
     const lowerQuery = query.toLowerCase();
     setSearchQuery(query);
 
-    const person = Object.values(cadState.persons).find((p) => {
+    const person = $personsArray().find((p) => {
       return (
         p.citizenid.toLowerCase() === lowerQuery ||
         p.firstName.toLowerCase().includes(lowerQuery) ||

@@ -1,6 +1,7 @@
 import { createSignal, createMemo, Show, For, onMount } from 'solid-js';
 import { terminalActions, terminalState } from '~/stores/terminalStore';
-import { cadState, cadActions } from '~/stores/cadStore';
+import { cadActions } from '~/stores/cadStore';
+import { $casesArray } from '~/stores/storeSelectors';
 import { userActions } from '~/stores/userStore';
 import { DosSelect } from '../DosSelect';
 import type { Case, Note } from '~/stores/cadStore';
@@ -12,7 +13,7 @@ export function NotesEditor() {
 
   onMount(() => {
     if (modalData?.caseId) {
-      const c = Object.values(cadState.cases).find(c => c.caseId === modalData.caseId);
+      const c = $casesArray().find(c => c.caseId === modalData.caseId);
       if (c) {
         setCurrentCase(c);
       }
@@ -108,16 +109,18 @@ export function NotesEditor() {
             value={currentCase()?.caseId || ''}
             onChange={(e) => {
               const caseId = e.currentTarget.value;
-              const c = Object.values(cadState.cases).find(c => c.caseId === caseId);
+              const c = $casesArray().find(c => c.caseId === caseId);
               setCurrentCase(c || null);
               setSelectedNote(null);
               setIsEditing(false);
             }}
           >
             <option value="">SELECT CASE...</option>
-            {Object.values(cadState.cases).map(c => (
-              <option value={c.caseId}>{c.caseId} - {c.title}</option>
-            ))}
+            <For each={$casesArray()}>
+              {(c) => (
+                <option value={c.caseId}>{c.caseId} - {c.title}</option>
+              )}
+            </For>
           </Select.Root>
 
           <Show when={currentCase()}>

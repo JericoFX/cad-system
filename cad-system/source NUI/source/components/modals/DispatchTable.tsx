@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, createSelector, For, onCleanup, onMount, Show } from 'solid-js';
 import { terminalActions } from '~/stores/terminalStore';
 import {
   cadActions,
@@ -6,6 +6,7 @@ import {
   type DispatchCall,
   type SecurityCamera,
 } from '~/stores/cadStore';
+import { $activeCalls, $dispatchUnitsArray } from '~/stores/storeSelectors';
 import { radioActions } from '~/stores/radioStore';
 import { fetchNui } from '~/utils/fetchNui';
 import { useNui } from '~/hooks/useNui';
@@ -44,6 +45,7 @@ import { DispatchUnitActionRow } from './DispatchUnitActionRow';
 
 export function DispatchTable() {
   const [selectedCallId, setSelectedCallId] = createSignal<string | null>(null);
+  const isCallSelected = createSelector(selectedCallId);
   const [dispatchSettings, setDispatchSettings] = createSignal<DispatchSettings>(DEFAULT_DISPATCH_SETTINGS);
   const [nowMs, setNowMs] = createSignal(Date.now());
   const [searchQuery, setSearchQuery] = createSignal('');
@@ -75,9 +77,9 @@ export function DispatchTable() {
     setWatchingCameraId(null);
   });
 
-  const allCalls = createMemo(() => sortDispatchCalls(Object.values(cadState.dispatchCalls)));
+  const allCalls = createMemo(() => sortDispatchCalls($activeCalls()));
 
-  const allUnits = createMemo(() => Object.values(cadState.dispatchUnits));
+  const allUnits = createMemo(() => $dispatchUnitsArray());
 
   const cameraGrid = createMemo(() => sortCameraGrid(Object.values(cadState.securityCameras)));
 
@@ -613,7 +615,7 @@ export function DispatchTable() {
                 {(call) => (
                   <DispatchCallCard
                     call={call}
-                    selected={selectedCall()?.callId === call.callId}
+                    selected={isCallSelected(call.callId)}
                     onSelect={setSelectedCallId}
                     getSlaLevel={getCallSlaLevelFor}
                     getSlaLabel={getCallSlaLabelFor}

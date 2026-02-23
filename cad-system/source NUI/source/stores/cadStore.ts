@@ -1,4 +1,5 @@
-import { createStore } from 'solid-js/store';
+import { createStore, produce } from 'solid-js/store';
+import { batch, untrack } from 'solid-js';
 import { 
   updateEntity, 
   addToArray, 
@@ -338,8 +339,10 @@ export const cadActions = {
   },
   addCase: (caseData: Case) => {
     const normalized = normalizeCaseRecord(caseData);
-    setCADState('cases', normalized.caseId, normalized);
-    setCADState('currentCase', normalized);
+    batch(() => {
+      setCADState('cases', normalized.caseId, normalized);
+      setCADState('currentCase', normalized);
+    });
   },
   setCurrentCase: (caseData: Case | null) => setCADState('currentCase', caseData),
   updateCase: (caseId: string, data: Partial<Case>) => {
@@ -380,15 +383,21 @@ export const cadActions = {
   },
   
   addCaseNote: (caseId: string, note: Note) => {
-    setCADState('cases', caseId, 'notes', (prev) => [...(prev || []), note]);
+    setCADState('cases', caseId, 'notes', produce((notes) => {
+      notes.push(note);
+    }));
   },
   updateCaseNote: (caseId: string, noteId: string, data: Partial<Note>) => {
-    setCADState('cases', caseId, 'notes', (prev) => 
-      prev.map(n => n.id === noteId ? { ...n, ...data } : n)
-    );
+    setCADState('cases', caseId, 'notes', produce((notes) => {
+      const note = notes.find(n => n.id === noteId);
+      if (note) Object.assign(note, data);
+    }));
   },
   removeCaseNote: (caseId: string, noteId: string) => {
-    setCADState('cases', caseId, 'notes', (prev) => prev.filter(n => n.id !== noteId));
+    setCADState('cases', caseId, 'notes', produce((notes) => {
+      const idx = notes.findIndex(n => n.id === noteId);
+      if (idx !== -1) notes.splice(idx, 1);
+    }));
   },
   
   addCaseEvidence: (caseId: string, evidence: Evidence) => {
@@ -406,26 +415,25 @@ export const cadActions = {
       currentLocation: 'Evidence Storage',
       currentCustodian: evidence.attachedBy,
     };
-    setCADState('cases', caseId, 'evidence', (prev) => [...(prev || []), evidenceWithCustody]);
+    setCADState('cases', caseId, 'evidence', produce((evidenceList) => {
+      evidenceList.push(evidenceWithCustody);
+    }));
   },
   removeCaseEvidence: (caseId: string, evidenceId: string) => {
-    setCADState('cases', caseId, 'evidence', (prev) => prev.filter(e => e.evidenceId !== evidenceId));
+    setCADState('cases', caseId, 'evidence', produce((evidenceList) => {
+      const idx = evidenceList.findIndex(e => e.evidenceId === evidenceId);
+      if (idx !== -1) evidenceList.splice(idx, 1);
+    }));
   },
-  
   addCustodyEvent: (caseId: string, evidenceId: string, event: CustodyEvent) => {
-    setCADState('cases', caseId, 'evidence', (prev) =>
-      prev.map(e => {
-        if (e.evidenceId === evidenceId) {
-          return {
-            ...e,
-            custodyChain: [...(e.custodyChain || []), event],
-            currentLocation: event.location || e.currentLocation,
-            currentCustodian: event.toOfficer || event.recordedBy,
-          };
-        }
-        return e;
-      })
-    );
+    setCADState('cases', caseId, 'evidence', produce((evidenceList) => {
+      const e = evidenceList.find(e => e.evidenceId === evidenceId);
+      if (e) {
+        e.custodyChain = [...(e.custodyChain || []), event];
+        e.currentLocation = event.location || e.currentLocation;
+        e.currentCustodian = event.toOfficer || event.recordedBy;
+      }
+    }));
   },
   transferEvidence: (caseId: string, evidenceId: string, fromOfficer: string, toOfficer: string, notes?: string) => {
     const event = createTransferEvent(evidenceId, fromOfficer, toOfficer, notes);
@@ -440,8 +448,10 @@ export const cadActions = {
     cadActions.addCustodyEvent(caseId, evidenceId, event);
   },
   getEvidenceCustodyChain: (caseId: string, evidenceId: string): CustodyEvent[] => {
-    const evidence = cadState.cases[caseId]?.evidence?.find(e => e.evidenceId === evidenceId);
-    return evidence?.custodyChain || [];
+    return untrack(() => {
+      const evidence = cadState.cases[caseId]?.evidence?.find(e => e.evidenceId === evidenceId);
+      return evidence?.custodyChain || [];
+    });
   },
   
   searchCases: (query: string) => {
@@ -524,12 +534,14 @@ export const cadActions = {
     });
   },
   getActiveBOLOs: (): BOLO[] => {
-    return Object.values(cadState.bolos).filter(b => b.active);
+    return untrack(() => Object.values(cadState.bolos).filter(b => b.active));
   },
   checkBOLO: (type: 'PERSON' | 'VEHICLE', identifier: string): BOLO | null => {
-    return Object.values(cadState.bolos).find(b => 
-      b.active && b.type === type && b.identifier === identifier
-    ) || null;
+    return untrack(() => 
+      Object.values(cadState.bolos).find(b => 
+        b.active && b.type === type && b.identifier === identifier
+      ) || null
+    );
   },
   
   addRadioMarker: (marker: RadioMarker) => {
@@ -548,49 +560,62 @@ export const cadActions = {
     setCADState('radioMarkers', markerId, 'linkedCallId', callId);
   },
   getMarkersForCase: (caseId: string): RadioMarker[] => {
-    return Object.values(cadState.radioMarkers).filter(m => m.linkedCaseId === caseId);
+    return untrack(() => Object.values(cadState.radioMarkers).filter(m => m.linkedCaseId === caseId));
   },
   getMarkersForCall: (callId: string): RadioMarker[] => {
-    return Object.values(cadState.radioMarkers).filter(m => m.linkedCallId === callId);
+    return untrack(() => Object.values(cadState.radioMarkers).filter(m => m.linkedCallId === callId));
   },
   getAllMarkers: (): RadioMarker[] => {
-    return Object.values(cadState.radioMarkers).sort((a, b) => 
+    return untrack(() => Object.values(cadState.radioMarkers).sort((a, b) => 
       new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    );
+    ));
   },
   
   addCaseTask: (caseId: string, task: CaseTask) => {
-    setCADState('cases', caseId, 'tasks', (prev) => [...(prev || []), task]);
+    setCADState('cases', caseId, 'tasks', produce((tasks) => {
+      tasks.push(task);
+    }));
   },
   updateCaseTask: (caseId: string, taskId: string, data: Partial<CaseTask>) => {
-    setCADState('cases', caseId, 'tasks', (prev) =>
-      prev.map(t => t.taskId === taskId ? { ...t, ...data } : t)
-    );
+    setCADState('cases', caseId, 'tasks', produce((tasks) => {
+      const task = tasks.find(t => t.taskId === taskId);
+      if (task) Object.assign(task, data);
+    }));
   },
   removeCaseTask: (caseId: string, taskId: string) => {
-    setCADState('cases', caseId, 'tasks', (prev) => prev.filter(t => t.taskId !== taskId));
+    setCADState('cases', caseId, 'tasks', produce((tasks) => {
+      const idx = tasks.findIndex(t => t.taskId === taskId);
+      if (idx !== -1) tasks.splice(idx, 1);
+    }));
   },
   completeCaseTask: (caseId: string, taskId: string) => {
-    setCADState('cases', caseId, 'tasks', (prev) =>
-      prev.map(t => t.taskId === taskId ? { 
-        ...t, 
-        status: 'COMPLETED', 
-        completedAt: new Date().toISOString() 
-      } : t)
-    );
+    setCADState('cases', caseId, 'tasks', produce((tasks) => {
+      const task = tasks.find(t => t.taskId === taskId);
+      if (task) {
+        task.status = 'COMPLETED';
+        task.completedAt = new Date().toISOString();
+      }
+    }));
   },
   getPendingTasks: (caseId: string): CaseTask[] => {
-    return cadState.cases[caseId]?.tasks?.filter(t => t.status === 'PENDING') || [];
+    return untrack(() => cadState.cases[caseId]?.tasks?.filter(t => t.status === 'PENDING') || []);
   },
   getOverdueTasks: (caseId: string): CaseTask[] => {
-    const now = new Date().toISOString();
-    return cadState.cases[caseId]?.tasks?.filter(t => 
-      t.status === 'PENDING' && t.dueDate < now
-    ) || [];
+    return untrack(() => {
+      const now = new Date().toISOString();
+      return cadState.cases[caseId]?.tasks?.filter(t => 
+        t.status === 'PENDING' && t.dueDate < now
+      ) || [];
+    });
   },
   
-  setSearchResults: (results: { persons: Person[]; vehicles: Vehicle[] }) => 
-    setCADState('searchResults', { ...results, loading: false }),
+  setSearchResults: (results: { persons: Person[]; vehicles: Vehicle[] }) => {
+    batch(() => {
+      setCADState('searchResults', 'persons', results.persons);
+      setCADState('searchResults', 'vehicles', results.vehicles);
+      setCADState('searchResults', 'loading', false);
+    });
+  },
   setSearchLoading: (loading: boolean) => setCADState('searchResults', 'loading', loading),
   clearSearchResults: () => setCADState('searchResults', { persons: [], vehicles: [], loading: false }),
   

@@ -1,6 +1,7 @@
 import { createSignal, createMemo, Show, For, onMount } from 'solid-js';
 import { terminalActions } from '~/stores/terminalStore';
 import { cadActions, cadState } from '~/stores/cadStore';
+import { $casesArray, $stagingEvidenceArray } from '~/stores/storeSelectors';
 import { photoActions, photoState, type PhotoMetadata } from '~/stores/photoStore';
 import { viewerActions } from '~/stores/viewerStore';
 import { fetchNui } from '~/utils/fetchNui';
@@ -109,7 +110,7 @@ export function EvidenceManager() {
       icon: '📂'
     });
     
-    cadState.stagingEvidence.forEach(ev => {
+    $stagingEvidenceArray().forEach(ev => {
       files.push({
         name: buildEvidenceFileName(ev.stagingId, ev.evidenceType),
         type: 'file',
@@ -120,7 +121,8 @@ export function EvidenceManager() {
       });
     });
     
-    Object.entries(cadState.cases).forEach(([caseId, caseData]) => {
+    $casesArray().forEach((caseData) => {
+      const caseId = caseData.caseId;
       const evidenceList = caseData.evidence || [];
       
       const folderName = `📁 ${caseId} - ${caseData.title}`;
@@ -545,9 +547,11 @@ export function EvidenceManager() {
               }}
             >
               <option value="">Target Case...</option>
-              {Object.values(cadState.cases).map((caseItem) => (
-                <option value={caseItem.caseId}>{caseItem.caseId} - {caseItem.title}</option>
-              ))}
+              <For each={$casesArray()}>
+                {(caseItem) => (
+                  <option value={caseItem.caseId}>{caseItem.caseId} - {caseItem.title}</option>
+                )}
+              </For>
             </Select.Root>
             <Button.Root class="btn" onClick={() => void loadLocker()} disabled={lockerBusy()}>
               [LOCKER REFRESH]

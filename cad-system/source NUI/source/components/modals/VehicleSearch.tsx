@@ -1,6 +1,7 @@
 import { createSignal, createMemo, For, Show, onMount } from 'solid-js';
 import { terminalActions, terminalState } from '~/stores/terminalStore';
-import { cadState, cadActions, type Vehicle } from '~/stores/cadStore';
+import { cadActions, type Vehicle } from '~/stores/cadStore';
+import { $vehiclesArray } from '~/stores/storeSelectors';
 import { Button, Input, Modal, Tabs, Textarea } from '~/components/ui';
 import { PhotoGallery } from '~/components/ui/PhotoGallery';
 
@@ -33,7 +34,7 @@ export function VehicleSearch() {
       return;
     }
     
-    const results = Object.values(cadState.vehicles).filter(v => 
+    const results = $vehiclesArray().filter(v => 
       v.plate.toLowerCase().includes(query) ||
       v.model.toLowerCase().includes(query) ||
       v.make.toLowerCase().includes(query) ||
@@ -72,7 +73,7 @@ export function VehicleSearch() {
       return;
     }
 
-    const vehicles = Object.values(cadState.vehicles);
+    const vehicles = $vehiclesArray();
 
     if (modalData.plate && modalData.plate.trim() !== '') {
       const plateQuery = modalData.plate.trim();
