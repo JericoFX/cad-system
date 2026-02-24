@@ -1,7 +1,6 @@
 import { createSignal, createMemo, Show, For, onMount } from 'solid-js';
 import { terminalActions } from '~/stores/terminalStore';
 import { cadActions, cadState } from '~/stores/cadStore';
-import { $casesArray, $stagingEvidenceArray } from '~/stores/storeSelectors';
 import { photoActions, photoState, type PhotoMetadata } from '~/stores/photoStore';
 import { viewerActions } from '~/stores/viewerStore';
 import { fetchNui } from '~/utils/fetchNui';
@@ -60,6 +59,8 @@ export function EvidenceManager() {
   const [lockerTerminalId, setLockerTerminalId] = createSignal<string | null>(null);
   const [lockerBusy, setLockerBusy] = createSignal(false);
   const [selectedStagingPhotoId, setSelectedStagingPhotoId] = createSignal<string | null>(null);
+  const casesArray = createMemo(() => Object.values(cadState.cases));
+  const stagingEvidenceArray = createMemo(() => cadState.stagingEvidence);
 
   const selectedStagingPhoto = createMemo(() =>
     photoState.stagingPhotos.find((photo) => photo.photoId === selectedStagingPhotoId()) || null
@@ -110,7 +111,7 @@ export function EvidenceManager() {
       icon: '📂'
     });
     
-    $stagingEvidenceArray().forEach(ev => {
+    stagingEvidenceArray().forEach(ev => {
       files.push({
         name: buildEvidenceFileName(ev.stagingId, ev.evidenceType),
         type: 'file',
@@ -121,7 +122,7 @@ export function EvidenceManager() {
       });
     });
     
-    $casesArray().forEach((caseData) => {
+    casesArray().forEach((caseData) => {
       const caseId = caseData.caseId;
       const evidenceList = caseData.evidence || [];
       
@@ -547,7 +548,7 @@ export function EvidenceManager() {
               }}
             >
               <option value="">Target Case...</option>
-              <For each={$casesArray()}>
+              <For each={casesArray()}>
                 {(caseItem) => (
                   <option value={caseItem.caseId}>{caseItem.caseId} - {caseItem.title}</option>
                 )}

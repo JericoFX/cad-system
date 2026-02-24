@@ -1,7 +1,6 @@
 import { createSignal, createMemo, Show, For, onMount } from 'solid-js';
 import { terminalActions, terminalState } from '~/stores/terminalStore';
-import { cadActions } from '~/stores/cadStore';
-import { $casesArray } from '~/stores/storeSelectors';
+import { cadState, cadActions } from '~/stores/cadStore';
 import { userActions } from '~/stores/userStore';
 import { DosSelect } from '../DosSelect';
 import type { Case, Note } from '~/stores/cadStore';
@@ -10,10 +9,11 @@ import { Button, Modal, Select, Textarea } from '~/components/ui';
 export function NotesEditor() {
   const modalData = terminalState.modalData as { caseId?: string } | null;
   const [currentCase, setCurrentCase] = createSignal<Case | null>(null);
+  const casesArray = createMemo(() => Object.values(cadState.cases));
 
   onMount(() => {
     if (modalData?.caseId) {
-      const c = $casesArray().find(c => c.caseId === modalData.caseId);
+      const c = Object.values(cadState.cases).find(c => c.caseId === modalData.caseId);
       if (c) {
         setCurrentCase(c);
       }
@@ -109,14 +109,14 @@ export function NotesEditor() {
             value={currentCase()?.caseId || ''}
             onChange={(e) => {
               const caseId = e.currentTarget.value;
-              const c = $casesArray().find(c => c.caseId === caseId);
+              const c = casesArray().find(c => c.caseId === caseId);
               setCurrentCase(c || null);
               setSelectedNote(null);
               setIsEditing(false);
             }}
           >
             <option value="">SELECT CASE...</option>
-            <For each={$casesArray()}>
+            <For each={casesArray()}>
               {(c) => (
                 <option value={c.caseId}>{c.caseId} - {c.title}</option>
               )}

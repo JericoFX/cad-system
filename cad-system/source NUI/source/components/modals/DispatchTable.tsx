@@ -6,7 +6,6 @@ import {
   type DispatchCall,
   type SecurityCamera,
 } from '~/stores/cadStore';
-import { $activeCalls, $dispatchUnitsArray } from '~/stores/storeSelectors';
 import { radioActions } from '~/stores/radioStore';
 import { fetchNui } from '~/utils/fetchNui';
 import { useNui } from '~/hooks/useNui';
@@ -77,9 +76,15 @@ export function DispatchTable() {
     setWatchingCameraId(null);
   });
 
-  const allCalls = createMemo(() => sortDispatchCalls($activeCalls()));
+  const allCalls = createMemo(() =>
+    sortDispatchCalls(
+      Object.values(cadState.dispatchCalls).filter(
+        (c) => c.status === 'ACTIVE' || c.status === 'PENDING'
+      )
+    )
+  );
 
-  const allUnits = createMemo(() => $dispatchUnitsArray());
+  const allUnits = createMemo(() => Object.values(cadState.dispatchUnits));
 
   const cameraGrid = createMemo(() => sortCameraGrid(Object.values(cadState.securityCameras)));
 
@@ -113,11 +118,20 @@ export function DispatchTable() {
     getRecommendedUnit(selectedCall(), dispatchSettings(), allUnits())
   );
 
+  const caseByLinkedCallId = createMemo(() => {
+    const map: Record<string, true> = {};
+    const cases = Object.values(cadState.cases);
+    for (let i = 0; i < cases.length; i += 1) {
+      const linkedCallId = cases[i].linkedCallId;
+      if (linkedCallId) map[linkedCallId] = true;
+    }
+    return map;
+  });
+
   const formatAge = (iso: string) => formatCallAge(iso, nowMs());
 
   const getCaseActionLabel = (callId: string) => {
-    const linkedCase = Object.values(cadState.cases).find((caseItem) => caseItem.linkedCallId === callId);
-    return linkedCase ? 'OPEN CASE' : 'CREATE CASE';
+    return caseByLinkedCallId()[callId] ? 'OPEN CASE' : 'CREATE CASE';
   };
 
   const notifyCallToChannels = (call: DispatchCall, unitIds: string[], prefix = 'Assignment') => {

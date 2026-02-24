@@ -2,7 +2,6 @@
 import { createSignal, createMemo, createEffect, createSelector, For, Show } from 'solid-js';
 import { terminalActions, terminalState } from '~/stores/terminalStore';
 import { cadState, cadActions, type Case, type Note, type Evidence } from '~/stores/cadStore';
-import { $casesArray } from '~/stores/storeSelectors';
 import { userActions } from '~/stores/userStore';
 import { viewerActions } from '~/stores/viewerStore';
 import { fetchNui } from '~/utils/fetchNui';
@@ -44,7 +43,7 @@ export function CaseManager() {
   const [newTaskDesc, setNewTaskDesc] = createSignal('');
   const [newTaskAssignedTo, setNewTaskAssignedTo] = createSignal('');
 
-  const allCases = createMemo(() => $casesArray());
+  const allCases = createMemo(() => Object.values(cadState.cases));
 
   const modalData = createMemo(() =>
     (terminalState.modalData as { caseId?: string } | null) || null

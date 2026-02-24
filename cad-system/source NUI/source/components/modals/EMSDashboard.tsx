@@ -467,8 +467,10 @@ export function EMSDashboard() {
     terminalActions.addLine(`✓ Restocked ${qty} ${emsState.inventory[itemId]?.unit}`, 'output');
   };
 
-  const activePatients = createMemo(() => 
-    Object.values(emsState.patients)
+  const patientsArray = createMemo(() => Object.values(emsState.patients));
+
+  const activePatients = createMemo(() =>
+    patientsArray()
       .filter(p => p.status !== 'DISCHARGED' && p.status !== 'TRANSFERRED')
       .sort((a, b) => {
         if (a.triagePriority !== b.triagePriority) {
@@ -490,24 +492,26 @@ export function EMSDashboard() {
   });
 
   const inTreatmentPatients = createMemo(() =>
-    Object.values(emsState.patients)
+    patientsArray()
       .filter(p => p.status === 'IN_TREATMENT')
       .sort((a, b) => a.triagePriority - b.triagePriority)
   );
 
   const inventoryList = createMemo(() => Object.values(emsState.inventory));
 
-  const criticalCount = createMemo(() => 
-    Object.values(emsState.patients).filter(p => p.condition === 'CRITICAL' && p.status !== 'DISCHARGED' && p.status !== 'TRANSFERRED').length
-  );
+  const triageCounts = createMemo(() => {
+    const counts = { critical: 0, serious: 0, stable: 0 };
+    const patients = activePatients();
 
-  const seriousCount = createMemo(() => 
-    Object.values(emsState.patients).filter(p => p.condition === 'SERIOUS' && p.status !== 'DISCHARGED' && p.status !== 'TRANSFERRED').length
-  );
+    for (let i = 0; i < patients.length; i += 1) {
+      const condition = patients[i].condition;
+      if (condition === 'CRITICAL') counts.critical += 1;
+      else if (condition === 'SERIOUS') counts.serious += 1;
+      else if (condition === 'STABLE') counts.stable += 1;
+    }
 
-  const stableCount = createMemo(() => 
-    Object.values(emsState.patients).filter(p => p.condition === 'STABLE' && p.status !== 'DISCHARGED' && p.status !== 'TRANSFERRED').length
-  );
+    return counts;
+  });
 
   return (
     <Modal.Root onClose={closeModal} useContentWrapper={false}>
@@ -519,15 +523,15 @@ export function EMSDashboard() {
 
         <div class="triage-stats">
           <div class="stat-item critical">
-            <span class="stat-number">{criticalCount()}</span>
+            <span class="stat-number">{triageCounts().critical}</span>
             <span class="stat-label">CRITICAL</span>
           </div>
           <div class="stat-item serious">
-            <span class="stat-number">{seriousCount()}</span>
+            <span class="stat-number">{triageCounts().serious}</span>
             <span class="stat-label">SERIOUS</span>
           </div>
           <div class="stat-item stable">
-            <span class="stat-number">{stableCount()}</span>
+            <span class="stat-number">{triageCounts().stable}</span>
             <span class="stat-label">STABLE</span>
           </div>
           <div class="stat-item total">

@@ -1,4 +1,4 @@
-import { createMemo, createSignal, Show } from 'solid-js';
+import { createMemo, createSignal, For, Show } from 'solid-js';
 import { terminalActions, terminalState } from '~/stores/terminalStore';
 import { cadState, cadActions } from '~/stores/cadStore';
 import { userState } from '~/stores/userStore';
@@ -390,11 +390,13 @@ export function MapModal() {
                   style={{ width: '100%' }}
                 >
                   <option value=''>-- Select Unit --</option>
-                  {availableUnits().map((unit) => (
-                    <option value={unit.unitId}>
-                      {unit.unitId} - {unit.name} ({unit.type})
-                    </option>
-                  ))}
+                  <For each={availableUnits()}>
+                    {(unit) => (
+                      <option value={unit.unitId}>
+                        {unit.unitId} - {unit.name} ({unit.type})
+                      </option>
+                    )}
+                  </For>
                 </select>
               </div>
             </Show>
@@ -504,28 +506,30 @@ export function MapModal() {
           <div class='info-section'>
             <h3>[UNITS: {unitMarkers().length}]</h3>
             <div class='marker-list'>
-              {unitMarkers().map((marker) => (
-                <div
-                  class={`marker-item ${selectedMarker() === marker.id ? 'selected' : ''}`}
-                  onClick={() => {
-                    setSelectedMarker(marker.id);
-                    setSelectedMarkerType('unit');
-                    setShowDeleteConfirm(false);
-                  }}
-                  onDblClick={() => {
-                    mapRef()?.setCenter([marker.position[0], marker.position[1]]);
-                  }}
-                >
-                  <span
-                    style={{
-                      color: marker.color === 'red-168' ? '#ff0000' : '#00ff00',
+              <For each={unitMarkers()}>
+                {(marker) => (
+                  <div
+                    class={`marker-item ${selectedMarker() === marker.id ? 'selected' : ''}`}
+                    onClick={() => {
+                      setSelectedMarker(marker.id);
+                      setSelectedMarkerType('unit');
+                      setShowDeleteConfirm(false);
+                    }}
+                    onDblClick={() => {
+                      mapRef()?.setCenter([marker.position[0], marker.position[1]]);
                     }}
                   >
-                    {marker.icon}
-                  </span>
-                  {marker.id} - {marker.tooltip}
-                </div>
-              ))}
+                    <span
+                      style={{
+                        color: marker.color === 'red-168' ? '#ff0000' : '#00ff00',
+                      }}
+                    >
+                      {marker.icon}
+                    </span>
+                    {marker.id} - {marker.tooltip}
+                  </div>
+                )}
+              </For>
               {unitMarkers().length === 0 && (
                 <div class='marker-empty'>No units with location</div>
               )}
@@ -535,44 +539,46 @@ export function MapModal() {
           <div class='info-section'>
             <h3>[CALLS: {callMarkers().length}]</h3>
             <div class='marker-list'>
-              {callMarkers().map((marker) => (
-                <div
-                  class={`marker-item ${selectedMarker() === marker.id ? 'selected' : ''}`}
-                  onClick={() => {
-                    setSelectedMarker(marker.id);
-                    setSelectedMarkerType('dispatch');
-                    setShowDeleteConfirm(false);
-                  }}
-                  onDblClick={() => {
-                    mapRef()?.setCenter([marker.position[0], marker.position[1]]);
-                  }}
-                >
-                  <span
-                    style={{
-                      color:
-                        marker.color === 'red-168'
-                          ? '#ff0000'
-                          : marker.color === 'yellow-168'
-                            ? '#ffff00'
-                            : '#00ff00',
+              <For each={callMarkers()}>
+                {(marker) => (
+                  <div
+                    class={`marker-item ${selectedMarker() === marker.id ? 'selected' : ''}`}
+                    onClick={() => {
+                      setSelectedMarker(marker.id);
+                      setSelectedMarkerType('dispatch');
+                      setShowDeleteConfirm(false);
+                    }}
+                    onDblClick={() => {
+                      mapRef()?.setCenter([marker.position[0], marker.position[1]]);
                     }}
                   >
-                    {marker.icon}
-                  </span>
-                  {marker.tooltip}
-                  {marker.id.startsWith('CALL_') && (
                     <span
                       style={{
-                        color: '#00ff00',
-                        'margin-left': '8px',
-                        'font-size': '12px',
+                        color:
+                          marker.color === 'red-168'
+                            ? '#ff0000'
+                            : marker.color === 'yellow-168'
+                              ? '#ffff00'
+                              : '#00ff00',
                       }}
                     >
-                      [CUSTOM]
+                      {marker.icon}
                     </span>
-                  )}
-                </div>
-              ))}
+                    {marker.tooltip}
+                    {marker.id.startsWith('CALL_') && (
+                      <span
+                        style={{
+                          color: '#00ff00',
+                          'margin-left': '8px',
+                          'font-size': '12px',
+                        }}
+                      >
+                        [CUSTOM]
+                      </span>
+                    )}
+                  </div>
+                )}
+              </For>
               {callMarkers().length === 0 && (
                 <div class='marker-empty'>No calls with coordinates</div>
               )}
