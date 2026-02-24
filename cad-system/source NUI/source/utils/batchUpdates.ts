@@ -19,3 +19,30 @@ export function batchUpdates(...fns: (() => void)[]) {
     fns.forEach(fn => fn());
   });
 }
+
+/**
+ * Executes async operations and batches state updates on completion.
+ * Useful for async operations that need to update multiple state properties.
+ */
+export async function asyncBatchUpdates<T>(
+  asyncFn: () => Promise<T>,
+  ...fns: (() => void)[]
+): Promise<T> {
+  const result = await asyncFn();
+  batch(() => {
+    fns.forEach(fn => fn());
+  });
+  return result;
+}
+
+/**
+ * Conditionally executes batch only if there are multiple updates.
+ * Useful for avoiding unnecessary batch overhead on single updates.
+ */
+export function conditionalBatch(shouldBatch: boolean, fns: (() => void)[]) {
+  if (shouldBatch && fns.length > 1) {
+    batchUpdates(...fns);
+  } else if (fns.length > 0) {
+    fns[0]();
+  }
+}

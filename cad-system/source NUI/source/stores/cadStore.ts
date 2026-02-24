@@ -383,21 +383,15 @@ export const cadActions = {
   },
   
   addCaseNote: (caseId: string, note: Note) => {
-    setCADState('cases', caseId, 'notes', produce((notes) => {
-      notes.push(note);
-    }));
+    setCADState('cases', caseId, 'notes', (notes) => [...notes, note]);
   },
   updateCaseNote: (caseId: string, noteId: string, data: Partial<Note>) => {
-    setCADState('cases', caseId, 'notes', produce((notes) => {
-      const note = notes.find(n => n.id === noteId);
-      if (note) Object.assign(note, data);
-    }));
+    setCADState('cases', caseId, 'notes', (notes) => 
+      notes.map(n => n.id === noteId ? { ...n, ...data } : n)
+    );
   },
   removeCaseNote: (caseId: string, noteId: string) => {
-    setCADState('cases', caseId, 'notes', produce((notes) => {
-      const idx = notes.findIndex(n => n.id === noteId);
-      if (idx !== -1) notes.splice(idx, 1);
-    }));
+    setCADState('cases', caseId, 'notes', (notes) => notes.filter(n => n.id !== noteId));
   },
   
   addCaseEvidence: (caseId: string, evidence: Evidence) => {
@@ -415,15 +409,10 @@ export const cadActions = {
       currentLocation: 'Evidence Storage',
       currentCustodian: evidence.attachedBy,
     };
-    setCADState('cases', caseId, 'evidence', produce((evidenceList) => {
-      evidenceList.push(evidenceWithCustody);
-    }));
+    setCADState('cases', caseId, 'evidence', (evidenceList) => [...evidenceList, evidenceWithCustody]);
   },
   removeCaseEvidence: (caseId: string, evidenceId: string) => {
-    setCADState('cases', caseId, 'evidence', produce((evidenceList) => {
-      const idx = evidenceList.findIndex(e => e.evidenceId === evidenceId);
-      if (idx !== -1) evidenceList.splice(idx, 1);
-    }));
+    setCADState('cases', caseId, 'evidence', (evidenceList) => evidenceList.filter(e => e.evidenceId !== evidenceId));
   },
   addCustodyEvent: (caseId: string, evidenceId: string, event: CustodyEvent) => {
     setCADState('cases', caseId, 'evidence', produce((evidenceList) => {
@@ -572,30 +561,24 @@ export const cadActions = {
   },
   
   addCaseTask: (caseId: string, task: CaseTask) => {
-    setCADState('cases', caseId, 'tasks', produce((tasks) => {
-      tasks.push(task);
-    }));
+    setCADState('cases', caseId, 'tasks', (tasks) => [...tasks, task]);
   },
   updateCaseTask: (caseId: string, taskId: string, data: Partial<CaseTask>) => {
-    setCADState('cases', caseId, 'tasks', produce((tasks) => {
-      const task = tasks.find(t => t.taskId === taskId);
-      if (task) Object.assign(task, data);
-    }));
+    setCADState('cases', caseId, 'tasks', (tasks) => 
+      tasks.map(t => t.taskId === taskId ? { ...t, ...data } : t)
+    );
   },
   removeCaseTask: (caseId: string, taskId: string) => {
-    setCADState('cases', caseId, 'tasks', produce((tasks) => {
-      const idx = tasks.findIndex(t => t.taskId === taskId);
-      if (idx !== -1) tasks.splice(idx, 1);
-    }));
+    setCADState('cases', caseId, 'tasks', (tasks) => tasks.filter(t => t.taskId !== taskId));
   },
   completeCaseTask: (caseId: string, taskId: string) => {
-    setCADState('cases', caseId, 'tasks', produce((tasks) => {
-      const task = tasks.find(t => t.taskId === taskId);
-      if (task) {
-        task.status = 'COMPLETED';
-        task.completedAt = new Date().toISOString();
-      }
-    }));
+    setCADState('cases', caseId, 'tasks', (tasks) => 
+      tasks.map(t => 
+        t.taskId === taskId
+          ? { ...t, status: 'COMPLETED', completedAt: new Date().toISOString() }
+          : t
+      )
+    );
   },
   getPendingTasks: (caseId: string): CaseTask[] => {
     return untrack(() => cadState.cases[caseId]?.tasks?.filter(t => t.status === 'PENDING') || []);
