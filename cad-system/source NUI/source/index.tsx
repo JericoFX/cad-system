@@ -5,7 +5,7 @@ import { App } from './App';
 import { userActions } from './stores/userStore';
 import { featureActions } from './stores/featureStore';
 import { codeCatalogActions } from './stores/codeCatalogStore';
-import { UIProvider } from './components/ui';
+import { AppProviders } from './providers/AppProviders';
 
 import { initNuiSystem } from './hooks/useNui';
 
@@ -13,9 +13,9 @@ const root = document.getElementById('root');
 if (root) {
   render(
     () => (
-      <UIProvider>
+      <AppProviders>
         <App />
-      </UIProvider>
+      </AppProviders>
     ),
     root,
   );
