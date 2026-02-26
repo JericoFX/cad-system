@@ -100,6 +100,12 @@ export const [userState, setUserState] = createStore<UserState>(initialState);
 export const userActions = {
   init: async () => {
     if (CONFIG.USE_MOCK_DATA) {
+      const mockCallsign = CONFIG.MOCK_USER.badge || null;
+      const mockNeedsCallsign = needsCallsignSetup(mockCallsign, {
+        requireWhenEmpty: true,
+        blockedPrefixes: ['B-'],
+      });
+
       setUserState({
         currentUser: {
           id: CONFIG.MOCK_USER.id,
@@ -110,9 +116,9 @@ export const userActions = {
           rank: 'Officer',
         },
         isAuthenticated: true,
-        callsign: CONFIG.MOCK_USER.badge,
-        needsCallsign: false,
-        callsignValidated: true,
+        callsign: mockCallsign,
+        needsCallsign: mockNeedsCallsign,
+        callsignValidated: !mockNeedsCallsign,
       });
       return;
     }
