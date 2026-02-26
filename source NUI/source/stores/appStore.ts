@@ -10,9 +10,11 @@ import { CONFIG } from '~/config';
 
 interface AppState {
   isVisible: boolean;
+  hasBootCompleted: boolean;
   isBooting: boolean;
   bootStep: string;
   bootProgress: number;
+  bootLines: string[];
   skipBootRequested: boolean;
   bootStartedAt: number | null;
   bootOfficer: {
@@ -80,9 +82,11 @@ function getBootDefaults(): BootConfig {
 
 const initialState: AppState = {
   isVisible: false,
+  hasBootCompleted: false,
   isBooting: false,
   bootStep: 'Initializing',
   bootProgress: 0,
+  bootLines: [],
   skipBootRequested: false,
   bootStartedAt: null,
   bootOfficer: null,
@@ -111,6 +115,7 @@ export const appActions = {
       isBooting: false,
       bootStep: 'Initializing',
       bootProgress: 0,
+      bootLines: [],
       skipBootRequested: false,
       bootStartedAt: null,
       bootOfficer: null,
@@ -129,6 +134,7 @@ export const appActions = {
    * Check if CAD is currently visible
    */
   isOpen: () => appState.isVisible,
+  hasBooted: () => appState.hasBootCompleted,
 
   startBoot: () => {
     setAppState('bootConfig', getBootDefaults());
@@ -138,6 +144,7 @@ export const appActions = {
         isBooting: false,
         bootStep: 'System ready',
         bootProgress: 100,
+        bootLines: [],
         skipBootRequested: false,
         bootStartedAt: null,
       });
@@ -148,6 +155,11 @@ export const appActions = {
       isBooting: true,
       bootStep: 'Powering terminal',
       bootProgress: 4,
+      bootLines: [
+        'JERICOFX CAD BIOS v1.0',
+        'CPU: MDT-9700K @ 3.60GHz',
+        'Memory Test: 16384MB OK',
+      ],
       skipBootRequested: false,
       bootStartedAt: Date.now(),
     });
@@ -157,6 +169,16 @@ export const appActions = {
     setAppState({
       bootStep: label,
       bootProgress: Math.min(100, Math.max(0, progress)),
+    });
+  },
+
+  pushBootLine: (line: string) => {
+    setAppState('bootLines', (current) => {
+      const next = [...current, line];
+      if (next.length > 14) {
+        return next.slice(next.length - 14);
+      }
+      return next;
     });
   },
 
@@ -174,9 +196,22 @@ export const appActions = {
 
   completeBoot: () => {
     setAppState({
+      hasBootCompleted: true,
       isBooting: false,
       bootStep: 'System ready',
       bootProgress: 100,
+      skipBootRequested: false,
+      bootStartedAt: null,
+    });
+  },
+
+  powerCycle: () => {
+    setAppState({
+      hasBootCompleted: false,
+      isBooting: false,
+      bootStep: 'Initializing',
+      bootProgress: 0,
+      bootLines: [],
       skipBootRequested: false,
       bootStartedAt: null,
     });

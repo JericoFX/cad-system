@@ -9774,94 +9774,56 @@ select option:hover {
   z-index: 5000;
   display: grid;
   place-items: center;
-  background:
-    radial-gradient(circle at 15% 20%, rgba(0, 200, 255, 0.18), transparent 35%),
-    radial-gradient(circle at 85% 10%, rgba(255, 170, 60, 0.12), transparent 28%),
-    linear-gradient(180deg, rgba(6, 14, 20, 0.97), rgba(2, 7, 11, 0.98));
-  backdrop-filter: blur(2px);
+  background: linear-gradient(180deg, #020409, #05090f 40%, #03060a);
 }
 
 .cad-boot-shell {
-  width: min(860px, 94vw);
-  border: 2px solid rgba(145, 211, 255, 0.7);
-  background:
-    linear-gradient(180deg, rgba(8, 18, 26, 0.96), rgba(4, 12, 18, 0.96)),
-    repeating-linear-gradient(
-      0deg,
-      rgba(255, 255, 255, 0.02),
-      rgba(255, 255, 255, 0.02) 1px,
-      transparent 1px,
-      transparent 3px
-    );
+  width: min(920px, 95vw);
+  border: 2px solid rgba(48, 255, 170, 0.65);
+  background: linear-gradient(180deg, rgba(4, 14, 10, 0.95), rgba(5, 11, 9, 0.96));
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.8),
-    0 0 35px rgba(0, 185, 255, 0.2),
+    0 0 30px rgba(12, 255, 165, 0.22),
     0 0 90px rgba(0, 0, 0, 0.6);
-  padding: 20px 22px;
+  padding: 14px 16px;
+  font-family: var(--font-terminal);
 }
 
 .cad-boot-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .cad-boot-pill {
-  padding: 4px 10px;
-  font-size: 12px;
-  letter-spacing: 1px;
+  padding: 2px 8px;
+  font-size: 11px;
+  letter-spacing: 0.8px;
   text-transform: uppercase;
-  border: 1px solid rgba(145, 211, 255, 0.7);
-  color: rgba(200, 236, 255, 0.95);
-  background-color: rgba(8, 36, 54, 0.45);
+  border: 1px solid rgba(48, 255, 170, 0.55);
+  color: rgba(132, 255, 208, 0.95);
+  background-color: rgba(4, 32, 22, 0.5);
 }
 
 .cad-boot-version {
-  color: rgba(200, 236, 255, 0.75);
-  font-size: 12px;
-}
-
-.cad-boot-ascii {
-  margin: 0 0 14px;
-  color: rgba(205, 238, 255, 0.92);
-  font-size: clamp(8px, 1.3vw, 14px);
-  line-height: 1.35;
-  overflow-x: auto;
-}
-
-.cad-boot-operator {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.cad-boot-operator > div {
-  border: 1px solid rgba(145, 211, 255, 0.34);
-  background-color: rgba(12, 28, 38, 0.76);
-  padding: 10px 12px;
-}
-
-.cad-boot-operator span {
-  display: block;
+  color: rgba(122, 255, 202, 0.8);
   font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: rgba(173, 212, 235, 0.65);
-  margin-bottom: 4px;
 }
 
-.cad-boot-operator strong {
-  font-size: 16px;
-  color: rgba(223, 243, 255, 0.95);
-  letter-spacing: 0.4px;
-}
-
-.cad-boot-step {
-  font-size: 14px;
-  color: rgba(214, 241, 255, 0.95);
+.cad-boot-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 10px;
+  font-size: 11px;
+  color: rgba(149, 255, 214, 0.88);
+}
+
+.cad-boot-meta span {
+  border: 1px solid rgba(48, 255, 170, 0.32);
+  background: rgba(6, 18, 14, 0.75);
+  padding: 2px 8px;
 }
 
 .cad-boot-progress {
@@ -9872,32 +9834,78 @@ select option:hover {
 
 .cad-boot-progress-track {
   flex: 1;
-  height: 12px;
-  border: 1px solid rgba(145, 211, 255, 0.55);
-  background-color: rgba(10, 24, 34, 0.85);
+  height: 11px;
+  border: 1px solid rgba(48, 255, 170, 0.48);
+  background-color: rgba(4, 17, 13, 0.95);
   overflow: hidden;
 }
 
 .cad-boot-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #2cc9ff, #ffd25f);
-  box-shadow: 0 0 12px rgba(44, 201, 255, 0.4);
-  transition: width 0.22s ease;
+  background: linear-gradient(90deg, #1cff9c, #f2ff7a);
+  box-shadow: 0 0 12px rgba(27, 255, 164, 0.35);
+  transition: width 0.28s ease;
 }
 
 .cad-boot-progress span {
   min-width: 44px;
   text-align: right;
   font-size: 12px;
-  color: rgba(190, 228, 255, 0.9);
+  color: rgba(145, 255, 214, 0.92);
+}
+
+.cad-boot-terminal {
+  margin-bottom: 12px;
+  min-height: 292px;
+  max-height: 292px;
+  overflow: hidden;
+  border: 1px solid rgba(48, 255, 170, 0.38);
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(133, 255, 206, 0.04),
+      rgba(133, 255, 206, 0.04) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
+    rgba(1, 10, 8, 0.92);
+  padding: 10px 12px;
+}
+
+.cad-boot-line {
+  color: rgba(133, 255, 206, 0.93);
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  text-shadow: 0 0 6px rgba(59, 255, 179, 0.22);
+}
+
+.cad-boot-line-active {
+  color: rgba(246, 255, 154, 0.96);
+}
+
+.cad-boot-cursor {
+  margin-left: 3px;
+  animation: cadBootBlink 0.85s steps(1, end) infinite;
+}
+
+@keyframes cadBootBlink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
 }
 
 .cad-boot-skip {
-  margin-top: 14px;
-  padding: 8px 14px;
-  border: 1px solid rgba(145, 211, 255, 0.65);
-  background-color: rgba(8, 36, 54, 0.4);
-  color: rgba(215, 241, 255, 0.95);
+  margin-top: 10px;
+  padding: 7px 12px;
+  border: 1px solid rgba(48, 255, 170, 0.55);
+  background-color: rgba(6, 24, 18, 0.5);
+  color: rgba(177, 255, 223, 0.95);
   text-transform: uppercase;
   letter-spacing: 1px;
   font-size: 11px;
@@ -9905,20 +9913,21 @@ select option:hover {
 }
 
 .cad-boot-skip:hover {
-  background-color: rgba(30, 109, 154, 0.42);
+  background-color: rgba(16, 62, 47, 0.58);
 }
 
 @media (max-width: 680px) {
   .cad-boot-shell {
-    padding: 16px;
+    padding: 12px;
   }
 
-  .cad-boot-operator {
-    grid-template-columns: 1fr;
+  .cad-boot-terminal {
+    min-height: 240px;
+    max-height: 240px;
   }
 
-  .cad-boot-ascii {
-    font-size: 8px;
+  .cad-boot-line {
+    font-size: 12px;
   }
 }
 

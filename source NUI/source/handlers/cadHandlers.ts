@@ -27,11 +27,13 @@ async function waitForBootFrame(ms: number): Promise<void> {
 
 async function runBootStep(
   label: string,
+  line: string,
   progress: number,
   targetMs: number,
   action?: () => Promise<void>
 ): Promise<void> {
   appActions.setBootStep(label, progress);
+  appActions.pushBootLine(line);
 
   if (appActions.shouldPlayBootSounds()) {
     playBootStep();
@@ -64,20 +66,36 @@ export function initCadHandlers(): void {
       });
     }
 
-    const bootEnabled = appActions.isBootEnabled();
+    const bootEnabled = appActions.isBootEnabled() && !appActions.hasBooted();
     if (bootEnabled) {
       appActions.startBoot();
       if (appActions.shouldPlayBootSounds()) {
         playBootStart();
       }
-      await runBootStep('Linking patrol terminal', 18, 280);
-      await runBootStep('Checking auth token', 34, 220);
+      await runBootStep(
+        'Initializing motherboard bridge',
+        '[POST] Southbridge link ......... OK',
+        14,
+        520
+      );
+      await runBootStep(
+        'Enumerating secure devices',
+        '[POST] TPM security module ....... OK',
+        26,
+        540
+      );
     }
 
     if (bootEnabled) {
-      await runBootStep('Validating operator profile', 52, 380, async () => {
+      await runBootStep(
+        'Validating operator profile',
+        '[AUTH] Officer profile checksum ... RUN',
+        44,
+        780,
+        async () => {
         await userActions.init();
-      });
+        }
+      );
     } else {
       await userActions.init();
     }
@@ -90,12 +108,22 @@ export function initCadHandlers(): void {
     });
 
     if (bootEnabled) {
-      await runBootStep('Syncing dispatch context', 72, 260);
+      await runBootStep(
+        'Syncing dispatch context',
+        '[NET ] Dispatch uplink ........... LOCKED',
+        62,
+        620
+      );
     }
 
     if (userState.needsCallsign) {
       if (bootEnabled) {
-        await runBootStep('Callsign required to continue', 90, 180);
+        await runBootStep(
+          'Callsign required to continue',
+          '[WARN] Callsign assignment missing',
+          78,
+          700
+        );
         appActions.completeBoot();
       }
       terminalActions.setActiveModal('CALLSIGN_PROMPT');
@@ -103,7 +131,12 @@ export function initCadHandlers(): void {
     }
 
     if (bootEnabled) {
-      await runBootStep('Loading operational modules', 88, 260);
+      await runBootStep(
+        'Loading operational modules',
+        '[LOAD] MDT, dispatch, evidence ..... READY',
+        84,
+        740
+      );
     }
 
     await continueCadInit(data);
@@ -113,6 +146,7 @@ export function initCadHandlers(): void {
       const elapsed = startedAt ? Date.now() - startedAt : 0;
       const minDuration = appState.bootConfig.minDurationMs;
       await waitForBootFrame(Math.max(0, minDuration - elapsed));
+      appActions.pushBootLine('[BOOT] Final integrity check ....... PASS');
       appActions.setBootStep('System ready', 100);
       if (appActions.shouldPlayBootSounds()) {
         playBootReady();
