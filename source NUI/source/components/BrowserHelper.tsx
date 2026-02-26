@@ -3,6 +3,8 @@ import { appActions } from '~/stores/appStore';
 
 export function BrowserHelper() {
   const emitCadOpened = () => {
+    const bootMode = appActions.hasBooted() ? 'warm' : 'cold';
+
     window.postMessage(
       {
         action: 'cad:opened',
@@ -11,6 +13,7 @@ export function BrowserHelper() {
           location: 'Mission Row Front Desk',
           hasContainer: true,
           hasReader: true,
+          bootMode,
         },
       },
       '*'

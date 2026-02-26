@@ -16,6 +16,7 @@ export interface CadOpenedData {
   location?: { x: number; y: number; z: number };
   hasContainer: boolean;
   hasReader: boolean;
+  bootMode?: 'cold' | 'warm';
 }
 
 export interface CadClosedData {

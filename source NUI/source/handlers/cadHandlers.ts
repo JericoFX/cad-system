@@ -66,7 +66,12 @@ export function initCadHandlers(): void {
       });
     }
 
-    const bootEnabled = appActions.isBootEnabled() && !appActions.hasBooted();
+    const isWarmBoot = data.bootMode === 'warm';
+    const bootEnabled = appActions.isBootEnabled() && !isWarmBoot;
+
+    if (isWarmBoot) {
+      appActions.markBootCompleted();
+    }
     if (bootEnabled) {
       appActions.startBoot();
       if (appActions.shouldPlayBootSounds()) {
