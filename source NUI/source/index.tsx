@@ -53,6 +53,9 @@ void (async () => {
       await loadScenario(emptyScenario);
       console.log('[APP] Empty scenario loaded');
 
+      initNuiSystem();
+      console.log('[APP] NUI system initialized in browser mode');
+
       await userActions.init();
       console.log('[APP] User initialized');
 

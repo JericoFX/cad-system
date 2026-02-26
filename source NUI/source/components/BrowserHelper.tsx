@@ -2,8 +2,31 @@ import { isEnvBrowser } from '~/utils/misc';
 import { appActions } from '~/stores/appStore';
 
 export function BrowserHelper() {
+  const emitCadOpened = () => {
+    window.postMessage(
+      {
+        action: 'cad:opened',
+        data: {
+          terminalId: 'mock-mrpd-frontdesk',
+          location: 'Mission Row Front Desk',
+          hasContainer: true,
+          hasReader: true,
+        },
+      },
+      '*'
+    );
+  };
+
   const openCad = () => {
-    appActions.show();
+    localStorage.setItem('cad-mock-no-callsign', '0');
+    appActions.updateBootConfig({ enabled: true, skippable: true, soundsEnabled: true });
+    emitCadOpened();
+  };
+
+  const openCadWithoutCallsign = () => {
+    localStorage.setItem('cad-mock-no-callsign', '1');
+    appActions.updateBootConfig({ enabled: true, skippable: true, soundsEnabled: true });
+    emitCadOpened();
   };
 
   if (!isEnvBrowser()) return null;
@@ -36,7 +59,23 @@ export function BrowserHelper() {
           e.currentTarget.style.backgroundColor = '#c0c0c0';
         }}
       >
-        [ OPEN CAD ]
+        [ OPEN CAD + BOOT ]
+      </button>
+      <button
+        onClick={openCadWithoutCallsign}
+        style={{
+          'margin-top': '8px',
+          padding: '10px 24px',
+          'background-color': '#2a3743',
+          color: '#dcefff',
+          border: '2px solid #7db8dd',
+          'font-family': 'monospace',
+          'font-size': '12px',
+          cursor: 'pointer',
+          'box-shadow': '4px 4px 0 #000',
+        }}
+      >
+        [ BOOT + CALLSIGN SETUP ]
       </button>
       <div
         style={{
