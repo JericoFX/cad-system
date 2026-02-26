@@ -100,7 +100,17 @@ export const [userState, setUserState] = createStore<UserState>(initialState);
 export const userActions = {
   init: async () => {
     if (CONFIG.USE_MOCK_DATA) {
-      const mockCallsign = CONFIG.MOCK_USER.badge || null;
+      const mockNoCallsignFlag =
+        typeof window !== 'undefined' &&
+        window.localStorage.getItem('cad-mock-no-callsign') === '1';
+      const mockCallsignOverride =
+        typeof window !== 'undefined'
+          ? window.localStorage.getItem('cad-mock-callsign-override')
+          : null;
+
+      const mockCallsign = mockNoCallsignFlag
+        ? null
+        : mockCallsignOverride || CONFIG.MOCK_USER.badge || null;
       const mockNeedsCallsign = needsCallsignSetup(mockCallsign, {
         requireWhenEmpty: true,
         blockedPrefixes: ['B-'],
