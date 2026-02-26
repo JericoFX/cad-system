@@ -53,6 +53,18 @@ export const playBack = () => {
   playNativeSound('BACK');
 };
 
+export const playBootStart = () => {
+  playNativeSound('BOOT_START');
+};
+
+export const playBootStep = () => {
+  playNativeSound('BOOT_STEP');
+};
+
+export const playBootReady = () => {
+  playNativeSound('BOOT_READY');
+};
+
 // Initialize (no-op for native sounds, they work immediately)
 export const initSounds = () => {
   // Native sounds don't need initialization

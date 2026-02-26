@@ -33,6 +33,24 @@ function parseMode(value: string | undefined, fallback: UIMode): UIMode {
   return fallback;
 }
 
+function parseNumber(
+  value: string | undefined,
+  fallback: number,
+  min: number,
+  max: number
+): number {
+  if (value === undefined) {
+    return fallback;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+
+  return Math.min(max, Math.max(min, parsed));
+}
+
 function parseRole(value: string | undefined, fallback: UserRole): UserRole {
   if (!value) {
     return fallback;
@@ -65,6 +83,10 @@ const dispatchFeature = parseBoolean(env.VITE_FEATURE_DISPATCH, true);
 const forensicsFeature = parseBoolean(env.VITE_FEATURE_FORENSICS, true);
 const newsFeature = parseBoolean(env.VITE_FEATURE_NEWS, true);
 const vehicleDockFeature = parseBoolean(env.VITE_FEATURE_VEHICLE_DOCK, true);
+const bootEnabled = parseBoolean(env.VITE_BOOT_ENABLED, true);
+const bootSkippable = parseBoolean(env.VITE_BOOT_SKIPPABLE, true);
+const bootSoundsEnabled = parseBoolean(env.VITE_BOOT_SOUNDS, true);
+const bootMinDurationMs = parseNumber(env.VITE_BOOT_MIN_DURATION_MS, 2200, 300, 10000);
 
 export const CONFIG = {
   USE_MOCK_DATA: useMockData,
@@ -78,6 +100,13 @@ export const CONFIG = {
     FORENSICS: forensicsFeature,
     NEWS: newsFeature,
     VEHICLE_DOCK: vehicleDockFeature,
+  },
+
+  BOOT: {
+    ENABLED: bootEnabled,
+    SKIPPABLE: bootSkippable,
+    SOUNDS_ENABLED: bootSoundsEnabled,
+    MIN_DURATION_MS: bootMinDurationMs,
   },
 
   MOCK_USER: {
