@@ -205,6 +205,10 @@ export const appActions = {
     });
   },
 
+  markBootCompleted: () => {
+    setAppState('hasBootCompleted', true);
+  },
+
   powerCycle: () => {
     setAppState({
       hasBootCompleted: false,

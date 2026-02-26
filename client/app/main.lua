@@ -14,6 +14,7 @@ local readerActionBusy = false
 local lockerActionBusy = false
 local dispatchPublicRev = -1
 local casesPublicRev = -1
+local cadTerminalPoweredOn = false
 
 ---@class DispatchPublicStatePayload
 ---@field rev integer
@@ -927,6 +928,9 @@ function CAD.Client.SetUIState(open)
     end
 
     if uiOpen then
+        local bootMode = cadTerminalPoweredOn and 'warm' or 'cold'
+        cadTerminalPoweredOn = true
+
         SendNUIMessage({
             action = 'cad:opened',
             data = {
@@ -934,6 +938,7 @@ function CAD.Client.SetUIState(open)
                 location = activeTerminalContext and activeTerminalContext.coords or nil,
                 hasContainer = activeTerminalContext and activeTerminalContext.hasContainer or false,
                 hasReader = activeTerminalContext and activeTerminalContext.hasReader or false,
+                bootMode = bootMode,
             }
         })
 
