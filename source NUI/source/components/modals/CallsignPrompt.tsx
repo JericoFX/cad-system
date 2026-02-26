@@ -71,6 +71,7 @@ export function CallsignPrompt(props: CallsignPromptProps) {
           hasContainer: sessionState.hasContainer || false,
           hasReader: sessionState.hasReader || false,
         };
+        appActions.completeBoot();
         await continueCadInit(data);
       } else {
         terminalActions.setActiveModal(null);

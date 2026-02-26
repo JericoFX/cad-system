@@ -16,6 +16,7 @@ import { MediaPlayer } from './components/modals/MediaPlayer';
 import { ModalHost } from './components/modals/ModalHost';
 import { BrowserHelper } from './components/BrowserHelper';
 import { VehicleQuickDock } from './components/VehicleQuickDock';
+import { BootScreen } from './components/BootScreen';
 import { terminalState, terminalActions } from './stores/terminalStore';
 import { viewerState, viewerActions } from './stores/viewerStore';
 import { uiPrefsState, uiPrefsActions } from './stores/uiPreferencesStore';
@@ -93,6 +94,10 @@ export function App() {
     <>
       <Show when={appState.isVisible}>
         <div class={appClasses()}>
+          <Show when={appState.isBooting}>
+            <BootScreen />
+          </Show>
+
           <Show when={!isVehicleOverlayMode()}>
             {/* This was taken from a friend, if him used IA i dont know, but it work*/}
             <HackerTerminalBg maxLines={250} intervalMs={500} seed={20260215} />

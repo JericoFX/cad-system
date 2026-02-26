@@ -6,13 +6,87 @@
 
 import { createStore } from 'solid-js/store';
 import { isEnvBrowser } from '~/utils/misc';
+import { CONFIG } from '~/config';
 
 interface AppState {
   isVisible: boolean;
+  isBooting: boolean;
+  bootStep: string;
+  bootProgress: number;
+  skipBootRequested: boolean;
+  bootStartedAt: number | null;
+  bootOfficer: {
+    name: string;
+    rank?: string;
+    department?: string;
+    callsign?: string | null;
+  } | null;
+  bootConfig: {
+    enabled: boolean;
+    skippable: boolean;
+    minDurationMs: number;
+    soundsEnabled: boolean;
+  };
+}
+
+type BootConfig = AppState['bootConfig'];
+
+function loadBootOverrides(): Partial<BootConfig> {
+  if (typeof window === 'undefined') {
+    return {};
+  }
+
+  try {
+    const raw = localStorage.getItem('cad-boot-preferences');
+    if (!raw) {
+      return {};
+    }
+
+    const parsed = JSON.parse(raw) as Partial<BootConfig>;
+    return {
+      enabled: typeof parsed.enabled === 'boolean' ? parsed.enabled : undefined,
+      skippable: typeof parsed.skippable === 'boolean' ? parsed.skippable : undefined,
+      soundsEnabled: typeof parsed.soundsEnabled === 'boolean' ? parsed.soundsEnabled : undefined,
+      minDurationMs:
+        typeof parsed.minDurationMs === 'number' && Number.isFinite(parsed.minDurationMs)
+          ? Math.min(10000, Math.max(300, parsed.minDurationMs))
+          : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+function saveBootOverrides(config: BootConfig): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    localStorage.setItem('cad-boot-preferences', JSON.stringify(config));
+  } catch {
+  }
+}
+
+function getBootDefaults(): BootConfig {
+  return {
+    enabled: CONFIG.BOOT.ENABLED,
+    skippable: CONFIG.BOOT.SKIPPABLE,
+    minDurationMs: CONFIG.BOOT.MIN_DURATION_MS,
+    soundsEnabled: CONFIG.BOOT.SOUNDS_ENABLED,
+    ...loadBootOverrides(),
+  };
 }
 
 const initialState: AppState = {
   isVisible: false,
+  isBooting: false,
+  bootStep: 'Initializing',
+  bootProgress: 0,
+  skipBootRequested: false,
+  bootStartedAt: null,
+  bootOfficer: null,
+  bootConfig: getBootDefaults(),
 };
 
 export const [appState, setAppState] = createStore<AppState>(initialState);
@@ -32,7 +106,15 @@ export const appActions = {
    * Called when receiving 'cad:closed' from Lua or when player closes UI
    */
   hide: () => {
-    setAppState('isVisible', false);
+    setAppState({
+      isVisible: false,
+      isBooting: false,
+      bootStep: 'Initializing',
+      bootProgress: 0,
+      skipBootRequested: false,
+      bootStartedAt: null,
+      bootOfficer: null,
+    });
     console.log('[AppStore] CAD hidden');
   },
 
@@ -47,4 +129,75 @@ export const appActions = {
    * Check if CAD is currently visible
    */
   isOpen: () => appState.isVisible,
+
+  startBoot: () => {
+    setAppState('bootConfig', getBootDefaults());
+
+    if (!appState.bootConfig.enabled) {
+      setAppState({
+        isBooting: false,
+        bootStep: 'System ready',
+        bootProgress: 100,
+        skipBootRequested: false,
+        bootStartedAt: null,
+      });
+      return;
+    }
+
+    setAppState({
+      isBooting: true,
+      bootStep: 'Powering terminal',
+      bootProgress: 4,
+      skipBootRequested: false,
+      bootStartedAt: Date.now(),
+    });
+  },
+
+  setBootStep: (label: string, progress: number) => {
+    setAppState({
+      bootStep: label,
+      bootProgress: Math.min(100, Math.max(0, progress)),
+    });
+  },
+
+  setBootOfficer: (officer: AppState['bootOfficer']) => {
+    setAppState('bootOfficer', officer);
+  },
+
+  requestBootSkip: () => {
+    if (!appState.bootConfig.skippable) {
+      return;
+    }
+
+    setAppState('skipBootRequested', true);
+  },
+
+  completeBoot: () => {
+    setAppState({
+      isBooting: false,
+      bootStep: 'System ready',
+      bootProgress: 100,
+      skipBootRequested: false,
+      bootStartedAt: null,
+    });
+  },
+
+  updateBootConfig: (partial: Partial<BootConfig>) => {
+    setAppState('bootConfig', (current) => {
+      const next = {
+        ...current,
+        ...partial,
+        minDurationMs: Math.min(
+          10000,
+          Math.max(300, Number(partial.minDurationMs ?? current.minDurationMs))
+        ),
+      };
+
+      saveBootOverrides(next);
+      return next;
+    });
+  },
+
+  isBootEnabled: () => appState.bootConfig.enabled,
+  shouldPlayBootSounds: () => appState.bootConfig.soundsEnabled,
 };
