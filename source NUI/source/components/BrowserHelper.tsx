@@ -19,13 +19,29 @@ export function BrowserHelper() {
 
   const openCad = () => {
     localStorage.setItem('cad-mock-no-callsign', '0');
-    appActions.updateBootConfig({ enabled: true, skippable: true, soundsEnabled: true });
+    appActions.updateBootConfig({
+      enabled: true,
+      skippable: true,
+      soundsEnabled: true,
+      minDurationMs: 6500,
+    });
     emitCadOpened();
   };
 
   const openCadWithoutCallsign = () => {
     localStorage.setItem('cad-mock-no-callsign', '1');
-    appActions.updateBootConfig({ enabled: true, skippable: true, soundsEnabled: true });
+    appActions.updateBootConfig({
+      enabled: true,
+      skippable: true,
+      soundsEnabled: true,
+      minDurationMs: 6500,
+    });
+    emitCadOpened();
+  };
+
+  const powerCycleAndOpen = () => {
+    localStorage.setItem('cad-mock-no-callsign', '0');
+    appActions.powerCycle();
     emitCadOpened();
   };
 
@@ -59,7 +75,7 @@ export function BrowserHelper() {
           e.currentTarget.style.backgroundColor = '#c0c0c0';
         }}
       >
-        [ OPEN CAD + BOOT ]
+        [ OPEN CAD ]
       </button>
       <button
         onClick={openCadWithoutCallsign}
@@ -76,6 +92,22 @@ export function BrowserHelper() {
         }}
       >
         [ BOOT + CALLSIGN SETUP ]
+      </button>
+      <button
+        onClick={powerCycleAndOpen}
+        style={{
+          'margin-top': '8px',
+          padding: '10px 24px',
+          'background-color': '#16371f',
+          color: '#d7ffe3',
+          border: '2px solid #70d18c',
+          'font-family': 'monospace',
+          'font-size': '12px',
+          cursor: 'pointer',
+          'box-shadow': '4px 4px 0 #000',
+        }}
+      >
+        [ POWER CYCLE + BOOT ]
       </button>
       <div
         style={{

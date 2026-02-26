@@ -86,7 +86,7 @@ const vehicleDockFeature = parseBoolean(env.VITE_FEATURE_VEHICLE_DOCK, true);
 const bootEnabled = parseBoolean(env.VITE_BOOT_ENABLED, true);
 const bootSkippable = parseBoolean(env.VITE_BOOT_SKIPPABLE, true);
 const bootSoundsEnabled = parseBoolean(env.VITE_BOOT_SOUNDS, true);
-const bootMinDurationMs = parseNumber(env.VITE_BOOT_MIN_DURATION_MS, 2200, 300, 10000);
+const bootMinDurationMs = parseNumber(env.VITE_BOOT_MIN_DURATION_MS, 6500, 300, 10000);
 
 export const CONFIG = {
   USE_MOCK_DATA: useMockData,
