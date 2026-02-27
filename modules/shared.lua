@@ -3,6 +3,8 @@
 CAD = CAD or {}
 CAD.Progress = CAD.Progress or {}
 
+-- igual
+
 function CAD.GenerateId(prefix)
     local base = (prefix or 'ID'):upper()
     return ('%s_%s_%04d'):format(base, os.date('%Y%m%d%H%M%S'), math.random(0, 9999))
