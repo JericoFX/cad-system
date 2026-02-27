@@ -199,6 +199,10 @@ local function bootstrapFromDatabase()
         end
     end
 
+    if CAD.Topology and CAD.Topology.LoadFromDatabase then
+        CAD.Topology.LoadFromDatabase()
+    end
+
     local virtualSlots = 0
     if CAD.VirtualContainer and CAD.VirtualContainer.LoadFromDatabase then
         virtualSlots = tonumber(CAD.VirtualContainer.LoadFromDatabase()) or 0
@@ -249,14 +253,7 @@ local function getCallsignPolicy()
     }
 end
 
-lib.callback.register('cad:getPlayerData', function(source)
-    local officer = CAD.Auth.GetOfficerData(source)
-    if not officer then
-        return {
-            ok = false,
-            error = 'not_authorized',
-        }
-    end
+lib.callback.register('cad:getPlayerData', CAD.Auth.WithGuard('default', function(_, _, officer)
 
     return {
         identifier = officer.identifier,
@@ -268,7 +265,7 @@ lib.callback.register('cad:getPlayerData', function(source)
         isAdmin = officer.isAdmin,
         callsignPolicy = getCallsignPolicy(),
     }
-end)
+end))
 
 AddEventHandler('playerDropped', function()
     local source = source
@@ -279,26 +276,16 @@ AddEventHandler('playerDropped', function()
     end
 end)
 
-lib.callback.register('cad:getCallsign', function(source)
-    local identifier = CAD.Server.GetIdentifier(source)
-    if not identifier then
-        return { success = false, error = 'no_identifier' }
-    end
-
-    local callsign = CAD.Officers.GetCallsign(identifier)
+lib.callback.register('cad:getCallsign', CAD.Auth.WithGuard('default', function(_, _, officer)
+    local callsign = CAD.Officers.GetCallsign(officer.identifier)
 
     return {
         success = true,
         callsign = callsign
     }
-end)
+end))
 
-lib.callback.register('cad:setCallsign', function(source, data)
-    local identifier = CAD.Server.GetIdentifier(source)
-    if not identifier then
-        return { success = false, error = 'no_identifier' }
-    end
-
+lib.callback.register('cad:setCallsign', CAD.Auth.WithGuard('default', function(source, data, officer)
     if not data or type(data.callsign) ~= 'string' then
         return { success = false, error = 'invalid_data' }
     end
@@ -310,20 +297,20 @@ lib.callback.register('cad:setCallsign', function(source, data)
 
     local callsign = normalizedOrError
 
-    local isDuplicate = CAD.Officers.CheckDuplicate(callsign, identifier)
+    local isDuplicate = CAD.Officers.CheckDuplicate(callsign, officer.identifier)
 
-    local saved = CAD.Officers.SetCallsignDB(identifier, callsign)
+    local saved = CAD.Officers.SetCallsignDB(officer.identifier, callsign)
     if not saved then
         return { success = false, error = 'db_error' }
     end
 
     CAD.Officers.SyncToFramework(source, callsign)
 
-    CAD.Log('info', 'Officer %s set callsign to %s', identifier, callsign)
+    CAD.Log('info', 'Officer %s set callsign to %s', officer.identifier, callsign)
 
     return {
         success = true,
         callsign = callsign,
         warning = isDuplicate and 'callsign_duplicate' or nil
     }
-end)
+end))
