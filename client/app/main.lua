@@ -1137,10 +1137,15 @@ AddEventHandler('cad:client:emsLowStock', function(data)
     SendNUIMessage({ action = 'ems:lowStock', data = data })
 end)
 
-RegisterNetEvent('cad:client:emsBloodRequest')
-AddEventHandler('cad:client:emsBloodRequest', function(data)
+local function forwardEmsBloodRequestCreated(data)
     SendNUIMessage({ action = 'ems:bloodRequestCreated', data = data })
-end)
+end
+
+RegisterNetEvent('cad:client:emsBloodRequest')
+AddEventHandler('cad:client:emsBloodRequest', forwardEmsBloodRequestCreated)
+
+RegisterNetEvent('cad:client:emsBloodRequestCreated')
+AddEventHandler('cad:client:emsBloodRequestCreated', forwardEmsBloodRequestCreated)
 
 RegisterNetEvent('cad:client:forensicsAnalysisStarted')
 AddEventHandler('cad:client:forensicsAnalysisStarted', function(data)
@@ -1190,6 +1195,11 @@ end)
 RegisterNetEvent('cad:client:finePaid')
 AddEventHandler('cad:client:finePaid', function(data)
     SendNUIMessage({ action = 'fine:paid', data = data })
+end)
+
+RegisterNetEvent('cad:client:policeJailTransferLogged')
+AddEventHandler('cad:client:policeJailTransferLogged', function(data)
+    SendNUIMessage({ action = 'police:jailTransferLogged', data = data })
 end)
 
 RegisterNetEvent('cad:client:syncOffline')

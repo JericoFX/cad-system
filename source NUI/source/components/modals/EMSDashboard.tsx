@@ -163,26 +163,30 @@ export function EMSDashboard() {
     }
 
     try {
+      const priorityToLevel: Record<'LOW' | 'MEDIUM' | 'HIGH', number> = {
+        LOW: 3,
+        MEDIUM: 2,
+        HIGH: 1,
+      };
+
       const response = await fetchNui<{
-        ok: boolean;
         callId?: string;
-        error?: string;
-      }>('cad:dispatch:createCall', {
+      }>('cad:createDispatchCall', {
         type: 'POLICE_ASSISTANCE',
-        priority: policeCallPriority(),
+        priority: priorityToLevel[policeCallPriority()],
         title: `EMS Request - ${reason.substring(0, 50)}`,
         description: reason,
         location: 'Hospital / EMS Facility',
         requestingUnit: 'EMS',
       });
 
-      if (!response?.ok) {
-        terminalActions.addLine(`Failed to call police: ${response?.error || 'unknown_error'}`, 'error');
+      if (!response?.callId) {
+        terminalActions.addLine('Failed to call police: invalid_response', 'error');
         return;
       }
 
       terminalActions.addLine(
-        `✓ Police assistance requested (${response.callId || 'CALL'}) - Priority: ${policeCallPriority()}`,
+        `✓ Police assistance requested (${response.callId}) - Priority: ${policeCallPriority()}`,
         'output'
       );
       setShowPoliceCallModal(false);
