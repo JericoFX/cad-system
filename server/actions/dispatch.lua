@@ -34,6 +34,8 @@ local sourceToUnit = {}
 local saveCallDb
 local dispatchPublicRev = 0
 local dispatchPublicFingerprint = ''
+local dispatchGridEnabled = lib and lib.grid and type(lib.grid.addEntry) == 'function' and type(lib.grid.removeEntry) == 'function' and type(lib.grid.getNearbyEntries) == 'function'
+local dispatchGridEntries = {}
 
 local dispatchPublicCfg = CAD.Config.Dispatch and CAD.Config.Dispatch.PublicState or {}
 local DISPATCH_PUBLIC_CELL_SIZE = math.max(50, tonumber(dispatchPublicCfg.CellSizeMeters) or 200)
@@ -124,6 +126,102 @@ local function isUnitStale(unit)
     return (os.time() - updatedEpoch) > staleSeconds
 end
 
+---@param coords { x: number, y: number, z: number }|nil
+---@return string|nil
+local function getCoordCellHash(coords)
+    if type(coords) ~= 'table' then
+        return nil
+    end
+
+    local x = tonumber(coords.x)
+    local y = tonumber(coords.y)
+    local z = tonumber(coords.z)
+    if not x or not y or not z then
+        return nil
+    end
+
+    if dispatchGridEnabled and type(lib.grid.getCellPosition) == 'function' then
+        -- Verified: Context7 /websites/coxdocs_dev ox_lib Grid Shared lib.grid.getCellPosition(point)
+        local cellX, cellY = lib.grid.getCellPosition(vector3(x, y, z))
+        if type(cellX) == 'number' and type(cellY) == 'number' then
+            return ('%s:%s'):format(cellX, cellY)
+        end
+    end
+
+    local cellX = math.floor(x / DISPATCH_PUBLIC_CELL_SIZE)
+    local cellY = math.floor(y / DISPATCH_PUBLIC_CELL_SIZE)
+    return ('%s:%s'):format(cellX, cellY)
+end
+
+---@param unitId string
+local function removeDispatchGridEntry(unitId)
+    if not dispatchGridEnabled then
+        return
+    end
+
+    local entry = dispatchGridEntries[unitId]
+    if not entry then
+        return
+    end
+
+    -- Verified: Context7 /websites/coxdocs_dev ox_lib Grid Shared lib.grid.removeEntry(entry)
+    lib.grid.removeEntry(entry)
+    dispatchGridEntries[unitId] = nil
+end
+
+---@param unitId string
+---@param unit DispatchUnitRecord|nil
+local function upsertDispatchGridEntry(unitId, unit)
+    if not dispatchGridEnabled or type(unit) ~= 'table' then
+        return
+    end
+
+    local location = unit.location
+    if type(location) ~= 'table' then
+        removeDispatchGridEntry(unitId)
+        return
+    end
+
+    local x = tonumber(location.x)
+    local y = tonumber(location.y)
+    local z = tonumber(location.z)
+    if not x or not y or not z then
+        removeDispatchGridEntry(unitId)
+        return
+    end
+
+    local oldEntry = dispatchGridEntries[unitId]
+    if oldEntry then
+        -- Verified: Context7 /websites/coxdocs_dev ox_lib Grid Shared lib.grid.removeEntry(entry)
+        lib.grid.removeEntry(oldEntry)
+    end
+
+    local entry = {
+        coords = vector3(x, y, z),
+        radius = DISPATCH_PUBLIC_CELL_SIZE,
+        unitId = unitId,
+    }
+
+    -- Verified: Context7 /websites/coxdocs_dev ox_lib Grid Shared lib.grid.addEntry(entry)
+    lib.grid.addEntry(entry)
+    dispatchGridEntries[unitId] = entry
+end
+
+local function rebuildDispatchGridEntries()
+    if not dispatchGridEnabled then
+        return
+    end
+
+    for unitId, entry in pairs(dispatchGridEntries) do
+        lib.grid.removeEntry(entry)
+        dispatchGridEntries[unitId] = nil
+    end
+
+    for unitId, unit in pairs(units) do
+        upsertDispatchGridEntry(unitId, unit)
+    end
+end
+
 ---@param unit DispatchUnitRecord
 ---@return table
 local function buildPublicUnit(unit)
@@ -212,15 +310,17 @@ local function buildDispatchPublicStateCore()
         end
     end
 
-    table.sort(callRows, function(a, b)
-        if a.priority ~= b.priority then
-            return a.priority < b.priority
-        end
-        if a.createdAt ~= b.createdAt then
-            return a.createdAt > b.createdAt
-        end
-        return a.callId < b.callId
-    end)
+    if #callRows > 1 then
+        table.sort(callRows, function(a, b)
+            if a.priority ~= b.priority then
+                return a.priority < b.priority
+            end
+            if a.createdAt ~= b.createdAt then
+                return a.createdAt > b.createdAt
+            end
+            return a.callId < b.callId
+        end)
+    end
 
     local publicCalls = {}
     local limit = math.min(#callRows, DISPATCH_PUBLIC_MAX_CALLS)
@@ -352,10 +452,12 @@ local function removeSourceUnit(source, persistCalls)
 
     local unit = units[unitId]
     if not unit then
+        removeDispatchGridEntry(unitId)
         return
     end
 
     releaseUnitFromCalls(unitId, persistCalls)
+    removeDispatchGridEntry(unitId)
 
     units[unitId] = nil
     CAD.State.EMS.Units[unitId] = nil
@@ -478,6 +580,7 @@ lib.callback.register('cad:registerDispatchUnit', withDispatchGuard('default', f
     touchUnit(unit)
 
     units[unitId] = unit
+    upsertDispatchGridEntry(unitId, unit)
 
     if officer.job == 'ambulance' or officer.job == 'ems' then
         CAD.State.EMS.Units[unitId] = {
@@ -534,15 +637,20 @@ lib.callback.register('cad:updateUnitStatus', withDispatchGuard('default', funct
     end
 
     local unit = units[unitId]
+    local previousStatus = unit.status
+    local previousCellHash = getCoordCellHash(unit.location)
+
     if payload.status then
         unit.status = normalizeUnitStatus(payload.status)
     end
+
     if type(payload.location) == 'table' then
         unit.location = {
             x = tonumber(payload.location.x) or 0.0,
             y = tonumber(payload.location.y) or 0.0,
             z = tonumber(payload.location.z) or 0.0,
         }
+        upsertDispatchGridEntry(unitId, unit)
     end
 
     touchUnit(unit)
@@ -553,7 +661,11 @@ lib.callback.register('cad:updateUnitStatus', withDispatchGuard('default', funct
         CAD.State.EMS.Units[unitId].updatedAt = unit.updatedAt
     end
 
-    publishDispatchPublicState(false)
+    local statusChanged = previousStatus ~= unit.status
+    local cellChanged = previousCellHash ~= getCoordCellHash(unit.location)
+    if statusChanged or cellChanged then
+        publishDispatchPublicState(false)
+    end
 
     return unit
 end))
@@ -810,12 +922,24 @@ lib.callback.register('cad:setOfficerStatus', withDispatchGuard('default', funct
         return { ok = false, error = 'unit_not_found' }
     end
 
-    units[unitId].status = normalizeUnitStatus(payload.statusCode or payload.status)
-    touchUnit(units[unitId])
-    publishDispatchPublicState(false)
+    local unit = units[unitId]
+    local normalized = normalizeUnitStatus(payload.statusCode or payload.status)
+
+    if unit.status ~= normalized then
+        unit.status = normalized
+        touchUnit(unit)
+        publishDispatchPublicState(false)
+    else
+        touchUnit(unit)
+    end
+
+    if CAD.State.EMS.Units[unitId] then
+        CAD.State.EMS.Units[unitId].status = unit.status
+        CAD.State.EMS.Units[unitId].updatedAt = unit.updatedAt
+    end
 
     return {
-        statusCode = units[unitId].status,
+        statusCode = unit.status,
     }
 end))
 
@@ -848,15 +972,41 @@ lib.callback.register('cad:getNearestUnit', withDispatchGuard('default', functio
 
     local nearest = nil
     local nearestDistance = nil
-    for _, unit in pairs(units) do
-        if unit.location then
-            local dx = unit.location.x - tx
-            local dy = unit.location.y - ty
-            local dz = unit.location.z - tz
-            local distance = math.sqrt((dx * dx) + (dy * dy) + (dz * dz))
-            if not nearestDistance or distance < nearestDistance then
-                nearestDistance = distance
-                nearest = unit
+    local targetCoords = vector3(tx, ty, tz)
+
+    if dispatchGridEnabled then
+        -- Verified: Context7 /websites/coxdocs_dev ox_lib Grid Shared lib.grid.getNearbyEntries(point, filter)
+        local nearbyEntries = lib.grid.getNearbyEntries(targetCoords, function(entry)
+            return type(entry) == 'table' and type(entry.unitId) == 'string' and units[entry.unitId] ~= nil
+        end)
+
+        for i = 1, #nearbyEntries do
+            local entry = nearbyEntries[i]
+            local unit = units[entry.unitId]
+            if unit and unit.location then
+                local dx = unit.location.x - tx
+                local dy = unit.location.y - ty
+                local dz = unit.location.z - tz
+                local distance = math.sqrt((dx * dx) + (dy * dy) + (dz * dz))
+                if not nearestDistance or distance < nearestDistance then
+                    nearestDistance = distance
+                    nearest = unit
+                end
+            end
+        end
+    end
+
+    if not nearest then
+        for _, unit in pairs(units) do
+            if unit.location then
+                local dx = unit.location.x - tx
+                local dy = unit.location.y - ty
+                local dz = unit.location.z - tz
+                local distance = math.sqrt((dx * dx) + (dy * dy) + (dz * dz))
+                if not nearestDistance or distance < nearestDistance then
+                    nearestDistance = distance
+                    nearest = unit
+                end
             end
         end
     end
@@ -869,6 +1019,30 @@ lib.callback.register('cad:getNearestUnit', withDispatchGuard('default', functio
 end))
 
 local positionUpdateLimits = {}
+local statusChangeLimits = {}
+
+local function cleanupDispatchRateLimits(now)
+    local timestamp = tonumber(now) or os.time()
+
+    for source, last in pairs(positionUpdateLimits) do
+        if (timestamp - (tonumber(last) or 0)) > 15 then
+            positionUpdateLimits[source] = nil
+        end
+    end
+
+    for source, last in pairs(statusChangeLimits) do
+        if (timestamp - (tonumber(last) or 0)) > 30 then
+            statusChangeLimits[source] = nil
+        end
+    end
+end
+
+if lib and lib.cron and type(lib.cron.new) == 'function' then
+    -- Verified: Context7 /websites/coxdocs_dev ox_lib Cron Server lib.cron.new(expression, job, options)
+    lib.cron.new('* * * * *', function()
+        cleanupDispatchRateLimits(os.time())
+    end)
+end
 
 RegisterNetEvent('cad:server:updatePosition', function(coords)
     local source = source
@@ -900,6 +1074,9 @@ RegisterNetEvent('cad:server:updatePosition', function(coords)
         return
     end
 
+    local unit = units[unitId]
+    local previousCellHash = getCoordCellHash(unit.location)
+
     local x = tonumber(coords.x)
     local y = tonumber(coords.y)
     local z = tonumber(coords.z)
@@ -911,18 +1088,20 @@ RegisterNetEvent('cad:server:updatePosition', function(coords)
         return
     end
 
-    units[unitId].location = { x = x, y = y, z = z }
-    touchUnit(units[unitId])
+    unit.location = { x = x, y = y, z = z }
+    touchUnit(unit)
 
     if CAD.State.EMS.Units[unitId] then
-        CAD.State.EMS.Units[unitId].location = units[unitId].location
-        CAD.State.EMS.Units[unitId].updatedAt = units[unitId].updatedAt
+        CAD.State.EMS.Units[unitId].location = unit.location
+        CAD.State.EMS.Units[unitId].updatedAt = unit.updatedAt
     end
 
-    publishDispatchPublicState(false)
+    local currentCellHash = getCoordCellHash(unit.location)
+    if previousCellHash ~= currentCellHash then
+        upsertDispatchGridEntry(unitId, unit)
+        publishDispatchPublicState(false)
+    end
 end)
-
-local statusChangeLimits = {}
 
 RegisterNetEvent('cad:server:statusChanged', function(statusCode)
     local source = source
@@ -975,12 +1154,14 @@ end)
 
 CreateThread(function()
     Wait(500)
+    rebuildDispatchGridEntries()
     publishDispatchPublicState(true)
     Wait(5000)
     publishDispatchPublicState(true)
 
     while true do
         Wait(30000)
+        cleanupDispatchRateLimits(os.time())
 
         local didMutate = false
         local staleSources = {}
