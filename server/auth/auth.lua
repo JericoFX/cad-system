@@ -34,6 +34,7 @@ function CAD.Auth.GetOfficerData(source)
         source = src,
         identifier = identity.identifier,
         callsign = identity.callsign,
+        badge = identity.callsign,
         name = identity.name,
         job = identity.job,
         jobLabel = identity.jobLabel,
@@ -43,6 +44,10 @@ function CAD.Auth.GetOfficerData(source)
     }
 
     return officerCache[src]
+end
+
+function CAD.Auth.GetOfficer(source)
+    return CAD.Auth.GetOfficerData(source)
 end
 
 function CAD.Auth.RequireOfficer(source)
