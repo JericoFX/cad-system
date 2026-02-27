@@ -8,6 +8,8 @@ CAD.State.Forensics = CAD.State.Forensics or {}
 CAD.State.Forensics.WorldTraces = CAD.State.Forensics.WorldTraces or {}
 local worldTraces = CAD.State.Forensics.WorldTraces
 local ingestRateState = {}
+local traceGridEnabled = lib and lib.grid and type(lib.grid.addEntry) == 'function' and type(lib.grid.removeEntry) == 'function' and type(lib.grid.getNearbyEntries) == 'function'
+local traceGridEntries = {}
 
 local function getNowMs()
     local gameTimer = GetGameTimer and GetGameTimer() or nil
@@ -20,6 +22,96 @@ end
 local function getForensicsConfig()
     return CAD.Config.Forensics or {}
 end
+
+---@param coords any
+---@return vector3|nil
+local function getTraceVectorCoords(coords)
+    if type(coords) == 'vector3' then
+        return coords
+    end
+
+    if type(coords) ~= 'table' then
+        return nil
+    end
+
+    local x = tonumber(coords.x)
+    local y = tonumber(coords.y)
+    local z = tonumber(coords.z)
+    if not x or not y or not z then
+        return nil
+    end
+
+    return vector3(x, y, z)
+end
+
+---@param traceId string
+local function removeTraceGridEntry(traceId)
+    if not traceGridEnabled then
+        return
+    end
+
+    local entry = traceGridEntries[traceId]
+    if not entry then
+        return
+    end
+
+    -- Verified: Context7 /websites/coxdocs_dev ox_lib Grid Shared lib.grid.removeEntry(entry)
+    lib.grid.removeEntry(entry)
+    traceGridEntries[traceId] = nil
+end
+
+---@param trace table|nil
+local function upsertTraceGridEntry(trace)
+    if not traceGridEnabled or type(trace) ~= 'table' then
+        return
+    end
+
+    local traceId = tostring(trace.traceId or '')
+    if traceId == '' then
+        return
+    end
+
+    local coords = getTraceVectorCoords(trace.coords)
+    if not coords then
+        removeTraceGridEntry(traceId)
+        return
+    end
+
+    local oldEntry = traceGridEntries[traceId]
+    if oldEntry then
+        -- Verified: Context7 /websites/coxdocs_dev ox_lib Grid Shared lib.grid.removeEntry(entry)
+        lib.grid.removeEntry(oldEntry)
+    end
+
+    local cfg = getForensicsConfig()
+    local detectRadius = tonumber(cfg.WorldTraceDetectRadius) or 18.0
+    local entry = {
+        coords = coords,
+        radius = detectRadius,
+        traceId = traceId,
+    }
+
+    -- Verified: Context7 /websites/coxdocs_dev ox_lib Grid Shared lib.grid.addEntry(entry)
+    lib.grid.addEntry(entry)
+    traceGridEntries[traceId] = entry
+end
+
+local function rebuildTraceGridEntries()
+    if not traceGridEnabled then
+        return
+    end
+
+    for traceId, entry in pairs(traceGridEntries) do
+        lib.grid.removeEntry(entry)
+        traceGridEntries[traceId] = nil
+    end
+
+    for _, trace in pairs(worldTraces) do
+        upsertTraceGridEntry(trace)
+    end
+end
+
+rebuildTraceGridEntries()
 
 local function canIngestNow(sourceName)
     -- Limita la ingesta por recurso para reducir spam de trazas al servidor.
@@ -38,6 +130,23 @@ local function canIngestNow(sourceName)
 
     ingestRateState[key] = now
     return true
+end
+
+local function cleanupIngestRateState(nowMs)
+    local cfg = getForensicsConfig()
+    local minIntervalMs = tonumber(cfg.WorldTraceMinIntervalMs) or 750
+    if minIntervalMs <= 0 then
+        minIntervalMs = 750
+    end
+
+    local retentionMs = math.max(60000, minIntervalMs * 40)
+    local currentMs = tonumber(nowMs) or getNowMs()
+
+    for key, last in pairs(ingestRateState) do
+        if (currentMs - (tonumber(last) or 0)) > retentionMs then
+            ingestRateState[key] = nil
+        end
+    end
 end
 
 local function isForensicsEnabled()
@@ -134,6 +243,9 @@ local function sanitizeTracePayload(payload)
     evidenceType = (evidenceType ~= '' and evidenceType or 'DNA'):upper()
     local description = CAD.Server.SanitizeString(tracePayload.description, 500)
 
+    local nowEpoch = os.time()
+    local expiresAtEpoch = nowEpoch + ttlSeconds
+
     return {
         traceId = CAD.Server.GenerateId('TRACE'),
         evidenceType = evidenceType,
@@ -141,7 +253,8 @@ local function sanitizeTracePayload(payload)
         coords = coords,
         metadata = type(tracePayload.metadata) == 'table' and tracePayload.metadata or {},
         createdAt = CAD.Server.ToIso(),
-        expiresAt = CAD.Server.ToIso(os.time() + ttlSeconds),
+        expiresAt = CAD.Server.ToIso(expiresAtEpoch),
+        expiresAtEpoch = expiresAtEpoch,
         sourceResource = tostring(tracePayload.sourceResource or GetInvokingResource() or 'unknown'),
     }, nil
 end
@@ -153,25 +266,38 @@ local function ingestWorldTrace(payload)
     end
 
     worldTraces[trace.traceId] = trace
+    upsertTraceGridEntry(trace)
     return trace
 end
 
 local function pruneExpiredWorldTraces()
     local now = os.time()
     for traceId, trace in pairs(worldTraces) do
-        if trace.expiresAt then
+        local expiresAtEpoch = tonumber(trace.expiresAtEpoch)
+        if not expiresAtEpoch and type(trace.expiresAt) == 'string' then
             local y, mo, d, h, mi, s = string.match(trace.expiresAt, '^(%d+)%-(%d+)%-(%d+)T(%d+):(%d+):(%d+)Z$')
             if y then
-                local expiresAt = os.time({
+                expiresAtEpoch = os.time({
                     year = tonumber(y), month = tonumber(mo), day = tonumber(d),
                     hour = tonumber(h), min = tonumber(mi), sec = tonumber(s),
                 })
-                if expiresAt <= now then
-                    worldTraces[traceId] = nil
-                end
+                trace.expiresAtEpoch = expiresAtEpoch
             end
         end
+
+        if expiresAtEpoch and expiresAtEpoch <= now then
+            removeTraceGridEntry(traceId)
+            worldTraces[traceId] = nil
+        end
     end
+end
+
+if lib and lib.cron and type(lib.cron.new) == 'function' then
+    -- Verified: Context7 /websites/coxdocs_dev ox_lib Cron Server lib.cron.new(expression, job, options)
+    lib.cron.new('* * * * *', function()
+        cleanupIngestRateState(getNowMs())
+        pruneExpiredWorldTraces()
+    end)
 end
 
 local function ensureSceneEvidenceState()
@@ -835,28 +961,85 @@ lib.callback.register('cad:forensic:getNearbyWorldTraces', CAD.Auth.WithGuard('d
     pruneExpiredWorldTraces()
 
     local coords = GetEntityCoords(ped)
-    local detectRadius = tonumber(CAD.Config.Forensics.WorldTraceDetectRadius) or 18.0
+    local cfg = getForensicsConfig()
+    local detectRadius = tonumber(cfg.WorldTraceDetectRadius) or 18.0
     local out = {}
+    local seenTraceIds = {}
+    local usedGrid = false
 
-    for _, trace in pairs(worldTraces) do
-        local distance = #(coords - trace.coords)
-        if distance <= detectRadius then
-            out[#out + 1] = {
-                traceId = trace.traceId,
-                evidenceType = trace.evidenceType,
-                description = trace.description,
-                coords = { x = trace.coords.x, y = trace.coords.y, z = trace.coords.z },
-                distance = distance,
-                metadata = trace.metadata,
-                createdAt = trace.createdAt,
-                expiresAt = trace.expiresAt,
-            }
+    if traceGridEnabled then
+        usedGrid = true
+        -- Verified: Context7 /websites/coxdocs_dev ox_lib Grid Shared lib.grid.getNearbyEntries(point, filter)
+        local nearbyEntries = lib.grid.getNearbyEntries(coords, function(entry)
+            if type(entry) ~= 'table' or type(entry.traceId) ~= 'string' then
+                return false
+            end
+
+            local trace = worldTraces[entry.traceId]
+            if not trace then
+                return false
+            end
+
+            local traceCoords = getTraceVectorCoords(trace.coords)
+            if not traceCoords then
+                return false
+            end
+
+            return #(coords - traceCoords) <= detectRadius
+        end)
+
+        for i = 1, #nearbyEntries do
+            local entry = nearbyEntries[i]
+            local traceId = entry and entry.traceId
+            if type(traceId) == 'string' and not seenTraceIds[traceId] then
+                local trace = worldTraces[traceId]
+                local traceCoords = trace and getTraceVectorCoords(trace.coords) or nil
+                if trace and traceCoords then
+                    seenTraceIds[traceId] = true
+                    local distance = #(coords - traceCoords)
+                    if distance <= detectRadius then
+                        out[#out + 1] = {
+                            traceId = trace.traceId,
+                            evidenceType = trace.evidenceType,
+                            description = trace.description,
+                            coords = { x = traceCoords.x, y = traceCoords.y, z = traceCoords.z },
+                            distance = distance,
+                            metadata = trace.metadata,
+                            createdAt = trace.createdAt,
+                            expiresAt = trace.expiresAt,
+                        }
+                    end
+                end
+            end
         end
     end
 
-    table.sort(out, function(a, b)
-        return (a.distance or 99999) < (b.distance or 99999)
-    end)
+    if not usedGrid then
+        for _, trace in pairs(worldTraces) do
+            local traceCoords = getTraceVectorCoords(trace.coords)
+            if traceCoords then
+                local distance = #(coords - traceCoords)
+                if distance <= detectRadius then
+                    out[#out + 1] = {
+                        traceId = trace.traceId,
+                        evidenceType = trace.evidenceType,
+                        description = trace.description,
+                        coords = { x = traceCoords.x, y = traceCoords.y, z = traceCoords.z },
+                        distance = distance,
+                        metadata = trace.metadata,
+                        createdAt = trace.createdAt,
+                        expiresAt = trace.expiresAt,
+                    }
+                end
+            end
+        end
+    end
+
+    if #out > 1 then
+        table.sort(out, function(a, b)
+            return (a.distance or 99999) < (b.distance or 99999)
+        end)
+    end
 
     return {
         ok = true,
@@ -931,6 +1114,7 @@ lib.callback.register('cad:forensic:bagWorldTrace', CAD.Auth.WithGuard('heavy', 
     }
 
     bucket[#bucket + 1] = staged
+    removeTraceGridEntry(trace.traceId)
     worldTraces[trace.traceId] = nil
 
     if caseId ~= '' and CAD.State.Cases[caseId] then
@@ -970,6 +1154,7 @@ lib.callback.register('cad:forensic:bagWorldTrace', CAD.Auth.WithGuard('heavy', 
             table.remove(caseObj.notes, #caseObj.notes)
             table.remove(bucket, #bucket)
             worldTraces[trace.traceId] = trace
+            upsertTraceGridEntry(trace)
             CAD.Log('error', 'Failed saving forensic case note %s: %s', tostring(noteId), tostring(insertErr))
             return { ok = false, error = 'db_write_failed' }
         end
@@ -1032,18 +1217,17 @@ RegisterNetEvent('cad:forensic:ingestWorldTrace', function(payload)
 
     local invoking = GetInvokingResource() or 'unknown'
     if not shouldAcceptIngestFrom(invoking) then
-        CAD.Log('warn', 'Rejected world trace ingest from %s', invoking)
+        CAD.Log('debug', 'Rejected world trace ingest from %s', invoking)
         return
     end
 
     if not canIngestNow(invoking) then
-        CAD.Log('warn', 'Rate-limited world trace ingest from %s', invoking)
         return
     end
 
     local trace, err = ingestWorldTrace(payload)
     if not trace then
-        CAD.Log('warn', 'Failed world trace ingest from %s: %s', invoking, tostring(err))
+        CAD.Log('debug', 'Failed world trace ingest from %s: %s', invoking, tostring(err))
         return
     end
 
