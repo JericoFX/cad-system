@@ -90,21 +90,24 @@ local function bootstrapFromDatabase()
         end
     end
 
-    local callRows = safeQuery('SELECT * FROM cad_dispatch_calls WHERE status <> ?', { 'CLOSED' }, 'cad_dispatch_calls')
-    for i = 1, #callRows do
-        local row = callRows[i]
-        CAD.State.Dispatch.Calls[row.call_id] = {
-            callId = row.call_id,
-            type = row.call_type,
-            priority = tonumber(row.priority) or 2,
-            title = row.title,
-            description = row.description or '',
-            location = row.location,
-            coordinates = safeJsonDecode(row.coordinates, nil, ('cad_dispatch_calls.coordinates:%s'):format(tostring(row.call_id))),
-            status = row.status,
-            assignedUnits = safeJsonDecode(row.assigned_units, {}, ('cad_dispatch_calls.assigned_units:%s'):format(tostring(row.call_id))),
-            createdAt = row.created_at,
-        }
+    local callRows = {}
+    if CAD.IsFeatureEnabled == nil or CAD.IsFeatureEnabled('Dispatch') then
+        callRows = safeQuery('SELECT * FROM cad_dispatch_calls WHERE status <> ?', { 'CLOSED' }, 'cad_dispatch_calls')
+        for i = 1, #callRows do
+            local row = callRows[i]
+            CAD.State.Dispatch.Calls[row.call_id] = {
+                callId = row.call_id,
+                type = row.call_type,
+                priority = tonumber(row.priority) or 2,
+                title = row.title,
+                description = row.description or '',
+                location = row.location,
+                coordinates = safeJsonDecode(row.coordinates, nil, ('cad_dispatch_calls.coordinates:%s'):format(tostring(row.call_id))),
+                status = row.status,
+                assignedUnits = safeJsonDecode(row.assigned_units, {}, ('cad_dispatch_calls.assigned_units:%s'):format(tostring(row.call_id))),
+                createdAt = row.created_at,
+            }
+        end
     end
 
     local fineRows = safeQuery('SELECT * FROM cad_fines WHERE status = ?', { 'PENDING' }, 'cad_fines')
@@ -130,40 +133,43 @@ local function bootstrapFromDatabase()
         }
     end
 
-    local bloodRows = safeQuery('SELECT * FROM cad_ems_blood_requests', {}, 'cad_ems_blood_requests')
-    for i = 1, #bloodRows do
-        local row = bloodRows[i]
-        CAD.State.EMS.BloodRequests[row.request_id] = {
-            requestId = row.request_id,
-            caseId = row.case_id,
-            citizenId = row.citizen_id,
-            personName = row.person_name,
-            reason = row.reason,
-            location = row.location,
-            status = row.status,
-            requestedBy = row.requested_by,
-            requestedByName = row.requested_by_name,
-            requestedByJob = row.requested_by_job,
-            requestedAt = row.requested_at,
-            handledBy = row.handled_by,
-            handledByName = row.handled_by_name,
-            handledAt = row.handled_at,
-            notes = row.notes or '',
-            analysisStartedAt = row.analysis_started_at,
-            analysisStartedAtMs = tonumber(row.analysis_started_ms) or nil,
-            analysisDurationMs = tonumber(row.analysis_duration_ms) or nil,
-            analysisEndsAt = row.analysis_ends_at,
-            analysisEndsAtMs = tonumber(row.analysis_ends_ms) or nil,
-            analysisCompletedAt = row.analysis_completed_at,
-            analysisCompletedAtMs = tonumber(row.analysis_completed_ms) or nil,
-            lastReminderAt = row.last_reminder_at,
-            lastReminderAtMs = tonumber(row.last_reminder_ms) or nil,
-            sampleStashId = row.sample_stash_id,
-            sampleSlot = tonumber(row.sample_slot) or nil,
-            sampleItemName = row.sample_item_name,
-            sampleMetadata = safeJsonDecode(row.sample_metadata, nil, ('cad_ems_blood_requests.sample_metadata:%s'):format(tostring(row.request_id))),
-            evidenceId = row.evidence_id,
-        }
+    local bloodRows = {}
+    if CAD.IsFeatureEnabled == nil or CAD.IsFeatureEnabled('EMS') then
+        bloodRows = safeQuery('SELECT * FROM cad_ems_blood_requests', {}, 'cad_ems_blood_requests')
+        for i = 1, #bloodRows do
+            local row = bloodRows[i]
+            CAD.State.EMS.BloodRequests[row.request_id] = {
+                requestId = row.request_id,
+                caseId = row.case_id,
+                citizenId = row.citizen_id,
+                personName = row.person_name,
+                reason = row.reason,
+                location = row.location,
+                status = row.status,
+                requestedBy = row.requested_by,
+                requestedByName = row.requested_by_name,
+                requestedByJob = row.requested_by_job,
+                requestedAt = row.requested_at,
+                handledBy = row.handled_by,
+                handledByName = row.handled_by_name,
+                handledAt = row.handled_at,
+                notes = row.notes or '',
+                analysisStartedAt = row.analysis_started_at,
+                analysisStartedAtMs = tonumber(row.analysis_started_ms) or nil,
+                analysisDurationMs = tonumber(row.analysis_duration_ms) or nil,
+                analysisEndsAt = row.analysis_ends_at,
+                analysisEndsAtMs = tonumber(row.analysis_ends_ms) or nil,
+                analysisCompletedAt = row.analysis_completed_at,
+                analysisCompletedAtMs = tonumber(row.analysis_completed_ms) or nil,
+                lastReminderAt = row.last_reminder_at,
+                lastReminderAtMs = tonumber(row.last_reminder_ms) or nil,
+                sampleStashId = row.sample_stash_id,
+                sampleSlot = tonumber(row.sample_slot) or nil,
+                sampleItemName = row.sample_item_name,
+                sampleMetadata = safeJsonDecode(row.sample_metadata, nil, ('cad_ems_blood_requests.sample_metadata:%s'):format(tostring(row.request_id))),
+                evidenceId = row.evidence_id,
+            }
+        end
     end
 
     CAD.State.SecurityCameras = CAD.State.SecurityCameras or {
@@ -173,29 +179,32 @@ local function bootstrapFromDatabase()
     CAD.State.SecurityCameras.Cameras = CAD.State.SecurityCameras.Cameras or {}
     CAD.State.SecurityCameras.LastNumber = 0
 
-    local cameraRows = safeQuery('SELECT * FROM cad_security_cameras', {}, 'cad_security_cameras')
-    for i = 1, #cameraRows do
-        local row = cameraRows[i]
-        local cameraNumber = tonumber(row.camera_number) or 0
-        CAD.State.SecurityCameras.Cameras[row.camera_id] = {
-            cameraId = row.camera_id,
-            cameraNumber = cameraNumber,
-            label = row.label or ('Camera %04d'):format(math.max(0, cameraNumber)),
-            street = row.street or '',
-            crossStreet = row.cross_street or '',
-            zone = row.zone_name or '',
-            coords = safeJsonDecode(row.coords, nil, ('cad_security_cameras.coords:%s'):format(tostring(row.camera_id))),
-            rotation = safeJsonDecode(row.rotation, nil, ('cad_security_cameras.rotation:%s'):format(tostring(row.camera_id))),
-            fov = tonumber(row.fov) or 55.0,
-            status = row.status or 'ACTIVE',
-            installedBy = row.installed_by,
-            installedByName = row.installed_by_name,
-            createdAt = row.created_at,
-            updatedAt = row.updated_at,
-        }
+    local cameraRows = {}
+    if CAD.IsFeatureEnabled == nil or CAD.IsFeatureEnabled('SecurityCameras') then
+        cameraRows = safeQuery('SELECT * FROM cad_security_cameras', {}, 'cad_security_cameras')
+        for i = 1, #cameraRows do
+            local row = cameraRows[i]
+            local cameraNumber = tonumber(row.camera_number) or 0
+            CAD.State.SecurityCameras.Cameras[row.camera_id] = {
+                cameraId = row.camera_id,
+                cameraNumber = cameraNumber,
+                label = row.label or ('Camera %04d'):format(math.max(0, cameraNumber)),
+                street = row.street or '',
+                crossStreet = row.cross_street or '',
+                zone = row.zone_name or '',
+                coords = safeJsonDecode(row.coords, nil, ('cad_security_cameras.coords:%s'):format(tostring(row.camera_id))),
+                rotation = safeJsonDecode(row.rotation, nil, ('cad_security_cameras.rotation:%s'):format(tostring(row.camera_id))),
+                fov = tonumber(row.fov) or 55.0,
+                status = row.status or 'ACTIVE',
+                installedBy = row.installed_by,
+                installedByName = row.installed_by_name,
+                createdAt = row.created_at,
+                updatedAt = row.updated_at,
+            }
 
-        if cameraNumber > CAD.State.SecurityCameras.LastNumber then
-            CAD.State.SecurityCameras.LastNumber = cameraNumber
+            if cameraNumber > CAD.State.SecurityCameras.LastNumber then
+                CAD.State.SecurityCameras.LastNumber = cameraNumber
+            end
         end
     end
 

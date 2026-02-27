@@ -6,6 +6,14 @@ CAD.Forensic.Sync = {}
 
 local MAX_COORD_ABS = 100000.0
 
+local function isForensicsEnabled()
+    if CAD.IsFeatureEnabled then
+        return CAD.IsFeatureEnabled('Forensics')
+    end
+
+    return true
+end
+
 local function isConnectedPlayer(playerSource)
     local src = tonumber(playerSource)
     if not src or src <= 0 then
@@ -100,10 +108,18 @@ local function ensureEvidenceState()
 end
 
 CreateThread(function()
+    if not isForensicsEnabled() then
+        return
+    end
+
     ensureEvidenceState()
 end)
 
 RegisterNetEvent('cad:forensic:sync', function(evidenceType, ownerId, ...)
+    if not isForensicsEnabled() then
+        return
+    end
+
     local src = tonumber(source)
     if not src or src <= 0 then
         return

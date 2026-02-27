@@ -1,6 +1,7 @@
 
 import { createSignal, createMemo, For, Show, onMount, lazy } from 'solid-js';
 import { terminalActions } from '~/stores/terminalStore';
+import { featureState } from '~/stores/featureStore';
 import { 
   newsState, 
   newsActions, 
@@ -325,6 +326,13 @@ export function NewsManager() {
   };
   
   const publishArticle = () => {
+    if (!featureState.newsPublishWithoutConfirm) {
+      const confirmed = window.confirm('Publicar esta noticia ahora?');
+      if (!confirmed) {
+        return;
+      }
+    }
+
     const articleId = upsertEditingArticle();
     newsActions.publishArticle(articleId);
     

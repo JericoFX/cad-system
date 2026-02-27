@@ -2,6 +2,14 @@
 
 CAD = CAD or {}
 
+local function dispatchEnabled()
+    if CAD.IsFeatureEnabled then
+        return CAD.IsFeatureEnabled('Dispatch')
+    end
+
+    return true
+end
+
 exports('CreateCase', function(source, data)
     local officer = CAD.Auth.GetOfficerData(source)
     if not officer then return nil end
@@ -127,6 +135,10 @@ exports('AttachEvidenceToCase', function(source, evidenceId, caseId)
 end)
 
 exports('CreateDispatchCall', function(_, data)
+    if not dispatchEnabled() then
+        return nil
+    end
+
     local callId = CAD.Server.GenerateId('CALL')
     local call = {
         callId = callId,
@@ -145,10 +157,18 @@ exports('CreateDispatchCall', function(_, data)
 end)
 
 exports('GetActiveCalls', function()
+    if not dispatchEnabled() then
+        return {}
+    end
+
     return CAD.State.Dispatch.Calls
 end)
 
 exports('AssignUnit', function(_, callId, unitId)
+    if not dispatchEnabled() then
+        return false
+    end
+
     local call = CAD.State.Dispatch.Calls[callId]
     local unit = CAD.State.Dispatch.Units[unitId]
     if not call or not unit then return false end
@@ -160,10 +180,18 @@ exports('AssignUnit', function(_, callId, unitId)
 end)
 
 exports('GetUnitStatus', function(_, unitId)
+    if not dispatchEnabled() then
+        return nil
+    end
+
     return CAD.State.Dispatch.Units[unitId]
 end)
 
 exports('SetUnitStatus', function(_, unitId, statusCode)
+    if not dispatchEnabled() then
+        return false
+    end
+
     local unit = CAD.State.Dispatch.Units[unitId]
     if not unit then return false end
     unit.status = tostring(statusCode or 'AVAILABLE'):upper()

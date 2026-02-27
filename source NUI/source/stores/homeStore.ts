@@ -1,6 +1,7 @@
 
 import { createStore } from 'solid-js/store';
 import { userState } from './userStore';
+import { featureActions } from './featureStore';
 
 export type UserRole = 'police' | 'ems' | 'dispatch' | 'admin';
 
@@ -31,9 +32,11 @@ const getDefaultActions = (role: UserRole): QuickAction[] => {
     { id: 'search-person', label: 'Person', icon: '👤', modal: 'PERSON_SEARCH', color: '#ffff00' },
   ];
   
+  let actions: QuickAction[]
+
   switch (role) {
     case 'police':
-      return [
+      actions = [
         { id: 'new-case', label: 'New Case', icon: '📁', modal: 'CASE_CREATOR', color: '#00ff00' },
         { id: 'arrest', label: 'Arrest', icon: '⛓️', modal: 'ARREST_WIZARD', color: '#ff0000' },
         { id: 'bolo', label: 'BOLO', icon: '⚠️', modal: 'BOLO_MANAGER', color: '#ff8000' },
@@ -41,24 +44,36 @@ const getDefaultActions = (role: UserRole): QuickAction[] => {
         ...common,
         { id: 'evidence', label: 'Evidence', icon: '📎', modal: 'EVIDENCE', color: '#80ffff' },
       ];
+      break;
     case 'ems':
-      return [
+      actions = [
         { id: 'triage', label: 'Triage', icon: '🏥', command: 'triage', color: '#ff8000' },
         { id: 'treatment', label: 'Treatment', icon: '💊', command: 'treatment', color: '#00ff00' },
         { id: 'forensics', label: 'Forensics', icon: '🔬', modal: 'FORENSIC_COLLECTION', color: '#00ffff' },
         ...common,
         { id: 'ems-dash', label: 'EMS Dash', icon: '🚑', modal: 'EMS_DASHBOARD', color: '#ff0000' },
       ];
+      break;
     case 'dispatch':
-      return [
+      actions = [
         { id: 'new-call', label: 'New Call', icon: '📞', modal: 'MAP', color: '#ff0000' },
         { id: 'units', label: 'Units', icon: '🚓', modal: 'DISPATCH_PANEL', color: '#0080ff' },
         ...common,
         { id: 'radio', label: 'Radio', icon: '📻', modal: 'RADIO_PANEL', color: '#00ffff' },
       ];
+      break;
     default:
-      return common;
+      actions = common;
+      break;
   }
+
+  return actions.filter((action) => {
+    if (!action.modal) {
+      return true;
+    }
+
+    return featureActions.isModalEnabled(action.modal);
+  });
 };
 
 const initialState: HomeState = {
