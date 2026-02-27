@@ -60,7 +60,7 @@ export function SessionContextBar() {
                 📡
               </span>
             </Show>
-            <Show when={sessionState.radioChannel}>
+            <Show when={featureState.radio.visible && sessionState.radioChannel}>
               <span class={`status-indicator radio-${sessionState.radioStatus}`} title="Radio">
                 📻
               </span>
@@ -193,34 +193,36 @@ export function SessionContextBar() {
               </Show>
             </div>
 
-            <div class="session-section">
-              <div class="session-section-header">
-                <span class="section-icon">📻</span>
-                <span class="section-title">Radio</span>
-              </div>
-              <Show 
-                when={sessionState.radioChannel}
-                fallback={<div class="section-empty">Not connected</div>}
-              >
-                <div class="section-content">
-                  <div class="info-row">
-                    <span class="info-label">Channel:</span>
-                    <span class="info-value">{sessionState.radioChannel}</span>
-                  </div>
-                  <div class="info-row">
-                    <span class="info-label">Status:</span>
-                    <span class={`info-value status-${sessionState.radioStatus}`}>
-                      {sessionState.radioStatus.toUpperCase()}
-                    </span>
-                  </div>
-                  <div class="section-actions">
-                    <button class="section-btn" onClick={openRadio}>
-                      Open Radio
-                    </button>
-                  </div>
+            <Show when={featureState.radio.visible}>
+              <div class="session-section">
+                <div class="session-section-header">
+                  <span class="section-icon">📻</span>
+                  <span class="section-title">Radio</span>
                 </div>
-              </Show>
-            </div>
+                <Show 
+                  when={sessionState.radioChannel}
+                  fallback={<div class="section-empty">Not connected</div>}
+                >
+                  <div class="section-content">
+                    <div class="info-row">
+                      <span class="info-label">Channel:</span>
+                      <span class="info-value">{sessionState.radioChannel}</span>
+                    </div>
+                    <div class="info-row">
+                      <span class="info-label">Status:</span>
+                      <span class={`info-value status-${sessionState.radioStatus}`}>
+                        {sessionState.radioStatus.toUpperCase()}
+                      </span>
+                    </div>
+                    <div class="section-actions">
+                      <button class="section-btn" onClick={openRadio}>
+                        Open Radio
+                      </button>
+                    </div>
+                  </div>
+                </Show>
+              </div>
+            </Show>
 
             <Show when={!CONFIG.DOCK_ONLY}>
               <div class="session-section">

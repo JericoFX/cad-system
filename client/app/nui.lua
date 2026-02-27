@@ -50,6 +50,15 @@ wrapNui('cad:getUiFeatures', function()
     local newsEnabled = featureEnabled('News')
     local newsVisible = newsEnabled and featureVisible('News', true)
 
+    local emsEnabled = featureEnabled('EMS')
+    local emsVisible = emsEnabled and featureVisible('EMS', true)
+
+    local mapEnabled = featureEnabled('Map')
+    local mapVisible = mapEnabled and featureVisible('Map', true)
+
+    local radioEnabled = featureEnabled('Radio')
+    local radioVisible = radioEnabled and featureVisible('Radio', true)
+
     return {
         dispatch = {
             enabled = dispatchEnabled,
@@ -62,6 +71,19 @@ wrapNui('cad:getUiFeatures', function()
         news = {
             enabled = newsEnabled,
             visible = newsVisible,
+            publishWithoutConfirm = CAD.Config.News and CAD.Config.News.PublishWithoutConfirm == true,
+        },
+        ems = {
+            enabled = emsEnabled,
+            visible = emsVisible,
+        },
+        map = {
+            enabled = mapEnabled,
+            visible = mapVisible,
+        },
+        radio = {
+            enabled = radioEnabled,
+            visible = radioVisible,
         },
     }
 end)

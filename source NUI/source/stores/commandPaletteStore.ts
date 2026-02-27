@@ -46,7 +46,7 @@ const MODAL_ROLE_ACCESS: Record<string, Array<'police' | 'ems' | 'dispatch' | 'a
   FINE_MANAGER: ['police', 'dispatch', 'admin'],
   RADIO_PANEL: ['police', 'ems', 'dispatch', 'admin'],
   RADIO_MARKERS: ['police', 'ems', 'dispatch', 'admin'],
-  NEWS_MANAGER: ['dispatch', 'admin'],
+  NEWS_MANAGER: ['police', 'dispatch', 'admin', 'ems'],
 };
 
 function filterItemsByRole(items: PaletteItem[]): PaletteItem[] {

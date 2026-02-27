@@ -11,6 +11,9 @@ type FeaturePayload = {
   dispatch?: Partial<ModuleFeature>;
   forensics?: Partial<ModuleFeature>;
   news?: Partial<ModuleFeature>;
+  ems?: Partial<ModuleFeature>;
+  map?: Partial<ModuleFeature>;
+  radio?: Partial<ModuleFeature>;
 };
 
 interface FeatureState {
@@ -18,6 +21,9 @@ interface FeatureState {
   dispatch: ModuleFeature;
   forensics: ModuleFeature;
   news: ModuleFeature;
+  ems: ModuleFeature;
+  map: ModuleFeature;
+  radio: ModuleFeature;
 }
 
 const defaultFeature: ModuleFeature = {
@@ -39,6 +45,18 @@ const initialState: FeatureState = {
     enabled: CONFIG.FEATURES.NEWS,
     visible: CONFIG.FEATURES.NEWS,
   },
+  ems: {
+    enabled: CONFIG.FEATURES.EMS,
+    visible: CONFIG.FEATURES.EMS,
+  },
+  map: {
+    enabled: CONFIG.FEATURES.MAP,
+    visible: CONFIG.FEATURES.MAP,
+  },
+  radio: {
+    enabled: CONFIG.FEATURES.RADIO,
+    visible: CONFIG.FEATURES.RADIO,
+  },
 };
 
 export const [featureState, setFeatureState] = createStore<FeatureState>(initialState);
@@ -50,9 +68,12 @@ function normalizeFeature(input?: Partial<ModuleFeature>, fallback: ModuleFeatur
   };
 }
 
-const dispatchModals = new Set(['DISPATCH_PANEL', 'MAP']);
+const dispatchModals = new Set(['DISPATCH_PANEL']);
 const forensicsModals = new Set(['FORENSIC_COLLECTION']);
 const newsModals = new Set(['NEWS_MANAGER']);
+const emsModals = new Set(['EMS_DASHBOARD']);
+const mapModals = new Set(['MAP']);
+const radioModals = new Set(['RADIO_PANEL', 'RADIO_MARKERS']);
 
 export const featureActions = {
   load: async () => {
@@ -69,6 +90,9 @@ export const featureActions = {
         dispatch: normalizeFeature(payload?.dispatch, featureState.dispatch),
         forensics: normalizeFeature(payload?.forensics, featureState.forensics),
         news: normalizeFeature(payload?.news, featureState.news),
+        ems: normalizeFeature(payload?.ems, featureState.ems),
+        map: normalizeFeature(payload?.map, featureState.map),
+        radio: normalizeFeature(payload?.radio, featureState.radio),
       });
     } catch (error) {
       console.error('[FeatureStore] Failed to load feature flags', error);
@@ -91,6 +115,18 @@ export const featureActions = {
 
     if (newsModals.has(modalName)) {
       return featureState.news.enabled && featureState.news.visible;
+    }
+
+    if (emsModals.has(modalName)) {
+      return featureState.ems.enabled && featureState.ems.visible;
+    }
+
+    if (mapModals.has(modalName)) {
+      return featureState.map.enabled && featureState.map.visible;
+    }
+
+    if (radioModals.has(modalName)) {
+      return featureState.radio.enabled && featureState.radio.visible;
     }
 
     return true;

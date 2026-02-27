@@ -2,6 +2,7 @@ import { createMemo, createSignal, For, Show } from 'solid-js';
 import { terminalActions, terminalState } from '~/stores/terminalStore';
 import { cadState, cadActions } from '~/stores/cadStore';
 import { userState } from '~/stores/userStore';
+import { featureState } from '~/stores/featureStore';
 import type { MapMarker, MapRef } from '../Map.types';
 import type { DispatchCall } from '~/stores/cadStore';
 import { Button, Input, Modal } from '~/components/ui';
@@ -29,6 +30,7 @@ export function MapModal() {
   const [showAssignForm, setShowAssignForm] = createSignal(false);
   const [selectedUnitToAssign, setSelectedUnitToAssign] =
     createSignal<string>('');
+  const dispatchEnabled = createMemo(() => featureState.dispatch.enabled && featureState.dispatch.visible);
 
   const selectedCall = createMemo<DispatchCall | undefined>(() => {
     const markerId = selectedMarker();
@@ -86,6 +88,10 @@ export function MapModal() {
   });
 
   const callMarkers = createMemo<MapMarker[]>(() => {
+    if (!dispatchEnabled()) {
+      return [];
+    }
+
     const markers = Object.values(cadState.dispatchCalls)
       .filter(
         (c) =>
@@ -142,6 +148,10 @@ export function MapModal() {
   };
 
   const handleMapClick = (coords: [number, number]) => {
+    if (!dispatchEnabled()) {
+      return;
+    }
+
     console.log('Map clicked at:', coords);
     setClickCoords(coords);
     setShowCreateForm(true);
@@ -273,7 +283,7 @@ export function MapModal() {
             style={{ display: 'flex', gap: '10px', 'align-items': 'center' }}
           >
             <Show
-              when={selectedMarker() && selectedMarkerType() === 'dispatch'}
+              when={dispatchEnabled() && selectedMarker() && selectedMarkerType() === 'dispatch'}
             >
               <button
                 class='modal-close'
@@ -330,20 +340,22 @@ export function MapModal() {
                 </button>
               </Show>
             </Show>
-            <button
-              class='modal-close'
-              onClick={() => terminalActions.setActiveModal('DISPATCH_PANEL')}
-              style={{ 'margin-right': '10px', color: '#00ffff' }}
-            >
-              [DISPATCH]
-            </button>
-            <button
-              class='modal-close'
-              onClick={handleCreateMarker}
-              style={{ 'margin-right': '10px' }}
-            >
-              [+ MARKER]
-            </button>
+            <Show when={dispatchEnabled()}>
+              <button
+                class='modal-close'
+                onClick={() => terminalActions.setActiveModal('DISPATCH_PANEL')}
+                style={{ 'margin-right': '10px', color: '#00ffff' }}
+              >
+                [DISPATCH]
+              </button>
+              <button
+                class='modal-close'
+                onClick={handleCreateMarker}
+                style={{ 'margin-right': '10px' }}
+              >
+                [+ MARKER]
+              </button>
+            </Show>
             <button
               class='modal-close'
               onClick={() => setShowDosMode(!showDosMode())}
@@ -357,7 +369,7 @@ export function MapModal() {
           </div>
         </div>
 
-        <Show when={showAssignForm()}>
+        <Show when={dispatchEnabled() && showAssignForm()}>
           <div class='map-create-form'>
             <div class='form-label'>[ASSIGN UNIT TO CALL]</div>
             <div style={{ color: '#00ff00', 'margin-bottom': '10px' }}>
@@ -423,7 +435,7 @@ export function MapModal() {
           </div>
         </Show>
 
-        <Show when={showCreateForm()}>
+        <Show when={dispatchEnabled() && showCreateForm()}>
           <div class='map-create-form'>
             <div class='form-label'>[CREATE NEW CALL]</div>
             <Show
@@ -536,54 +548,56 @@ export function MapModal() {
             </div>
           </div>
 
-          <div class='info-section'>
-            <h3>[CALLS: {callMarkers().length}]</h3>
-            <div class='marker-list'>
-              <For each={callMarkers()}>
-                {(marker) => (
-                  <div
-                    class={`marker-item ${selectedMarker() === marker.id ? 'selected' : ''}`}
-                    onClick={() => {
-                      setSelectedMarker(marker.id);
-                      setSelectedMarkerType('dispatch');
-                      setShowDeleteConfirm(false);
-                    }}
-                    onDblClick={() => {
-                      mapRef()?.setCenter([marker.position[0], marker.position[1]]);
-                    }}
-                  >
-                    <span
-                      style={{
-                        color:
-                          marker.color === 'red-168'
-                            ? '#ff0000'
-                            : marker.color === 'yellow-168'
-                              ? '#ffff00'
-                              : '#00ff00',
+          <Show when={dispatchEnabled()}>
+            <div class='info-section'>
+              <h3>[CALLS: {callMarkers().length}]</h3>
+              <div class='marker-list'>
+                <For each={callMarkers()}>
+                  {(marker) => (
+                    <div
+                      class={`marker-item ${selectedMarker() === marker.id ? 'selected' : ''}`}
+                      onClick={() => {
+                        setSelectedMarker(marker.id);
+                        setSelectedMarkerType('dispatch');
+                        setShowDeleteConfirm(false);
+                      }}
+                      onDblClick={() => {
+                        mapRef()?.setCenter([marker.position[0], marker.position[1]]);
                       }}
                     >
-                      {marker.icon}
-                    </span>
-                    {marker.tooltip}
-                    {marker.id.startsWith('CALL_') && (
                       <span
                         style={{
-                          color: '#00ff00',
-                          'margin-left': '8px',
-                          'font-size': '12px',
+                          color:
+                            marker.color === 'red-168'
+                              ? '#ff0000'
+                              : marker.color === 'yellow-168'
+                                ? '#ffff00'
+                                : '#00ff00',
                         }}
                       >
-                        [CUSTOM]
+                        {marker.icon}
                       </span>
-                    )}
-                  </div>
+                      {marker.tooltip}
+                      {marker.id.startsWith('CALL_') && (
+                        <span
+                          style={{
+                            color: '#00ff00',
+                            'margin-left': '8px',
+                            'font-size': '12px',
+                          }}
+                        >
+                          [CUSTOM]
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </For>
+                {callMarkers().length === 0 && (
+                  <div class='marker-empty'>No calls with coordinates</div>
                 )}
-              </For>
-              {callMarkers().length === 0 && (
-                <div class='marker-empty'>No calls with coordinates</div>
-              )}
+              </div>
             </div>
-          </div>
+          </Show>
         </div>
 
         <div class='modal-footer'>
