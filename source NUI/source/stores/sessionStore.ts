@@ -1,6 +1,6 @@
 
 import { createStore } from 'solid-js/store';
-import { createEffect } from 'solid-js';
+import { createEffect, batch } from 'solid-js';
 import { cadState } from './cadStore';
 import { userState } from './userStore';
 
@@ -101,40 +101,38 @@ export function syncSessionWithUser() {
 
 export const sessionActions = {
   setActiveCase: (caseId: string | null, title?: string) => {
-    setSessionState({
-      activeCaseId: caseId,
-      activeCaseTitle: title || null,
+    batch(() => {
+      setSessionState('activeCaseId', caseId);
+      setSessionState('activeCaseTitle', title || null);
     });
   },
   
   setActiveCall: (callId: string | null, title?: string) => {
-    setSessionState({
-      activeCallId: callId,
-      activeCallTitle: title || null,
+    batch(() => {
+      setSessionState('activeCallId', callId);
+      setSessionState('activeCallTitle', title || null);
     });
   },
   
   clearActiveCase: () => {
-    setSessionState({
-      activeCaseId: null,
-      activeCaseTitle: null,
+    batch(() => {
+      setSessionState('activeCaseId', null);
+      setSessionState('activeCaseTitle', null);
     });
   },
   
   clearActiveCall: () => {
-    setSessionState({
-      activeCallId: null,
-      activeCallTitle: null,
+    batch(() => {
+      setSessionState('activeCallId', null);
+      setSessionState('activeCallTitle', null);
     });
   },
   
   setRadioChannel: (channel: string | null) => {
-    setSessionState('radioChannel', channel);
-    if (channel) {
-      setSessionState('radioStatus', 'connected');
-    } else {
-      setSessionState('radioStatus', 'disconnected');
-    }
+    batch(() => {
+      setSessionState('radioChannel', channel);
+      setSessionState('radioStatus', channel ? 'connected' : 'disconnected');
+    });
   },
   
   setRadioStatus: (status: SessionState['radioStatus']) => {
