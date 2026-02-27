@@ -10,7 +10,7 @@ type ModuleFeature = {
 type FeaturePayload = {
   dispatch?: Partial<ModuleFeature>;
   forensics?: Partial<ModuleFeature>;
-  news?: Partial<ModuleFeature>;
+  news?: Partial<ModuleFeature> & { publishWithoutConfirm?: boolean };
   ems?: Partial<ModuleFeature>;
   map?: Partial<ModuleFeature>;
   radio?: Partial<ModuleFeature>;
@@ -21,6 +21,7 @@ interface FeatureState {
   dispatch: ModuleFeature;
   forensics: ModuleFeature;
   news: ModuleFeature;
+  newsPublishWithoutConfirm: boolean;
   ems: ModuleFeature;
   map: ModuleFeature;
   radio: ModuleFeature;
@@ -45,6 +46,7 @@ const initialState: FeatureState = {
     enabled: CONFIG.FEATURES.NEWS,
     visible: CONFIG.FEATURES.NEWS,
   },
+  newsPublishWithoutConfirm: false,
   ems: {
     enabled: CONFIG.FEATURES.EMS,
     visible: CONFIG.FEATURES.EMS,
@@ -90,6 +92,7 @@ export const featureActions = {
         dispatch: normalizeFeature(payload?.dispatch, featureState.dispatch),
         forensics: normalizeFeature(payload?.forensics, featureState.forensics),
         news: normalizeFeature(payload?.news, featureState.news),
+        newsPublishWithoutConfirm: payload?.news?.publishWithoutConfirm === true,
         ems: normalizeFeature(payload?.ems, featureState.ems),
         map: normalizeFeature(payload?.map, featureState.map),
         radio: normalizeFeature(payload?.radio, featureState.radio),

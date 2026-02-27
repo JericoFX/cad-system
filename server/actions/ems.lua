@@ -18,6 +18,18 @@ local BLOOD_REQUEST_STATUSES = {
 
 local bloodSampleStashRegistered = false
 
+local function isEmsEnabled()
+    if CAD.IsFeatureEnabled then
+        return CAD.IsFeatureEnabled('EMS')
+    end
+
+    return true
+end
+
+local function emsDisabledResponse()
+    return { ok = false, error = 'ems_disabled' }
+end
+
 local function isBloodSampleVirtualEnabled()
     local cfg = CAD.Config.Forensics and CAD.Config.Forensics.BloodSampleContainer or {}
     if cfg.enabled == false then
@@ -1001,10 +1013,18 @@ createAlert = function(title, description, severity, coords, createdBy)
 end
 
 lib.callback.register('cad:ems:getUnits', CAD.Auth.WithGuard('default', function()
+    if not isEmsEnabled() then
+        return {}
+    end
+
     return CAD.State.EMS.Units
 end))
 
 lib.callback.register('cad:ems:getAlerts', CAD.Auth.WithGuard('default', function()
+    if not isEmsEnabled() then
+        return {}
+    end
+
     local out = {}
     for _, alert in pairs(alerts) do
         out[#out + 1] = alert
@@ -1016,6 +1036,10 @@ lib.callback.register('cad:ems:getAlerts', CAD.Auth.WithGuard('default', functio
 end))
 
 lib.callback.register('cad:ems:createAlert', CAD.Auth.WithGuard('heavy', function(source, payload, officer)
+    if not isEmsEnabled() then
+        return emsDisabledResponse()
+    end
+
     if not CAD.Server.HasRole(source, { 'ambulance', 'ems', 'dispatch', 'admin' }) then
         return { ok = false, error = 'forbidden' }
     end
@@ -1037,6 +1061,10 @@ lib.callback.register('cad:ems:createAlert', CAD.Auth.WithGuard('heavy', functio
 end))
 
 lib.callback.register('cad:ems:updateUnit', CAD.Auth.WithGuard('default', function(_, payload)
+    if not isEmsEnabled() then
+        return emsDisabledResponse()
+    end
+
     local unitId = payload.unitId
     if not unitId or not CAD.State.EMS.Units[unitId] then
         return { ok = false, error = 'unit_not_found' }
@@ -1057,6 +1085,10 @@ lib.callback.register('cad:ems:updateUnit', CAD.Auth.WithGuard('default', functi
 end))
 
 lib.callback.register('cad:ems:critical_patient', CAD.Auth.WithGuard('default', function(_, payload, officer)
+    if not isEmsEnabled() then
+        return emsDisabledResponse()
+    end
+
     local patientName = payload.patientName or payload.name or 'Unknown Patient'
     local alert, alertErr = createAlert(
         ('Critical Patient: %s'):format(patientName),
@@ -1075,6 +1107,10 @@ lib.callback.register('cad:ems:critical_patient', CAD.Auth.WithGuard('default', 
 end))
 
 lib.callback.register('cad:ems:low_stock', CAD.Auth.WithGuard('default', function(_, payload)
+    if not isEmsEnabled() then
+        return emsDisabledResponse()
+    end
+
     local alert, alertErr = createAlert(
         ('Low Stock: %s'):format(payload.itemId or 'Unknown'),
         ('Current stock: %s'):format(tostring(payload.currentStock or 'N/A')),
@@ -1091,6 +1127,10 @@ lib.callback.register('cad:ems:low_stock', CAD.Auth.WithGuard('default', functio
 end))
 
 lib.callback.register('cad:ems:handoff_complete', CAD.Auth.WithGuard('default', function(_, payload)
+    if not isEmsEnabled() then
+        return emsDisabledResponse()
+    end
+
     local alert, alertErr = createAlert(
         'Medical Handoff Completed',
         ('Patient %s linked to case %s'):format(payload.patientId or 'N/A', payload.caseId or 'N/A'),
@@ -1107,6 +1147,10 @@ lib.callback.register('cad:ems:handoff_complete', CAD.Auth.WithGuard('default', 
 end))
 
 lib.callback.register('cad:ems:createBloodRequest', CAD.Auth.WithGuard('heavy', function(source, payload, officer)
+    if not isEmsEnabled() then
+        return emsDisabledResponse()
+    end
+
     if not CAD.Server.HasRole(source, { 'police', 'sheriff', 'csi', 'admin' }) then
         return { ok = false, error = 'forbidden' }
     end
@@ -1123,6 +1167,13 @@ lib.callback.register('cad:ems:createBloodRequest', CAD.Auth.WithGuard('heavy', 
 end))
 
 lib.callback.register('cad:ems:getBloodRequests', CAD.Auth.WithGuard('default', function(source, payload)
+    if not isEmsEnabled() then
+        return {
+            ok = true,
+            requests = {},
+        }
+    end
+
     if not CAD.Server.HasRole(source, { 'ambulance', 'ems', 'police', 'sheriff', 'csi', 'admin' }) then
         return { ok = false, error = 'forbidden' }
     end
@@ -1147,6 +1198,10 @@ lib.callback.register('cad:ems:getBloodRequests', CAD.Auth.WithGuard('default', 
 end))
 
 lib.callback.register('cad:ems:updateBloodRequest', CAD.Auth.WithGuard('default', function(source, payload, officer)
+    if not isEmsEnabled() then
+        return emsDisabledResponse()
+    end
+
     if not CAD.Server.HasRole(source, { 'ambulance', 'ems', 'admin' }) then
         return { ok = false, error = 'forbidden' }
     end
@@ -1288,6 +1343,10 @@ lib.callback.register('cad:ems:updateBloodRequest', CAD.Auth.WithGuard('default'
 end))
 
 lib.cron.new('* * * * *', function()
+    if not isEmsEnabled() then
+        return
+    end
+
     local ok, result = pcall(runBloodPostAnalysisPolicy)
     if not ok then
         CAD.Log('error', 'Blood post-analysis cron failure: %s', tostring(result))
