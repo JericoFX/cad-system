@@ -7,6 +7,26 @@ export function BootScreen() {
   const officerDepartment = createMemo(
     () => appState.bootOfficer?.department || 'Los Santos Department'
   );
+  const progressLabel = createMemo(() => {
+    const latestLine = appState.bootLines[appState.bootLines.length - 1] || '';
+    const bracketLabelMatch = latestLine.match(/^\[([^\]]+)\]/);
+
+    if (bracketLabelMatch) {
+      return bracketLabelMatch[1].trim().toUpperCase();
+    }
+
+    const stepHead = appState.bootStep.trim().split(/\s+/)[0] || 'BOOT';
+    return stepHead.toUpperCase();
+  });
+
+  const progressLine = createMemo(() => {
+    const totalBlocks = 20;
+    const percent = Math.min(100, Math.max(0, Math.round(appState.bootProgress)));
+    const filledBlocks = Math.round((percent / 100) * totalBlocks);
+    const bar = '█'.repeat(filledBlocks) + '░'.repeat(totalBlocks - filledBlocks);
+
+    return `[${progressLabel()}] ${bar} ${percent}%`;
+  });
 
   const handleKeyDown = (event: KeyboardEvent) => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -48,13 +68,7 @@ export function BootScreen() {
         </div>
 
         <div class='cad-boot-progress'>
-          <div class='cad-boot-progress-track'>
-            <div
-              class='cad-boot-progress-fill'
-              style={{ width: `${Math.round(appState.bootProgress)}%` }}
-            />
-          </div>
-          <span>{Math.round(appState.bootProgress)}%</span>
+          <div class='cad-boot-line cad-boot-line-active'>{progressLine()}</div>
         </div>
 
         <Show when={appState.bootConfig.skippable}>
