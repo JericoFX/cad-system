@@ -88,27 +88,44 @@ export function PoliceDashboard() {
     });
   });
 
-  const recentArrests = createMemo(() => 
-    (Object.values(cadState.criminalRecords) as CriminalRecord[])
+  const criminalRecordsArray = createMemo(() =>
+    Object.values(cadState.criminalRecords) as CriminalRecord[]
+  );
+
+  const openCasesArray = createMemo(() =>
+    Object.values(cadState.cases).filter(c => c.status === 'OPEN')
+  );
+
+  const warrantsArray = createMemo(() =>
+    Object.values(cadState.warrants) as Warrant[]
+  );
+
+  const vehiclesArray = createMemo(() =>
+    Object.values(cadState.vehicles) as Vehicle[]
+  );
+
+  const personsArray = createMemo(() => Object.values(cadState.persons));
+
+  const recentArrests = createMemo(() =>
+    criminalRecordsArray()
       .filter(r => !r.cleared)
       .sort((a, b) => new Date(b.arrestedAt).getTime() - new Date(a.arrestedAt).getTime())
       .slice(0, 10)
   );
 
-  const availableCases = createMemo(() => 
-    Object.values(cadState.cases)
-      .filter(c => c.status === 'OPEN')
+  const availableCases = createMemo(() =>
+    openCasesArray()
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   );
   
-  const activeWarrants = createMemo(() => 
-    (Object.values(cadState.warrants) as Warrant[])
+  const activeWarrants = createMemo(() =>
+    warrantsArray()
       .filter(w => w.active && !w.executed)
       .sort((a, b) => new Date(b.issuedAt).getTime() - new Date(a.issuedAt).getTime())
   );
   
-  const impoundedVehicles = createMemo(() => 
-    (Object.values(cadState.vehicles) as Vehicle[])
+  const impoundedVehicles = createMemo(() =>
+    vehiclesArray()
       .filter(v => v.flags?.some(f => f === 'IMPOUNDED'))
   );
 
@@ -122,7 +139,7 @@ export function PoliceDashboard() {
     const query = lookupQuery().trim().toLowerCase();
     if (!query || lookupMode() !== 'PERSON') return [];
 
-    return Object.values(cadState.persons)
+    return personsArray()
       .filter((person) => {
         const fullName = `${person.firstName} ${person.lastName}`.toLowerCase();
         return person.citizenid.toLowerCase().includes(query) || fullName.includes(query);
@@ -134,7 +151,7 @@ export function PoliceDashboard() {
     const query = lookupQuery().trim().toLowerCase();
     if (!query || lookupMode() !== 'VEHICLE') return [];
 
-    return Object.values(cadState.vehicles)
+    return vehiclesArray()
       .filter((vehicle) => {
         const owner = (vehicle.ownerName || '').toLowerCase();
         const model = `${vehicle.make} ${vehicle.model}`.toLowerCase();

@@ -1,5 +1,5 @@
 
-import { createSignal, createMemo, For, Show, onMount } from 'solid-js';
+import { createSignal, createMemo, For, Show, onCleanup, onMount } from 'solid-js';
 import { terminalActions } from '~/stores/terminalStore';
 import { fleetState, fleetActions, type VehicleType, type VehicleStatus } from '~/stores/fleetStore';
 import { Button, Modal, Tabs } from '~/components/ui';
@@ -20,11 +20,11 @@ export function FleetManager() {
       }));
       fleetActions.updateGPS(updates);
     }, 5000);
-    
-    return () => {
+
+    onCleanup(() => {
       clearInterval(interval);
       fleetActions.stopTracking();
-    };
+    });
   });
   
   const filteredVehicles = createMemo(() => fleetActions.getFilteredVehicles());

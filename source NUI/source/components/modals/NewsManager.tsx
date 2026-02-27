@@ -893,7 +893,7 @@ export function NewsManager() {
                     <div class="article-content-full">
                       <p class="lead">{article.lead}</p>
                       
-                      <For each={article.paragraphs.sort((a, b) => a.order - b.order)}>
+                      <For each={[...article.paragraphs].sort((a, b) => a.order - b.order)}>
                         {(para) => (
                           <p>{para.content}</p>
                         )}

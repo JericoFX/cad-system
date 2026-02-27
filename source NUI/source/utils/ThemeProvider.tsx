@@ -1,4 +1,4 @@
-import { createContext, useContext, createSignal, createEffect, onMount, type JSX } from 'solid-js';
+import { createContext, useContext, onMount, onCleanup, createSignal, createEffect, type ParentComponent } from 'solid-js';
 import type { ThemeName } from './theme';
 import { applyTheme, getCurrentTheme, getThemeClasses, initTheme } from './theme';
 
@@ -8,7 +8,7 @@ export interface ThemeContextValue {
   themeClasses: () => ReturnType<typeof getThemeClasses>;
 }
 
-const ThemeContext = createContext<ThemeContextValue>();
+const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function useTheme(): ThemeContextValue {
   const context = useContext(ThemeContext);
@@ -18,13 +18,8 @@ export function useTheme(): ThemeContextValue {
   return context;
 }
 
-export interface ThemeProviderProps {
-  children: JSX.Element;
-  defaultTheme?: ThemeName;
-}
-
-export function ThemeProvider(props: ThemeProviderProps) {
-  const [currentTheme, setCurrentTheme] = createSignal<ThemeName>(props.defaultTheme || 'dos');
+export const ThemeProvider: ParentComponent = (props) => {
+  const [currentTheme, setCurrentTheme] = createSignal<ThemeName>('dos');
 
   onMount(() => {
     initTheme();
@@ -36,16 +31,19 @@ export function ThemeProvider(props: ThemeProviderProps) {
     applyTheme(theme);
   });
 
-  createEffect(() => {
-    const handleThemeChange = (e: Event) => {
-      const customEvent = e as CustomEvent<ThemeName>;
-      if (customEvent.detail !== currentTheme()) {
-        setCurrentTheme(customEvent.detail);
-      }
-    };
+  const handleThemeChange = (e: Event) => {
+    const customEvent = e as CustomEvent<ThemeName>;
+    if (customEvent.detail !== currentTheme()) {
+      setCurrentTheme(customEvent.detail);
+    }
+  };
 
+  onMount(() => {
     window.addEventListener('themechange', handleThemeChange);
-    return () => window.removeEventListener('themechange', handleThemeChange);
+  });
+
+  onCleanup(() => {
+    window.removeEventListener('themechange', handleThemeChange);
   });
 
   const setTheme = (theme: ThemeName) => {
@@ -65,4 +63,4 @@ export function ThemeProvider(props: ThemeProviderProps) {
       {props.children}
     </ThemeContext.Provider>
   );
-}
+};

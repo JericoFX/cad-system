@@ -1,26 +1,17 @@
-import { createSignal, createMemo, For, Show, onMount } from 'solid-js';
+import { createSignal, createMemo, createSelector, For, Show, onMount } from 'solid-js';
 import { terminalActions, terminalState } from '~/stores/terminalStore';
 import { cadState, cadActions, type Vehicle } from '~/stores/cadStore';
 import { Button, Input, Modal, Tabs, Textarea } from '~/components/ui';
+import { PhotoGallery } from '~/components/ui/PhotoGallery';
 
 export function VehicleSearch() {
   const [searchQuery, setSearchQuery] = createSignal('');
+  const [searchResults, setSearchResults] = createSignal<Vehicle[]>([]);
   const [selectedVehicle, setSelectedVehicle] = createSignal<Vehicle | null>(null);
   const [activeTab, setActiveTab] = createSignal<'info' | 'owner' | 'notes'>('info');
   const [newVehicleNote, setNewVehicleNote] = createSignal('');
-
-  const searchResults = createMemo(() => {
-    const query = searchQuery().toLowerCase();
-    if (!query) return [];
-    
-    return Object.values(cadState.vehicles).filter(v => 
-      v.plate.toLowerCase().includes(query) ||
-      v.model.toLowerCase().includes(query) ||
-      v.make.toLowerCase().includes(query) ||
-      v.vin.toLowerCase().includes(query) ||
-      v.ownerName.toLowerCase().includes(query)
-    );
-  });
+  const vehiclesArray = createMemo(() => Object.values(cadState.vehicles));
+  const isSelectedVehicle = createSelector(() => selectedVehicle()?.plate || null);
 
   const closeModal = () => {
     terminalActions.setActiveModal(null);
@@ -36,6 +27,24 @@ export function VehicleSearch() {
     if (!vehicle) return [];
     return (vehicle.notes || []).slice().sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   });
+
+  const handleSearch = () => {
+    const query = searchQuery().trim().toLowerCase();
+    if (!query) {
+      setSearchResults([]);
+      return;
+    }
+    
+    const results = vehiclesArray().filter(v =>
+      v.plate.toLowerCase().includes(query) ||
+      v.model.toLowerCase().includes(query) ||
+      v.make.toLowerCase().includes(query) ||
+      v.vin.toLowerCase().includes(query) ||
+      v.ownerName.toLowerCase().includes(query)
+    );
+    
+    setSearchResults(results);
+  };
 
   const addVehicleNote = () => {
     const vehicle = selectedVehicle();
@@ -65,7 +74,7 @@ export function VehicleSearch() {
       return;
     }
 
-    const vehicles = Object.values(cadState.vehicles);
+    const vehicles = vehiclesArray();
 
     if (modalData.plate && modalData.plate.trim() !== '') {
       const plateQuery = modalData.plate.trim();
@@ -113,8 +122,12 @@ export function VehicleSearch() {
               class="dos-input search-input"
               value={searchQuery()}
               onInput={(e) => setSearchQuery(e.currentTarget.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
               placeholder="Enter plate, model, or owner name..."
             />
+            <Button.Root class="btn btn-primary" onClick={handleSearch}>
+              [SEARCH]
+            </Button.Root>
           </div>
           <Show when={searchResults().length > 0}>
             <div class="search-stats">
@@ -132,7 +145,7 @@ export function VehicleSearch() {
             <For each={searchResults()}>
               {(vehicle) => (
                 <div 
-                  class={`result-item ${selectedVehicle()?.plate === vehicle.plate ? 'selected' : ''}`}
+                  class={`result-item ${isSelectedVehicle(vehicle.plate) ? 'selected' : ''}`}
                   onClick={() => { setSelectedVehicle(vehicle); setActiveTab('info'); }}
                 >
                   <div class="result-plate">
@@ -230,6 +243,28 @@ export function VehicleSearch() {
                         </span>
                       </div>
                     </Show>
+                  </div>
+                  
+                  <Show when={selectedVehicle()!.photos && selectedVehicle()!.photos!.length > 0}>
+                    <div class="photo-section" style={{ 'margin-top': '20px', padding: '10px 0', 'border-top': '1px solid var(--terminal-border)' }}>
+                      <h4 style={{ color: 'var(--terminal-system-bright)', 'margin-bottom': '10px' }}>Photos</h4>
+                      <PhotoGallery photos={selectedVehicle()!.photos!} />
+                    </div>
+                  </Show>
+                  
+                  <div class="vehicle-actions" style={{ 'margin-top': '15px' }}>
+                    <Button.Root 
+                      class="btn"
+                      onClick={() => {
+                        terminalActions.setActiveModal('UPLOAD', { 
+                          vehiclePlate: selectedVehicle()!.plate,
+                          vehicleInfo: `${selectedVehicle()!.year} ${selectedVehicle()!.make} ${selectedVehicle()!.model}`,
+                          type: 'photo'
+                        });
+                      }}
+                    >
+                      [UPLOAD PHOTO]
+                    </Button.Root>
                   </div>
                 </Show>
 

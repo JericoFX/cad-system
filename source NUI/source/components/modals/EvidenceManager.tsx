@@ -59,6 +59,8 @@ export function EvidenceManager() {
   const [lockerTerminalId, setLockerTerminalId] = createSignal<string | null>(null);
   const [lockerBusy, setLockerBusy] = createSignal(false);
   const [selectedStagingPhotoId, setSelectedStagingPhotoId] = createSignal<string | null>(null);
+  const casesArray = createMemo(() => Object.values(cadState.cases));
+  const stagingEvidenceArray = createMemo(() => cadState.stagingEvidence);
 
   const selectedStagingPhoto = createMemo(() =>
     photoState.stagingPhotos.find((photo) => photo.photoId === selectedStagingPhotoId()) || null
@@ -109,7 +111,7 @@ export function EvidenceManager() {
       icon: '📂'
     });
     
-    cadState.stagingEvidence.forEach(ev => {
+    stagingEvidenceArray().forEach(ev => {
       files.push({
         name: buildEvidenceFileName(ev.stagingId, ev.evidenceType),
         type: 'file',
@@ -120,7 +122,8 @@ export function EvidenceManager() {
       });
     });
     
-    Object.entries(cadState.cases).forEach(([caseId, caseData]) => {
+    casesArray().forEach((caseData) => {
+      const caseId = caseData.caseId;
       const evidenceList = caseData.evidence || [];
       
       const folderName = `📁 ${caseId} - ${caseData.title}`;
@@ -545,9 +548,11 @@ export function EvidenceManager() {
               }}
             >
               <option value="">Target Case...</option>
-              {Object.values(cadState.cases).map((caseItem) => (
-                <option value={caseItem.caseId}>{caseItem.caseId} - {caseItem.title}</option>
-              ))}
+              <For each={casesArray()}>
+                {(caseItem) => (
+                  <option value={caseItem.caseId}>{caseItem.caseId} - {caseItem.title}</option>
+                )}
+              </For>
             </Select.Root>
             <Button.Root class="btn" onClick={() => void loadLocker()} disabled={lockerBusy()}>
               [LOCKER REFRESH]
@@ -836,6 +841,27 @@ export function EvidenceManager() {
                 <Show when={currentPath() === 'staging'}>
                   <Button.Root class="btn" onClick={handleDeleteEvidence}>
                     [DELETE]
+                  </Button.Root>
+                </Show>
+                <Show when={selectedEvidence() && (selectedEvidence()!.evidenceType === 'BIOLOGICAL' || selectedEvidence()!.evidenceType === 'DNA' || selectedEvidence()!.evidenceType === 'BLOOD')}>
+                  <Button.Root 
+                    class="btn btn-primary" 
+                    style={{ 'background-color': '#ff00ff', 'border-color': '#ff00ff' }}
+                    onClick={() => {
+                      const ev = selectedEvidence()!;
+                      const evidenceId = ('stagingId' in ev) ? (ev as StagingEvidence).stagingId : (ev as Evidence).evidenceId;
+                      const caseId = currentCase()?.caseId;
+                      
+                      if (!caseId) {
+                        terminalActions.addLine('No active case selected', 'error');
+                        return;
+                      }
+                      
+                      cadActions.requestEvidenceAnalysis(caseId, evidenceId, 'OFFICER_001', 'Requested forensic analysis');
+                      terminalActions.addLine(`Analysis request submitted for evidence ${evidenceId}`, 'output');
+                    }}
+                  >
+                    [REQUEST ANALYSIS]
                   </Button.Root>
                 </Show>
               </div>

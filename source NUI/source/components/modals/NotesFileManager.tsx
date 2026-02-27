@@ -1,4 +1,4 @@
-import { createSignal, createMemo, Show } from 'solid-js';
+import { createSignal, createMemo, For, Show } from 'solid-js';
 import { terminalActions } from '~/stores/terminalStore';
 import { cadState } from '~/stores/cadStore';
 import { viewerActions } from '~/stores/viewerStore';
@@ -62,6 +62,7 @@ export function NotesFileManager() {
   const [currentPath, setCurrentPath] = createSignal<string>('');
   const [selectedNote, setSelectedNote] = createSignal<Note | null>(null);
   const [viewingNote, setViewingNote] = createSignal<Note | null>(null);
+  const casesArray = createMemo(() => Object.values(cadState.cases));
 
   const noteTypes: Record<string, { label: string; icon: string; color: string }> = {
     'general': { label: 'GENERAL', icon: '📝', color: '#c0c0c0' },
@@ -206,9 +207,9 @@ export function NotesFileManager() {
               }}
             >
               <option value="">SELECT CASE...</option>
-              {Object.values(cadState.cases).map(c => (
-                <option value={c.caseId}>{c.caseId} - {c.title}</option>
-              ))}
+              <For each={casesArray()}>
+                {(c) => <option value={c.caseId}>{c.caseId} - {c.title}</option>}
+              </For>
             </Select.Root>
 
             <Show when={currentCaseId()}>
