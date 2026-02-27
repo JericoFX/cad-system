@@ -5,6 +5,35 @@ import { sessionState } from '~/stores/sessionStore';
 import { playBootReady, playBootStart, playBootStep } from '~/utils/sounds';
 import type { CadOpenedData, CadClosedData } from '~/types/nuiMessages';
 
+type LookupPerson = {
+  citizenid: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
+  ssn: string;
+  gender: 'MALE' | 'FEMALE' | 'OTHER';
+  createdAt: string;
+  lastUpdated: string;
+  isDead: boolean;
+  phone?: string;
+  address?: string;
+  bloodType?: string;
+  allergies?: string;
+  height?: string;
+  weight?: string;
+  eyeColor?: string;
+  hairColor?: string;
+  photo?: string;
+  photos?: string[];
+  flags?: string[];
+  ckDate?: string;
+};
+
+type LookupPersonsResponse = {
+  ok?: boolean;
+  persons?: LookupPerson[];
+};
+
 const wait = (ms: number): Promise<void> =>
   new Promise((resolve) => {
     setTimeout(resolve, ms);
@@ -172,6 +201,77 @@ export function initCadHandlers(): void {
     homeActions.reset();
     sessionActions.clearTerminalContext();
     terminalActions.setActiveModal(null);
+  });
+
+  onNuiMessage<{ citizenId?: string; name?: string }>('searchPerson', async (data) => {
+    const { terminalActions } = await import('~/stores/terminalStore');
+    const { cadActions } = await import('~/stores/cadStore');
+    const { fetchNui } = await import('~/utils/fetchNui');
+
+    const citizenId = typeof data?.citizenId === 'string' ? data.citizenId.trim() : '';
+    const name = typeof data?.name === 'string' ? data.name.trim() : '';
+    const query = citizenId || name;
+
+    if (query === '') {
+      terminalActions.addLine('ID search failed: missing query', 'error');
+      try {
+        await fetchNui('personSearchResult', { success: false, citizenId });
+      } catch (callbackError) {
+        console.error('[NUI] personSearchResult callback failed:', callbackError);
+      }
+      return;
+    }
+
+    let matchedCitizenId = citizenId;
+    let found = false;
+
+    try {
+      const response = await fetchNui<LookupPersonsResponse>('cad:lookup:searchPersons', {
+        query,
+        limit: 5,
+      });
+
+      const persons = Array.isArray(response?.persons) ? response.persons : [];
+      for (const person of persons) {
+        cadActions.addPerson(person);
+      }
+
+      const normalizedQuery = query.toLowerCase();
+      const match = persons.find((person) => {
+        const fullName = `${person.firstName} ${person.lastName}`.toLowerCase();
+        return person.citizenid.toLowerCase() === normalizedQuery || fullName.includes(normalizedQuery);
+      });
+
+      if (match) {
+        matchedCitizenId = match.citizenid;
+        found = true;
+      } else if (citizenId !== '') {
+        found = persons.some((person) => person.citizenid.toLowerCase() === citizenId.toLowerCase());
+      }
+
+      terminalActions.setActiveModal('PERSON_SEARCH', {
+        citizenId: matchedCitizenId || undefined,
+        query,
+      });
+
+      terminalActions.addLine(
+        found
+          ? `ID search loaded person ${matchedCitizenId}`
+          : `ID search opened Person Search with query: ${query}`,
+        found ? 'output' : 'system'
+      );
+    } catch (error) {
+      terminalActions.addLine(`ID search failed: ${String(error)}`, 'error');
+    }
+
+    try {
+      await fetchNui('personSearchResult', {
+        success: found,
+        citizenId: matchedCitizenId || citizenId,
+      });
+    } catch (callbackError) {
+      console.error('[NUI] personSearchResult callback failed:', callbackError);
+    }
   });
 }
 

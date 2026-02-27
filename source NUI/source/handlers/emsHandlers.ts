@@ -17,27 +17,38 @@ import type {
 export function initEmsHandlers(): void {
   // EMS alert created
   onNuiMessage<EmsAlertCreatedData>('ems:alertCreated', async (data) => {
+    const alertTitle = data.alert.title || data.alert.type || 'Medical Alert';
+    const alertDescription = data.alert.description || data.alert.message || '';
+    const alertCoordinates = data.alert.coords || data.alert.location;
+    const alertSeverity = String(data.alert.severity || '').toUpperCase();
+    const priority =
+      alertSeverity === 'HIGH'
+        ? 1
+        : alertSeverity === 'LOW'
+          ? 3
+          : Math.max(1, Math.min(3, Number(data.alert.priority || 2)));
+
     console.log('[NUI] EMS alert created:', data.alert.alertId);
     
     const { notificationActions } = await import('~/stores/notificationStore');
     const { cadActions } = await import('~/stores/cadStore');
     
-    // Also create a dispatch call for critical alerts
-    if (data.alert.priority >= 2) {
+    // Also create a dispatch call for medium/high alerts
+    if (priority <= 2) {
       const dispatchCall = {
         callId: `EMS_${data.alert.alertId}`,
         type: 'MEDICAL',
-        priority: data.alert.priority,
-        title: `EMS: ${data.alert.type}`,
-        description: data.alert.message,
-        location: data.alert.location ? 
-          `${data.alert.location.x.toFixed(1)}, ${data.alert.location.y.toFixed(1)}` : 
+        priority,
+        title: `EMS: ${alertTitle}`,
+        description: alertDescription,
+        location: alertCoordinates ? 
+          `${alertCoordinates.x.toFixed(1)}, ${alertCoordinates.y.toFixed(1)}` : 
           'Unknown',
-        coordinates: data.alert.location,
+        coordinates: alertCoordinates,
         status: 'PENDING' as const,
         assignedUnits: {},
         createdAt: data.alert.createdAt,
-        createdBy: data.alert.createdBy,
+        createdBy: data.alert.createdBy || 'EMS',
       };
       
       cadActions.addDispatchCall(dispatchCall);
@@ -45,8 +56,8 @@ export function initEmsHandlers(): void {
     
     notificationActions.notifyCriticalPatient(
       data.alert.alertId,
-      data.alert.type,
-      data.alert.message
+      alertTitle,
+      alertDescription
     );
   });
   
@@ -89,7 +100,7 @@ export function initEmsHandlers(): void {
 
     notificationActions.notifySystem(
       'Blood Request',
-      `${data.request.bloodType} x${data.request.units} needed at ${data.request.hospital}`,
+      `${data.request.personName} (${data.request.citizenId || 'UNKNOWN'}) - ${data.request.reason}`,
       'info'
     );
   });

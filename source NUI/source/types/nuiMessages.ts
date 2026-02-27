@@ -210,24 +210,52 @@ export interface EvidenceTransferredData {
 // ============================================================
 export interface EmsAlert {
   alertId: string;
-  type: string;
-  priority: number;
-  message: string;
+  title?: string;
+  description?: string;
+  severity?: 'LOW' | 'MEDIUM' | 'HIGH' | string;
+  coords?: { x: number; y: number; z: number };
+  status?: 'ACTIVE' | 'RESOLVED' | string;
+  type?: string;
+  priority?: number;
+  message?: string;
   location?: { x: number; y: number; z: number };
   createdAt: string;
-  createdBy: string;
+  createdBy?: string;
 }
 
 export interface EmsBloodRequest {
   requestId: string;
-  bloodType: string;
-  units: number;
-  hospital: string;
-  requestedBy: string;
+  caseId?: string;
+  citizenId?: string;
+  personName: string;
+  reason: string;
+  location?: string;
+  requestedBy?: string;
+  requestedByName?: string;
+  requestedByJob?: string;
   requestedAt: string;
-  status: 'PENDING' | 'FULFILLED' | 'CANCELLED';
-  fulfilledBy?: string;
-  fulfilledAt?: string;
+  handledBy?: string;
+  handledByName?: string;
+  handledAt?: string;
+  notes?: string;
+  analysisStartedAt?: string;
+  analysisStartedAtMs?: number;
+  analysisDurationMs?: number;
+  analysisEndsAt?: string;
+  analysisEndsAtMs?: number;
+  analysisCompletedAt?: string;
+  analysisCompletedAtMs?: number;
+  analysisRemainingMs?: number;
+  analysisReady?: boolean;
+  sampleStashId?: string;
+  sampleSlot?: number;
+  sampleItemName?: string;
+  sampleMetadata?: Record<string, unknown>;
+  evidenceId?: string;
+  status: 'PENDING' | 'ACKNOWLEDGED' | 'IN_PROGRESS' | 'COMPLETED' | 'DECLINED' | 'CANCELLED';
+  bloodType?: string;
+  units?: number;
+  hospital?: string;
 }
 
 export interface EmsCriticalPatientData {
@@ -437,13 +465,22 @@ export interface FinePaidData {
 // ============================================================
 export interface JailTransfer {
   transferId: string;
-  inmateId: string;
-  inmateName: string;
-  fromFacility: string;
-  toFacility: string;
+  citizenId: string;
+  personName: string;
+  caseId?: string;
+  jailMonths: number;
   reason: string;
-  transferredBy: string;
-  transferredAt: string;
+  facility: string;
+  notes?: string;
+  createdBy: string;
+  createdByName: string;
+  createdAt: string;
+  inmateId?: string;
+  inmateName?: string;
+  fromFacility?: string;
+  toFacility?: string;
+  transferredBy?: string;
+  transferredAt?: string;
 }
 
 export interface PoliceJailTransferLoggedData {

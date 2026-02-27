@@ -1,7 +1,6 @@
 
 import { createStore } from 'solid-js/store';
 import { batch } from 'solid-js';
-import { fetchNui } from '~/utils/fetchNui';
 
 export type RadioChannelType = 'FIXED' | 'TEMPORARY';
 export type RadioDepartment = 'POLICE' | 'EMS' | 'DISPATCH' | 'NEWS' | 'ADMIN';
@@ -439,10 +438,6 @@ export const radioActions = {
   
   emitRadioEvent(event: string, data: any) {
     window.dispatchEvent(new CustomEvent(`radio:${event}`, { detail: data }));
-    
-    if (typeof window !== 'undefined') {
-      fetchNui(`cad:radio:${event}`, data).catch(console.error);
-    }
   },
   
   disconnect() {

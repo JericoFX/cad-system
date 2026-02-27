@@ -19,7 +19,7 @@ export function initPoliceHandlers(): void {
     // For now, just notify
     notificationActions.notifySystem(
       'Jail Transfer',
-      `${data.transfer.inmateName} transferred to ${data.transfer.toFacility}`,
+      `${data.transfer.personName} transferred to ${data.transfer.facility}`,
       'info'
     );
     
@@ -27,7 +27,7 @@ export function initPoliceHandlers(): void {
     const { auditActions } = await import('~/stores/auditStore');
     auditActions.logCommand(
       'jail-transfer',
-      [data.transfer.inmateId, data.transfer.toFacility],
+      [data.transfer.citizenId, data.transfer.facility],
       'success',
       `Transfer logged: ${data.transfer.transferId}`
     );
