@@ -1,5 +1,6 @@
 
 import { createStore } from 'solid-js/store';
+import { batch } from 'solid-js';
 import { fetchNui } from '~/utils/fetchNui';
 
 export type RadioChannelType = 'FIXED' | 'TEMPORARY';
@@ -335,8 +336,53 @@ export const radioActions = {
       type,
     };
 
-    setRadioState('messages', messages => [...messages.slice(-100), message]);
+    batch(() => {
+      setRadioState('messages', messages => [...messages.slice(-100), message]);
+    });
     this.emitRadioEvent('message', message);
+  },
+
+  injectSystemMessageToChannels(
+    channelIds: string[],
+    content: string,
+    type: RadioMessage['type'] = 'TEXT',
+    senderName: string = 'DISPATCH',
+    senderBadge: string = 'DSP'
+  ) {
+    if (!channelIds || channelIds.length === 0) {
+      return;
+    }
+
+    const messages: RadioMessage[] = [];
+    const now = new Date().toISOString();
+
+    channelIds.forEach(channelId => {
+      if (!radioState.channels[channelId]) {
+        return;
+      }
+
+      messages.push({
+        messageId: `SYS_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        channelId,
+        senderId: 'SYSTEM',
+        senderName,
+        senderBadge,
+        content: content.substring(0, 500),
+        timestamp: now,
+        type,
+      });
+    });
+
+    if (messages.length === 0) {
+      return;
+    }
+
+    batch(() => {
+      messages.forEach(message => {
+        setRadioState('messages', msgs => [...msgs.slice(-100), message]);
+        this.emitRadioEvent('message', message);
+      });
+    });
   },
   
   setTalking(isTalking: boolean) {

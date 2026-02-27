@@ -1,4 +1,5 @@
 import { createStore } from 'solid-js/store';
+import { batch } from 'solid-js';
 import { fetchNui } from '~/utils/fetchNui';
 
 export interface PhotoFOV {
@@ -141,30 +142,34 @@ export const photoActions = {
     }
 
     const next = { ...existing, description };
-    upsertPhotoMap(next);
-    setPhotoState('stagingPhotos', photos =>
-      photos.map(photo => (photo.photoId === photoId ? { ...photo, description } : photo))
-    );
-    setPhotoState('inventoryPhotos', photos =>
-      photos.map(photo => (photo.photoId === photoId ? { ...photo, description } : photo))
-    );
-    setPhotoState('releasedPhotos', photos =>
-      photos.map(photo => (photo.photoId === photoId ? { ...photo, description } : photo))
-    );
+    batch(() => {
+      upsertPhotoMap(next);
+      setPhotoState('stagingPhotos', photos =>
+        photos.map(photo => (photo.photoId === photoId ? { ...photo, description } : photo))
+      );
+      setPhotoState('inventoryPhotos', photos =>
+        photos.map(photo => (photo.photoId === photoId ? { ...photo, description } : photo))
+      );
+      setPhotoState('releasedPhotos', photos =>
+        photos.map(photo => (photo.photoId === photoId ? { ...photo, description } : photo))
+      );
+    });
   },
 
   removePhoto(photoId: string) {
-    setPhotoState('photos', prev => {
-      const next = { ...prev };
-      delete next[photoId];
-      return next;
+    batch(() => {
+      setPhotoState('photos', prev => {
+        const next = { ...prev };
+        delete next[photoId];
+        return next;
+      });
+      setPhotoState('stagingPhotos', photos => removeFromList(photos, photoId));
+      setPhotoState('inventoryPhotos', photos => removeFromList(photos, photoId));
+      setPhotoState('releasedPhotos', photos => removeFromList(photos, photoId));
+      if (photoState.currentPhoto?.photoId === photoId) {
+        setPhotoState('currentPhoto', null);
+      }
     });
-    setPhotoState('stagingPhotos', photos => removeFromList(photos, photoId));
-    setPhotoState('inventoryPhotos', photos => removeFromList(photos, photoId));
-    setPhotoState('releasedPhotos', photos => removeFromList(photos, photoId));
-    if (photoState.currentPhoto?.photoId === photoId) {
-      setPhotoState('currentPhoto', null);
-    }
   },
 
   // Fetch staging photos (for police)
@@ -180,14 +185,17 @@ export const photoActions = {
       }>('cad:photos:getStagingPhotos', {});
       
       if (response?.ok && response.photos) {
-        setPhotoState('stagingPhotos', response.photos);
-        
-        // Update photos map
-        const photosMap: Record<string, PhotoMetadata> = {};
-        response.photos.forEach(photo => {
-          photosMap[photo.photoId] = photo;
+        const photos = response.photos;
+        batch(() => {
+          setPhotoState('stagingPhotos', photos);
+          
+          // Update photos map
+          const photosMap: Record<string, PhotoMetadata> = {};
+          photos.forEach(photo => {
+            photosMap[photo.photoId] = photo;
+          });
+          setPhotoState('photos', { ...photoState.photos, ...photosMap });
         });
-        setPhotoState('photos', { ...photoState.photos, ...photosMap });
       } else {
         photoActions.setError(response?.error || 'Failed to fetch staging photos');
       }
@@ -211,17 +219,20 @@ export const photoActions = {
       }>('cad:photos:getInventoryPhotos', {});
       
       if (response?.ok && response.photos) {
-        setPhotoState('inventoryPhotos', response.photos);
-        
-        // Filter news photos only
-        const newsPhotos = response.photos.filter(p => p.job === 'reporter');
-        
-        // Update photos map
-        const photosMap: Record<string, PhotoMetadata> = {};
-        newsPhotos.forEach(photo => {
-          photosMap[photo.photoId] = photo;
+        const photos = response.photos;
+        batch(() => {
+          setPhotoState('inventoryPhotos', photos);
+          
+          // Filter news photos only
+          const newsPhotos = photos.filter(p => p.job === 'reporter');
+          
+          // Update photos map
+          const photosMap: Record<string, PhotoMetadata> = {};
+          newsPhotos.forEach(photo => {
+            photosMap[photo.photoId] = photo;
+          });
+          setPhotoState('photos', { ...photoState.photos, ...photosMap });
         });
-        setPhotoState('photos', { ...photoState.photos, ...photosMap });
       } else {
         photoActions.setError(response?.error || 'Failed to fetch inventory photos');
       }
@@ -245,14 +256,17 @@ export const photoActions = {
       }>('cad:photos:getReleasedPhotos', {});
       
       if (response?.ok && response.photos) {
-        setPhotoState('releasedPhotos', response.photos);
-        
-        // Update photos map
-        const photosMap: Record<string, PhotoMetadata> = {};
-        response.photos.forEach(photo => {
-          photosMap[photo.photoId] = photo;
+        const photos = response.photos;
+        batch(() => {
+          setPhotoState('releasedPhotos', photos);
+          
+          // Update photos map
+          const photosMap: Record<string, PhotoMetadata> = {};
+          photos.forEach(photo => {
+            photosMap[photo.photoId] = photo;
+          });
+          setPhotoState('photos', { ...photoState.photos, ...photosMap });
         });
-        setPhotoState('photos', { ...photoState.photos, ...photosMap });
       } else {
         photoActions.setError(response?.error || 'Failed to fetch released photos');
       }

@@ -1,5 +1,6 @@
 
 import { createStore } from 'solid-js/store';
+import { batch } from 'solid-js';
 import { fetchNui } from '~/utils/fetchNui';
 import { cadActions } from './cadStore';
 
@@ -316,12 +317,14 @@ export const emsActions = {
       timestamp: new Date().toISOString(),
     };
 
-    setEmsState('patients', patientId, 'treatments', 
-      [...patient.treatments, newTreatment]
-    );
+    batch(() => {
+      setEmsState('patients', patientId, 'treatments', 
+        [...patient.treatments, newTreatment]
+      );
 
-    treatment.medications.forEach(med => {
-      this.useInventory(med, 1, patientId, treatment.action);
+      treatment.medications.forEach(med => {
+        this.useInventory(med, 1, patientId, treatment.action);
+      });
     });
   },
 
@@ -331,20 +334,22 @@ export const emsActions = {
 
     const now = new Date().toISOString();
     
-    setEmsState('patients', patientId, 'vitals', vitals);
-    setEmsState('patients', patientId, 'vitalsHistory', [
-      ...patient.vitalsHistory,
-      {
-        timestamp: now,
-        vitals,
-        takenBy: emsState.currentUser?.name || 'Unknown',
-      }
-    ]);
+    batch(() => {
+      setEmsState('patients', patientId, 'vitals', vitals);
+      setEmsState('patients', patientId, 'vitalsHistory', [
+        ...patient.vitalsHistory,
+        {
+          timestamp: now,
+          vitals,
+          takenBy: emsState.currentUser?.name || 'Unknown',
+        }
+      ]);
 
-    const newPriority = calculateTriagePriority(patient.condition, vitals, patient.chiefComplaint);
-    if (newPriority !== patient.triagePriority) {
-      setEmsState('patients', patientId, 'triagePriority', newPriority);
-    }
+      const newPriority = calculateTriagePriority(patient.condition, vitals, patient.chiefComplaint);
+      if (newPriority !== patient.triagePriority) {
+        setEmsState('patients', patientId, 'triagePriority', newPriority);
+      }
+    });
   },
 
   dischargePatient(patientId: string, disposition: Patient['dischargeDisposition'], notes?: string) {
@@ -422,25 +427,28 @@ Time: ${new Date().toLocaleString()}`;
     }
 
     const now = new Date().toISOString();
+    const newQuantity = item.quantity - quantity;
     
-    setEmsState('inventory', itemId, {
-      quantity: item.quantity - quantity,
-      usedToday: item.usedToday + quantity,
-      usageHistory: [
-        ...item.usageHistory,
-        {
-          timestamp: now,
-          patientId,
-          medicId: emsState.currentUser?.id || 'UNKNOWN',
-          quantity,
-          reason: reason || 'Used in treatment',
-        }
-      ]
-    });
+    batch(() => {
+      setEmsState('inventory', itemId, {
+        quantity: newQuantity,
+        usedToday: item.usedToday + quantity,
+        usageHistory: [
+          ...item.usageHistory,
+          {
+            timestamp: now,
+            patientId,
+            medicId: emsState.currentUser?.id || 'UNKNOWN',
+            quantity,
+            reason: reason || 'Used in treatment',
+          }
+        ]
+      });
 
-    if (item.quantity - quantity <= item.minStock) {
-      this.emitEMSEvent('low_stock', { itemId, currentStock: item.quantity - quantity });
-    }
+      if (newQuantity <= item.minStock) {
+        this.emitEMSEvent('low_stock', { itemId, currentStock: newQuantity });
+      }
+    });
 
     return { success: true };
   },
