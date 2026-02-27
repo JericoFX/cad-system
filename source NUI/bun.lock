@@ -7,7 +7,6 @@
       "dependencies": {
         "leaflet": "^1.9.4",
         "solid-js": "^1.9.11",
-        "tuicss": "latest",
       },
       "devDependencies": {
         "@types/leaflet": "^1.9.21",
@@ -405,8 +404,6 @@
     "tinyglobby": ["tinyglobby@0.2.15", "", { "dependencies": { "fdir": "^6.5.0", "picomatch": "^4.0.3" } }, "sha512-j2Zq4NyQYG5XMST4cbs02Ak8iJUdxRM0XI5QyxXuZOzKOINmWurp3smXu3y5wDcJrptwpSjgXHzIQxR0omXljQ=="],
 
     "ts-api-utils": ["ts-api-utils@2.4.0", "", { "peerDependencies": { "typescript": ">=4.8.4" } }, "sha512-3TaVTaAv2gTiMB35i3FiGJaRfwb3Pyn/j3m/bfAvGe8FB7CF6u+LMYqYlDh7reQf7UNvoTvdfAqHGmPGOSsPmA=="],
-
-    "tuicss": ["tuicss@2.1.2", "", {}, "sha512-bqsV0FPyargcF3s5wXAyFaZsQPf9a1jLeHqSURohQMXS06PkTfIuZwILE5bFoZouLhPjvhvNQanHaqMBU4/amA=="],
 
     "type-check": ["type-check@0.4.0", "", { "dependencies": { "prelude-ls": "^1.2.1" } }, "sha512-XleUoc9uwGXqjWwXaUTZAmzMcFZ5858QA2vvx1Ur5xIcixXIP+8LnFDgRplU30us6teqdlskFfu+ae4K79Ooew=="],
 

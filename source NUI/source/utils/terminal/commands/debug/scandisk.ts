@@ -1,5 +1,5 @@
-import { defineCommand } from '../registry';
-import type { TerminalCommand } from '../types';
+import { defineCommand } from '../../registry';
+import type { TerminalCommand } from '../../types';
 
 defineCommand({
   name: 'scandisk',
