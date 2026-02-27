@@ -1056,19 +1056,43 @@ lib.callback.register('cad:photos:attachToCase', function(source, payload)
     }
 end)
 
-lib.callback.register('cad:photos:getPhoto', function(source, payload)
-    local photoId = type(payload) == 'string' and payload or payload.photoId
-    local photo = CAD.Photos.State.Photos[photoId]
+lib.callback.register('cad:photos:getPhoto', CAD.Auth.WithGuard('default', function(source, payload, officer)
+    if not officer then
+        return { ok = false, error = 'officer_not_found' }
+    end
 
+    local photoIdRaw = type(payload) == 'string' and payload or (payload and payload.photoId)
+    local photoId = CAD.Server.SanitizeString(photoIdRaw, 64)
+    if photoId == '' then
+        return { ok = false, error = 'photo_id_required' }
+    end
+
+    local photo = CAD.Photos.State.Photos[photoId]
     if not photo then
         return { ok = false, error = 'photo_not_found' }
     end
 
-    return { ok = true, photo = photo }
-end)
+    local isOwner = photo.takenByCitizenId == officer.identifier
+    local isLaw = officer.job == 'police' or officer.job == 'sheriff'
+    local isMedia = officer.job == 'reporter' or officer.job == 'weazelnews'
+    local canView = officer.isAdmin == true or isOwner or photo.releasedToPress == true
 
-lib.callback.register('cad:photos:updateDescription', function(source, payload)
-    local officer = CAD.Auth.GetOfficer(source)
+    if not canView and isLaw and (photo.job == 'police' or photo.isEvidence == true or photo.attachedCaseId ~= nil) then
+        canView = true
+    end
+
+    if not canView and isMedia and photo.job == 'reporter' then
+        canView = true
+    end
+
+    if not canView then
+        return { ok = false, error = 'not_owner' }
+    end
+
+    return { ok = true, photo = CAD.DeepCopy(photo) }
+end))
+
+lib.callback.register('cad:photos:updateDescription', CAD.Auth.WithGuard('default', function(_, payload, officer)
     if not officer then
         return { ok = false, error = 'officer_not_found' }
     end
@@ -1091,10 +1115,9 @@ lib.callback.register('cad:photos:updateDescription', function(source, payload)
 
     photo.description = description
     return { ok = true, photoId = photoId }
-end)
+end))
 
-lib.callback.register('cad:photos:deletePhoto', function(source, payload)
-    local officer = CAD.Auth.GetOfficer(source)
+lib.callback.register('cad:photos:deletePhoto', CAD.Auth.WithGuard('heavy', function(source, payload, officer)
     if not officer then
         return { ok = false, error = 'officer_not_found' }
     end
@@ -1126,6 +1149,6 @@ lib.callback.register('cad:photos:deletePhoto', function(source, payload)
     end
 
     return { ok = true, photoId = photoId }
-end)
+end))
 
 CAD.Log('info', 'Photo system initialized')

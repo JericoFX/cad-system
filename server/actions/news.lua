@@ -292,7 +292,7 @@ local function upsertNewsArticle(source, payload)
     }
 end
 
-lib.callback.register('cad:news:getArticles', function(source)
+lib.callback.register('cad:news:getArticles', CAD.Auth.WithGuard('default', function(source)
     if not newsFeatureEnabled() then
         return {
             ok = true,
@@ -314,21 +314,21 @@ lib.callback.register('cad:news:getArticles', function(source)
         ok = true,
         articles = listArticles(),
     }
-end)
+end))
 
-lib.callback.register('cad:news:published', function(source, payload)
+lib.callback.register('cad:news:published', CAD.Auth.WithGuard('heavy', function(source, payload)
     return upsertNewsArticle(source, payload)
-end)
+end))
 
-lib.callback.register('cad:news:updated', function(source, payload)
+lib.callback.register('cad:news:updated', CAD.Auth.WithGuard('heavy', function(source, payload)
     return upsertNewsArticle(source, payload)
-end)
+end))
 
-lib.callback.register('cad:news:expired', function(source, payload)
+lib.callback.register('cad:news:expired', CAD.Auth.WithGuard('heavy', function(source, payload)
     return upsertNewsArticle(source, payload)
-end)
+end))
 
-lib.callback.register('cad:news:deleted', function(source, payload)
+lib.callback.register('cad:news:deleted', CAD.Auth.WithGuard('heavy', function(source, payload)
     if not newsFeatureEnabled() then
         return { ok = false, error = 'news_disabled' }
     end
@@ -367,4 +367,4 @@ lib.callback.register('cad:news:deleted', function(source, payload)
         ok = true,
         articleId = articleId,
     }
-end)
+end))
