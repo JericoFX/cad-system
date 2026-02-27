@@ -353,7 +353,7 @@ CAD.Config = {
             sheriff = true,
             csi = true,
         },
-        AllowAllIngestResources = true,
+        AllowAllIngestResources = false,
         AllowedIngestResources = {},
         BloodAnalysisDurationMs = 45000,
         BloodPostAnalysis = {

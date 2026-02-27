@@ -91,16 +91,23 @@ end
 
 local function shouldAcceptIngestFrom(resourceName)
     local cfg = getForensicsConfig()
+    local invoking = tostring(resourceName or '')
+    local currentResource = GetCurrentResourceName and GetCurrentResourceName() or ''
+
+    if invoking ~= '' and currentResource ~= '' and invoking == currentResource then
+        return true
+    end
+
     if cfg.AllowAllIngestResources == true then
         return true
     end
 
-    if not resourceName or resourceName == '' then
+    if invoking == '' then
         return false
     end
 
     local allowed = cfg.AllowedIngestResources or {}
-    return CAD.TableContains(allowed, resourceName)
+    return CAD.TableContains(allowed, invoking)
 end
 
 local function sanitizeTracePayload(payload)

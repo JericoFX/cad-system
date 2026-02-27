@@ -597,6 +597,12 @@ local function isSupervisor(officer)
     return officer.grade >= requiredRank
 end
 
+local function withPhotoGuard(bucket, handler)
+    return CAD.Auth.WithGuard(bucket, function(source, payload, officer)
+        return handler(source, type(payload) == 'table' and payload or {}, officer)
+    end)
+end
+
 lib.callback.register('cad:photos:getCaptureConfig', CAD.Auth.WithGuard('default', function()
     local uploadConfig, err = getCaptureUploadConfig()
     if not uploadConfig then
@@ -659,11 +665,7 @@ lib.callback.register('cad:photos:uploadCapture', CAD.Auth.WithGuard('default', 
     }
 end))
 
-lib.callback.register('cad:photos:capturePolicePhoto', function(source, payload)
-    local officer = CAD.Auth.GetOfficer(source)
-    if not officer then
-        return { ok = false, error = 'officer_not_found' }
-    end
+lib.callback.register('cad:photos:capturePolicePhoto', withPhotoGuard('default', function(source, payload, officer)
 
     if officer.job ~= 'police' and officer.job ~= 'sheriff' then
         return { ok = false, error = 'invalid_job' }
@@ -694,13 +696,9 @@ lib.callback.register('cad:photos:capturePolicePhoto', function(source, payload)
         stagingId = metadata.stagingId,
         metadata = metadata
     }
-end)
+end))
 
-lib.callback.register('cad:photos:captureNewsPhoto', function(source, payload)
-    local officer = CAD.Auth.GetOfficer(source)
-    if not officer then
-        return { ok = false, error = 'officer_not_found' }
-    end
+lib.callback.register('cad:photos:captureNewsPhoto', withPhotoGuard('default', function(source, payload, officer)
 
     if officer.job ~= 'reporter' and officer.job ~= 'weazelnews' then
         return { ok = false, error = 'invalid_job' }
@@ -728,13 +726,9 @@ lib.callback.register('cad:photos:captureNewsPhoto', function(source, payload)
         photoId = metadata.photoId,
         metadata = metadata
     }
-end)
+end))
 
-lib.callback.register('cad:photos:getInventoryPhotos', function(source)
-    local officer = CAD.Auth.GetOfficer(source)
-    if not officer then
-        return { ok = false, error = 'officer_not_found' }
-    end
+lib.callback.register('cad:photos:getInventoryPhotos', withPhotoGuard('default', function(_, _, officer)
 
     local photos = {}
     for photoId, photo in pairs(CAD.Photos.State.Photos) do
@@ -744,29 +738,21 @@ lib.callback.register('cad:photos:getInventoryPhotos', function(source)
     end
 
     return { ok = true, photos = photos }
-end)
+end))
 
-lib.callback.register('cad:photos:getStagingPhotos', function(source)
-    local officer = CAD.Auth.GetOfficer(source)
-    if not officer then
-        return { ok = false, error = 'officer_not_found' }
-    end
+lib.callback.register('cad:photos:getStagingPhotos', withPhotoGuard('default', function(source)
 
     local staging = CAD.Photos.State.Staging[source] or {}
     return { ok = true, photos = staging }
-end)
+end))
 
-lib.callback.register('cad:photos:releaseToPress', function(source, payload)
-    local officer = CAD.Auth.GetOfficer(source)
-    if not officer then
-        return { ok = false, error = 'officer_not_found' }
-    end
+lib.callback.register('cad:photos:releaseToPress', withPhotoGuard('heavy', function(_, payload, officer)
 
     if not isSupervisor(officer) then
         return { ok = false, error = 'insufficient_rank', required = 'Sargento+' }
     end
 
-    local photoId = payload.photoId
+    local photoId = CAD.Server.SanitizeString(payload.photoId, 64)
     local photo = CAD.Photos.State.Photos[photoId]
 
     if not photo then
@@ -800,13 +786,9 @@ lib.callback.register('cad:photos:releaseToPress', function(source, payload)
         photoId = photoId,
         releasedAt = photo.releasedAt
     }
-end)
+end))
 
-lib.callback.register('cad:photos:getReleasedPhotos', function(source)
-    local officer = CAD.Auth.GetOfficer(source)
-    if not officer then
-        return { ok = false, error = 'officer_not_found' }
-    end
+lib.callback.register('cad:photos:getReleasedPhotos', withPhotoGuard('default', function()
 
     local photos = {}
     local now = os.time()
@@ -827,19 +809,15 @@ lib.callback.register('cad:photos:getReleasedPhotos', function(source)
     end)
 
     return { ok = true, photos = photos }
-end)
+end))
 
-lib.callback.register('cad:photos:submitToPolice', function(source, payload)
-    local officer = CAD.Auth.GetOfficer(source)
-    if not officer then
-        return { ok = false, error = 'officer_not_found' }
-    end
+lib.callback.register('cad:photos:submitToPolice', withPhotoGuard('heavy', function(_, payload, officer)
 
     if officer.job ~= 'reporter' and officer.job ~= 'weazelnews' then
         return { ok = false, error = 'invalid_job' }
     end
 
-    local photoId = payload.photoId
+    local photoId = CAD.Server.SanitizeString(payload.photoId, 64)
     local photo = CAD.Photos.State.Photos[photoId]
 
     if not photo then
@@ -856,14 +834,22 @@ lib.callback.register('cad:photos:submitToPolice', function(source, payload)
         photoId = photoId,
         submittedBy = officer.identifier,
         submittedByName = officer.name,
-        caseId = payload.caseId or nil,
-        reason = payload.reason or 'Submitted as potential evidence',
+        caseId = CAD.Server.SanitizeString(payload.caseId, 64),
+        reason = CAD.Server.SanitizeString(payload.reason, 300),
         status = 'PENDING_REVIEW',
         submittedAt = CAD.Server.ToIso(),
         reviewedBy = nil,
         reviewedAt = nil,
         reviewNotes = nil
     }
+
+    if submission.caseId == '' then
+        submission.caseId = nil
+    end
+
+    if submission.reason == '' then
+        submission.reason = 'Submitted as potential evidence'
+    end
 
     CAD.Photos.State.ReviewQueue[submissionId] = submission
 
@@ -879,19 +865,15 @@ lib.callback.register('cad:photos:submitToPolice', function(source, payload)
         submissionId = submissionId,
         status = 'PENDING_REVIEW'
     }
-end)
+end))
 
-lib.callback.register('cad:photos:reviewSubmission', function(source, payload)
-    local officer = CAD.Auth.GetOfficer(source)
-    if not officer then
-        return { ok = false, error = 'officer_not_found' }
-    end
+lib.callback.register('cad:photos:reviewSubmission', withPhotoGuard('heavy', function(source, payload, officer)
 
     if officer.job ~= 'police' and officer.job ~= 'sheriff' then
         return { ok = false, error = 'invalid_job' }
     end
 
-    local submissionId = payload.submissionId
+    local submissionId = CAD.Server.SanitizeString(payload.submissionId, 64)
     local submission = CAD.Photos.State.ReviewQueue[submissionId]
 
     if not submission then
@@ -902,11 +884,15 @@ lib.callback.register('cad:photos:reviewSubmission', function(source, payload)
         return { ok = false, error = 'already_reviewed', status = submission.status }
     end
 
-    local action = payload.action
+    local action = CAD.Server.SanitizeString(payload.action, 16):upper()
+    if action ~= 'ACCEPT' and action ~= 'REJECT' then
+        return { ok = false, error = 'invalid_action' }
+    end
+
     submission.status = action == 'ACCEPT' and 'ACCEPTED' or 'REJECTED'
     submission.reviewedBy = officer.identifier
     submission.reviewedAt = CAD.Server.ToIso()
-    submission.reviewNotes = payload.notes or ''
+    submission.reviewNotes = CAD.Server.SanitizeString(payload.notes, 500)
 
     if action == 'ACCEPT' then
         local photo = CAD.Photos.State.Photos[submission.photoId]
@@ -940,13 +926,9 @@ lib.callback.register('cad:photos:reviewSubmission', function(source, payload)
         submissionId = submissionId,
         status = submission.status
     }
-end)
+end))
 
-lib.callback.register('cad:photos:getReviewQueue', function(source)
-    local officer = CAD.Auth.GetOfficer(source)
-    if not officer then
-        return { ok = false, error = 'officer_not_found' }
-    end
+lib.callback.register('cad:photos:getReviewQueue', withPhotoGuard('default', function(_, _, officer)
 
     if officer.job ~= 'police' and officer.job ~= 'sheriff' then
         return { ok = false, error = 'invalid_job' }
@@ -964,20 +946,16 @@ lib.callback.register('cad:photos:getReviewQueue', function(source)
     end)
 
     return { ok = true, queue = queue }
-end)
+end))
 
-lib.callback.register('cad:photos:attachToCase', function(source, payload)
-    local officer = CAD.Auth.GetOfficer(source)
-    if not officer then
-        return { ok = false, error = 'officer_not_found' }
-    end
+lib.callback.register('cad:photos:attachToCase', withPhotoGuard('heavy', function(source, payload, officer)
 
     if officer.job ~= 'police' and officer.job ~= 'sheriff' then
         return { ok = false, error = 'invalid_job' }
     end
 
-    local photoId = payload.photoId
-    local caseId = payload.caseId
+    local photoId = CAD.Server.SanitizeString(payload.photoId, 64)
+    local caseId = CAD.Server.SanitizeString(payload.caseId, 64)
 
     local caseObj = CAD.State.Cases and CAD.State.Cases[caseId] or nil
     if not caseObj then
@@ -1054,7 +1032,7 @@ lib.callback.register('cad:photos:attachToCase', function(source, payload)
         caseId = caseId,
         evidenceId = evidence.evidenceId,
     }
-end)
+end))
 
 lib.callback.register('cad:photos:getPhoto', CAD.Auth.WithGuard('default', function(source, payload, officer)
     if not officer then
