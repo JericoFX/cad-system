@@ -155,6 +155,7 @@ export const modalRegistry: Record<ModalId, ModalRegistryEntry> = {
   },
   MAP: {
     component: MapModal,
+    enabled: () => featureState.map.visible,
   },
   EVIDENCE: {
     component: EvidenceManager,
@@ -185,6 +186,7 @@ export const modalRegistry: Record<ModalId, ModalRegistryEntry> = {
   },
   EMS_DASHBOARD: {
     component: EMSDashboard,
+    enabled: () => featureState.ems.visible,
   },
   NEWS_MANAGER: {
     component: NewsManager,
@@ -192,6 +194,7 @@ export const modalRegistry: Record<ModalId, ModalRegistryEntry> = {
   },
   RADIO_PANEL: {
     component: RadioPanel,
+    enabled: () => featureState.radio.visible,
   },
   LICENSE_MANAGER: {
     component: LicenseManager,
@@ -213,6 +216,7 @@ export const modalRegistry: Record<ModalId, ModalRegistryEntry> = {
   },
   RADIO_MARKERS: {
     component: RadioMarkers,
+    enabled: () => featureState.radio.visible,
   },
   BOLO_MANAGER: {
     component: BoloManager,

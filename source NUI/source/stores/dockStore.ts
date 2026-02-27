@@ -163,7 +163,7 @@ const DEFAULT_DOCK_ITEMS: DockItem[] = [
     modal: 'NEWS_MANAGER',
     tooltip: 'News Desk',
     category: 'news',
-    roles: ['dispatch', 'admin', 'ems'],
+    roles: ['police', 'dispatch', 'admin', 'ems'],
   },
   {
     id: 'radio',

@@ -12,6 +12,8 @@ local mediaUploadUrl = tostring(GetConvar('CAD_MEDIA_UPLOAD_URL', ''))
 
 CAD.Config = {
 
+    Profile = tostring(GetConvar('CAD_PROFILE', 'simple')):lower(), -- simple | full | custom
+
     Debug = false,  -- Global debug toggle for developer-only helpers and test commands.
 
     Framework = {
@@ -20,6 +22,10 @@ CAD.Config = {
 
     Features = {
         Dispatch = {
+            Enabled = true,
+            ShowInUI = true,
+        },
+        EMS = {
             Enabled = true,
             ShowInUI = true,
         },
@@ -32,6 +38,14 @@ CAD.Config = {
             ShowInUI = true,
         },
         News = {
+            Enabled = true,
+            ShowInUI = true,
+        },
+        Map = {
+            Enabled = true,
+            ShowInUI = true,
+        },
+        Radio = {
             Enabled = true,
             ShowInUI = true,
         },
@@ -128,6 +142,8 @@ CAD.Config = {
             ambulance = true,
             ems = true,
             dispatch = true,
+            reporter = true,
+            weazelnews = true,
             admin = true,
         },
         AdminJobs = {
@@ -293,6 +309,7 @@ CAD.Config = {
 
         MaxStagingPerOfficer = 60,
 
+        StorageMode = 'state',
         UseVirtualContainer = true,
         VirtualContainerSlotCount = 200,
 
@@ -317,6 +334,10 @@ CAD.Config = {
             AT_HOSPITAL = true,
             BUSY = true,
         },
+    },
+
+    News = {
+        PublishWithoutConfirm = false,
     },
 
     -- Physical lab locations and job access.
@@ -590,6 +611,71 @@ CAD.Config = {
         },
     },
 }
+
+local function applyFeatureFlags(overrides)
+    if type(overrides) ~= 'table' then
+        return
+    end
+
+    CAD.Config.Features = CAD.Config.Features or {}
+    for featureName, override in pairs(overrides) do
+        if type(override) == 'table' then
+            local current = CAD.Config.Features[featureName] or {}
+            if override.Enabled ~= nil then
+                current.Enabled = override.Enabled == true
+            end
+            if override.ShowInUI ~= nil then
+                current.ShowInUI = override.ShowInUI == true
+            end
+            CAD.Config.Features[featureName] = current
+        end
+    end
+end
+
+local function applySimpleProfile()
+    applyFeatureFlags({
+        Dispatch = { Enabled = false, ShowInUI = false },
+        SecurityCameras = { Enabled = false, ShowInUI = false },
+        Forensics = { Enabled = false, ShowInUI = false },
+        EMS = { Enabled = true, ShowInUI = true },
+        News = { Enabled = true, ShowInUI = true },
+        Map = { Enabled = true, ShowInUI = true },
+        Radio = { Enabled = false, ShowInUI = false },
+    })
+
+    CAD.Config.Dispatch.Enabled = false
+    CAD.Config.SecurityCameras.Enabled = false
+    CAD.Config.ForensicLabs.Enabled = false
+
+    CAD.Config.Evidence.StorageMode = 'state'
+    CAD.Config.Evidence.UseVirtualContainer = true
+
+    CAD.Config.News = CAD.Config.News or {}
+    CAD.Config.News.PublishWithoutConfirm = true
+end
+
+local function applyProfile()
+    local profile = tostring(CAD.Config.Profile or 'simple'):lower()
+
+    if profile == 'simple' then
+        applySimpleProfile()
+        return
+    end
+
+    if profile == 'full' then
+        return
+    end
+
+    if profile == 'custom' then
+        CAD.Config.Evidence.StorageMode = CAD.Config.Evidence.StorageMode or 'state'
+        return
+    end
+
+    CAD.Config.Profile = 'simple'
+    applySimpleProfile()
+end
+
+applyProfile()
 
 CAD.State = CAD.State or {
     Cases = {},

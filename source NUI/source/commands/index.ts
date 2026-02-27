@@ -50,7 +50,9 @@ export function registerAllCommands() {
   if (featureState.news.enabled && featureState.news.visible) {
     registerNewsCommands();
   }
-  registerRadioCommands();
+  if (featureState.radio.enabled && featureState.radio.visible) {
+    registerRadioCommands();
+  }
   registerLicenseCommands();
   registerPropertyCommands();
   registerFleetCommands();
