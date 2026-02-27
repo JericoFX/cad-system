@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, createSelector, For, onCleanup, onMount, Show } from 'solid-js';
 import { terminalActions } from '~/stores/terminalStore';
 import {
   cadActions,
@@ -44,6 +44,7 @@ import { DispatchUnitActionRow } from './DispatchUnitActionRow';
 
 export function DispatchTable() {
   const [selectedCallId, setSelectedCallId] = createSignal<string | null>(null);
+  const isCallSelected = createSelector(selectedCallId);
   const [dispatchSettings, setDispatchSettings] = createSignal<DispatchSettings>(DEFAULT_DISPATCH_SETTINGS);
   const [nowMs, setNowMs] = createSignal(Date.now());
   const [searchQuery, setSearchQuery] = createSignal('');
@@ -75,7 +76,13 @@ export function DispatchTable() {
     setWatchingCameraId(null);
   });
 
-  const allCalls = createMemo(() => sortDispatchCalls(Object.values(cadState.dispatchCalls)));
+  const allCalls = createMemo(() =>
+    sortDispatchCalls(
+      Object.values(cadState.dispatchCalls).filter(
+        (c) => c.status === 'ACTIVE' || c.status === 'PENDING'
+      )
+    )
+  );
 
   const allUnits = createMemo(() => Object.values(cadState.dispatchUnits));
 
@@ -111,11 +118,20 @@ export function DispatchTable() {
     getRecommendedUnit(selectedCall(), dispatchSettings(), allUnits())
   );
 
+  const caseByLinkedCallId = createMemo(() => {
+    const map: Record<string, true> = {};
+    const cases = Object.values(cadState.cases);
+    for (let i = 0; i < cases.length; i += 1) {
+      const linkedCallId = cases[i].linkedCallId;
+      if (linkedCallId) map[linkedCallId] = true;
+    }
+    return map;
+  });
+
   const formatAge = (iso: string) => formatCallAge(iso, nowMs());
 
   const getCaseActionLabel = (callId: string) => {
-    const linkedCase = Object.values(cadState.cases).find((caseItem) => caseItem.linkedCallId === callId);
-    return linkedCase ? 'OPEN CASE' : 'CREATE CASE';
+    return caseByLinkedCallId()[callId] ? 'OPEN CASE' : 'CREATE CASE';
   };
 
   const notifyCallToChannels = (call: DispatchCall, unitIds: string[], prefix = 'Assignment') => {
@@ -613,7 +629,7 @@ export function DispatchTable() {
                 {(call) => (
                   <DispatchCallCard
                     call={call}
-                    selected={selectedCall()?.callId === call.callId}
+                    selected={isCallSelected(call.callId)}
                     onSelect={setSelectedCallId}
                     getSlaLevel={getCallSlaLevelFor}
                     getSlaLabel={getCallSlaLabelFor}

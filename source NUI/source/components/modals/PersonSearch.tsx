@@ -1,45 +1,41 @@
-import { createSignal, createMemo, For, Show, onMount } from 'solid-js';
+import { createSignal, createMemo, createSelector, For, Show, onMount } from 'solid-js';
 import { terminalActions, terminalState } from '~/stores/terminalStore';
 import { cadState, cadActions, type Person } from '~/stores/cadStore';
 import { fetchNui } from '~/utils/fetchNui';
 import { Button, Input, Modal, Tabs, Textarea } from '~/components/ui';
+import { PhotoGallery } from '~/components/ui/PhotoGallery';
 
 export function PersonSearch() {
   const [searchQuery, setSearchQuery] = createSignal('');
+  const [searchResults, setSearchResults] = createSignal<Person[]>([]);
   const [selectedPerson, setSelectedPerson] = createSignal<Person | null>(null);
   const [activeTab, setActiveTab] = createSignal<'info' | 'vehicles' | 'records' | 'warrants' | 'notes'>('info');
   const [newPersonNote, setNewPersonNote] = createSignal('');
   const [showBloodRequestModal, setShowBloodRequestModal] = createSignal(false);
   const [bloodRequestReason, setBloodRequestReason] = createSignal('Forensic blood sample request');
+  const isSelectedPerson = createSelector(() => selectedPerson()?.citizenid || null);
 
-  const searchResults = createMemo(() => {
-    const query = searchQuery().toLowerCase();
-    if (!query) return [];
-    
-    return Object.values(cadState.persons).filter(p => 
-      p.firstName.toLowerCase().includes(query) ||
-      p.lastName.toLowerCase().includes(query) ||
-      p.citizenid.toLowerCase().includes(query) ||
-      p.ssn.includes(query)
-    );
-  });
+  const personsArray = createMemo(() => Object.values(cadState.persons));
+  const vehiclesArray = createMemo(() => Object.values(cadState.vehicles));
+  const criminalRecordsArray = createMemo(() => Object.values(cadState.criminalRecords));
+  const warrantsArray = createMemo(() => Object.values(cadState.warrants));
 
   const personVehicles = createMemo(() => {
     const person = selectedPerson();
     if (!person) return [];
-    return Object.values(cadState.vehicles).filter(v => v.ownerId === person.citizenid);
+    return vehiclesArray().filter(v => v.ownerId === person.citizenid);
   });
 
   const personRecords = createMemo(() => {
     const person = selectedPerson();
     if (!person) return [];
-    return Object.values(cadState.criminalRecords).filter(r => r.citizenid === person.citizenid);
+    return criminalRecordsArray().filter(r => r.citizenid === person.citizenid);
   });
 
   const personWarrants = createMemo(() => {
     const person = selectedPerson();
     if (!person) return [];
-    return Object.values(cadState.warrants).filter(w => w.citizenid === person.citizenid && w.active);
+    return warrantsArray().filter(w => w.citizenid === person.citizenid && w.active);
   });
 
   const personNotes = createMemo(() => {
@@ -62,7 +58,20 @@ export function PersonSearch() {
   };
 
   const handleSearch = () => {
-    if (!searchQuery().trim()) return;
+    const query = searchQuery().trim().toLowerCase();
+    if (!query) {
+      setSearchResults([]);
+      return;
+    }
+    
+    const results = personsArray().filter(p =>
+      p.firstName.toLowerCase().includes(query) ||
+      p.lastName.toLowerCase().includes(query) ||
+      p.citizenid.toLowerCase().includes(query) ||
+      p.ssn.includes(query)
+    );
+    
+    setSearchResults(results);
   };
 
   onMount(() => {
@@ -80,7 +89,7 @@ export function PersonSearch() {
     const lowerQuery = query.toLowerCase();
     setSearchQuery(query);
 
-    const person = Object.values(cadState.persons).find((p) => {
+    const person = personsArray().find((p) => {
       return (
         p.citizenid.toLowerCase() === lowerQuery ||
         p.firstName.toLowerCase().includes(lowerQuery) ||
@@ -279,7 +288,7 @@ export function PersonSearch() {
             <For each={searchResults()}>
               {(person) => (
                 <div 
-                  class={`result-item ${selectedPerson()?.citizenid === person.citizenid ? 'selected' : ''}`}
+                  class={`result-item ${isSelectedPerson(person.citizenid) ? 'selected' : ''}`}
                   onClick={() => setSelectedPerson(person)}
                 >
                   <div class="result-name">
@@ -359,6 +368,18 @@ export function PersonSearch() {
                 <Button.Root class="btn" onClick={openBloodRequestModal}>
                   [REQUEST BLOOD SAMPLE]
                 </Button.Root>
+                <Button.Root 
+                  class="btn"
+                  onClick={() => {
+                    terminalActions.setActiveModal('UPLOAD', { 
+                      personId: selectedPerson()!.citizenid,
+                      personName: `${selectedPerson()!.firstName} ${selectedPerson()!.lastName}`,
+                      type: 'photo'
+                    });
+                  }}
+                >
+                  [UPLOAD PHOTO]
+                </Button.Root>
               </div>
 
               <Tabs.Root
@@ -424,6 +445,13 @@ export function PersonSearch() {
                       </div>
                     </Show>
                   </div>
+                  
+                  <Show when={selectedPerson()!.photos && selectedPerson()!.photos!.length > 0}>
+                    <div class="photo-section" style={{ 'margin-top': '20px', padding: '10px 0', 'border-top': '1px solid var(--terminal-border)' }}>
+                      <h4 style={{ color: 'var(--terminal-system-bright)', 'margin-bottom': '10px' }}>Photos</h4>
+                      <PhotoGallery photos={selectedPerson()!.photos!} />
+                    </div>
+                  </Show>
                 </Show>
 
                 <Show when={activeTab() === 'vehicles'}>

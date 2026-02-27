@@ -9,6 +9,7 @@ import { Button, Modal, Select, Textarea } from '~/components/ui';
 export function NotesEditor() {
   const modalData = terminalState.modalData as { caseId?: string } | null;
   const [currentCase, setCurrentCase] = createSignal<Case | null>(null);
+  const casesArray = createMemo(() => Object.values(cadState.cases));
 
   onMount(() => {
     if (modalData?.caseId) {
@@ -108,16 +109,18 @@ export function NotesEditor() {
             value={currentCase()?.caseId || ''}
             onChange={(e) => {
               const caseId = e.currentTarget.value;
-              const c = Object.values(cadState.cases).find(c => c.caseId === caseId);
+              const c = casesArray().find(c => c.caseId === caseId);
               setCurrentCase(c || null);
               setSelectedNote(null);
               setIsEditing(false);
             }}
           >
             <option value="">SELECT CASE...</option>
-            {Object.values(cadState.cases).map(c => (
-              <option value={c.caseId}>{c.caseId} - {c.title}</option>
-            ))}
+            <For each={casesArray()}>
+              {(c) => (
+                <option value={c.caseId}>{c.caseId} - {c.title}</option>
+              )}
+            </For>
           </Select.Root>
 
           <Show when={currentCase()}>

@@ -1,5 +1,5 @@
 
-import { createSignal, createMemo, createEffect, For, Show } from 'solid-js';
+import { createSignal, createMemo, createEffect, createSelector, For, Show } from 'solid-js';
 import { terminalActions, terminalState } from '~/stores/terminalStore';
 import { cadState, cadActions, type Case, type Note, type Evidence } from '~/stores/cadStore';
 import { userActions } from '~/stores/userStore';
@@ -24,6 +24,8 @@ const isCaseApiError = (value: unknown): value is CaseApiError => {
 export function CaseManager() {
   const [activeTab, setActiveTab] = createSignal<'list' | 'detail' | 'notes' | 'evidence' | 'tasks'>('list');
   const [selectedCase, setSelectedCase] = createSignal<Case | null>(null);
+  const [selectedCaseId, setSelectedCaseId] = createSignal<string | null>(null);
+  const isCaseSelected = createSelector(selectedCaseId);
   const [searchQuery, setSearchQuery] = createSignal('');
   const [statusFilter, setStatusFilter] = createSignal<string>('all');
   const [typeFilter, setTypeFilter] = createSignal<string>('all');
@@ -107,6 +109,7 @@ export function CaseManager() {
 
   const selectCase = async (caseItem: Case) => {
     setSelectedCase(caseItem);
+    setSelectedCaseId(caseItem.caseId);
     cadActions.setCurrentCase(caseItem);
     setActiveTab('detail');
 
@@ -480,7 +483,7 @@ export function CaseManager() {
               <For each={filteredCases()}>
                 {caseItem => (
                    <div 
-                     class={`case-card ${caseItem.status === 'CLOSED' ? 'closed' : ''}`}
+                     class={`case-card ${caseItem.status === 'CLOSED' ? 'closed' : ''} ${isCaseSelected(caseItem.caseId) ? 'selected' : ''}`}
                      onClick={() => void selectCase(caseItem)}
                      onDblClick={() => { void selectCase(caseItem); setActiveTab('evidence'); }}
                    >
