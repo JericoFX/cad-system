@@ -59,6 +59,9 @@ Required:
 
 - ox_lib
 - oxmysql
+
+Recommended (feature-dependent):
+
 - ox_inventory
 
 Optional:
@@ -105,6 +108,55 @@ Framework = {
 }
 
 Yes, qb-core.
+
+---
+
+## Profiles (`CAD_PROFILE`)
+
+You can switch behavior by profile from `server.cfg`:
+
+set CAD_PROFILE simple
+
+Available values:
+
+- `simple`
+- `full`
+- `custom`
+
+What each one means:
+
+- `simple`: Cases + Evidence + Map + EMS + News. Dispatch/Radio/Forensics/CCTV off.
+- `full`: all modules enabled.
+- `custom`: manual control from `CAD.Config.Features`.
+
+Simple profile also enforces:
+
+- `CAD.Config.Evidence.StorageMode = 'state'`
+- `CAD.Config.Evidence.UseVirtualContainer = true`
+- `CAD.Config.News.PublishWithoutConfirm = true`
+
+---
+
+## Feature Matrix by Profile
+
+`ON` = enabled, `OFF` = disabled.
+
+| Feature | simple | full | custom |
+|---|---|---|---|
+| Cases | ON | ON | configurable |
+| Evidence | ON | ON | configurable |
+| Map | ON | ON | configurable |
+| EMS | ON | ON | configurable |
+| News | ON | ON | configurable |
+| Dispatch | OFF | ON | configurable |
+| Radio | OFF | ON | configurable |
+| Forensics | OFF | ON | configurable |
+| Security Cameras | OFF | ON | configurable |
+
+Notes:
+
+- In `simple`, evidence core flow is internal (`state` + virtual container), so it is not hard-coupled to external inventory.
+- Some item-based integrations (camera items, ID cards, etc.) can still use `ox_inventory` depending on your setup.
 
 ---
 
