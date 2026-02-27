@@ -12,8 +12,7 @@
   },
   "dependencies": {
     "leaflet": "^1.9.4",
-    "solid-js": "^1.9.11",
-    "tuicss": "latest"
+    "solid-js": "^1.9.11"
   },
   "devDependencies": {
     "@types/leaflet": "^1.9.21",

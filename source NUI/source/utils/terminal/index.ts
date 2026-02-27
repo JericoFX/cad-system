@@ -4,10 +4,9 @@ import './commands/view-vehicles';
 import './commands/view-reports';
 import './commands/view-citizen-reports';
 import './commands/add-report';
-import './commands/demo-choice';
-import './commands/boot-system';
-import './commands/scandisk';
-import './commands/load-database';
+import './commands/debug/demo-choice';
+import './commands/debug/boot-system';
+import './commands/debug/scandisk';
 
 export { commandRegistry, defineCommand, parseCommand } from './registry';
 export { createFiveMBridge, createMockUser } from './fivem-bridge';
