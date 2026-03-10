@@ -11,15 +11,15 @@ export function registerSearchCommands() {
     category: 'SEARCH',
     handler: async ({ terminal }) => {
       terminal.print('\n=== SEARCH COMMANDS ===', 'system');
-      terminal.print('Available search commands:', 'info');
-      terminal.print('  search-person [name|id]  - Search for persons', 'info');
-      terminal.print('  search-vehicle [plate]   - Search for vehicles', 'info');
-      terminal.print('  person gui               - Open person search GUI', 'info');
+        terminal.print('Available search commands:', 'info');
+        terminal.print('  search-person [name|id]  - Search for persons', 'info');
+        terminal.print('  search-vehicle [plate]   - Search for vehicles', 'info');
+        terminal.print('  person gui               - Open person search GUI', 'info');
       terminal.print('', 'info');
-      terminal.print('Examples:', 'info');
-      terminal.print('  search-person "John Doe"', 'info');
-      terminal.print('  search-person CID001', 'info');
-      terminal.print('  search-vehicle ABC123', 'info');
+        terminal.print('Examples:', 'info');
+        terminal.print('  search-person "John Doe"', 'info');
+        terminal.print('  search-person CID001', 'info');
+        terminal.print('  search-vehicle ABC123', 'info');
     }
   });
   

@@ -57,6 +57,16 @@ export function BoloManager() {
     }
   });
 
+  const boloSummary = createMemo(() => {
+    const active = Object.values(cadState.bolos).filter((entry) => entry.active);
+    return {
+      total: active.length,
+      persons: active.filter((entry) => entry.type === 'PERSON').length,
+      vehicles: active.filter((entry) => entry.type === 'VEHICLE').length,
+      high: active.filter((entry) => entry.priority === 'HIGH').length,
+    };
+  });
+
   const closeModal = () => {
     terminalActions.setActiveModal(null);
   };
@@ -117,12 +127,20 @@ export function BoloManager() {
 
         <div class="bolo-stats">
           <div class="stat-item">
-            <span class="stat-number">{bolos().length}</span>
+            <span class="stat-number">{boloSummary().total}</span>
             <span class="stat-label">ACTIVE</span>
           </div>
           <div class="stat-item high">
-            <span class="stat-number">{bolos().filter(b => b.priority === 'HIGH').length}</span>
+            <span class="stat-number">{boloSummary().high}</span>
             <span class="stat-label">HIGH PRIORITY</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-number">{boloSummary().persons}</span>
+            <span class="stat-label">PERSONS</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-number">{boloSummary().vehicles}</span>
+            <span class="stat-label">VEHICLES</span>
           </div>
         </div>
 
@@ -145,6 +163,10 @@ export function BoloManager() {
             {showCreateForm() ? '[CANCEL]' : '[+ CREATE BOLO]'}
           </Button.Root>
         </div>
+
+        <Show when={!showCreateForm() && bolos().length > 0}>
+          <div class="case-modal-hint">Select a BOLO to open record actions, arrest flow, or remove the alert.</div>
+        </Show>
 
         <Show when={showCreateForm()}>
           <div class="bolo-create-form">
@@ -221,7 +243,7 @@ export function BoloManager() {
 
         <div class="bolos-list">
           <Show when={bolos().length === 0}>
-            <div class="empty-state">No active BOLOs</div>
+            <div class="empty-state">No active BOLO alerts for this filter</div>
           </Show>
 
           <For each={bolos()}>
@@ -244,6 +266,13 @@ export function BoloManager() {
                 <div class="bolo-main">
                   <div class="bolo-identifier">{bolo.identifier}</div>
                   <div class="bolo-reason">{bolo.reason}</div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', 'flex-wrap': 'wrap', 'margin-top': '8px' }}>
+                  <span class="status-badge open">{bolo.type}</span>
+                  <Show when={bolo.priority === 'HIGH'}>
+                    <span class="status-badge" style={{ color: '#ff5555', border: '1px solid #ff5555' }}>IMMEDIATE ACTION</span>
+                  </Show>
                 </div>
 
                 <div class="bolo-meta">

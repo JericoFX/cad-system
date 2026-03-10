@@ -51,6 +51,18 @@ export function PersonSnapshot() {
 
   const flags = createMemo(() => person()?.flags || []);
 
+  const statusBadges = createMemo(() => {
+    const p = person();
+    if (!p) return [] as Array<{ label: string; tone: string }>;
+
+    const badges: Array<{ label: string; tone: string }> = [];
+    if (p.isDead) badges.push({ label: 'DECEASED', tone: '#ff7b72' });
+    if (warrants().length > 0) badges.push({ label: `${warrants().length} WARRANT${warrants().length > 1 ? 'S' : ''}`, tone: '#ffb86c' });
+    if (bolo()) badges.push({ label: 'BOLO', tone: '#ff5555' });
+    if (vehicles().some((vehicle) => vehicle.stolen)) badges.push({ label: 'STOLEN VEHICLE LINK', tone: '#ffd166' });
+    return badges;
+  });
+
   const closeModal = () => {
     terminalActions.setActiveModal(null);
   };
@@ -70,6 +82,17 @@ export function PersonSnapshot() {
     terminalActions.setActiveModal('ARREST_WIZARD', {
       citizenId: p.citizenid,
       personName: `${p.firstName} ${p.lastName}`
+    });
+  };
+
+  const openPhoneIntel = () => {
+    const p = person();
+    if (!p) return;
+
+    terminalActions.setActiveModal('PERSON_SEARCH', {
+      citizenId: p.citizenid,
+      tab: 'phone',
+      phoneNumber: p.phone || undefined,
     });
   };
 
@@ -101,8 +124,8 @@ export function PersonSnapshot() {
                 <h2>=== PERSON NOT FOUND ===</h2>
                 <button class="modal-close" onClick={closeModal}>[X]</button>
               </div>
-              <div style={{ padding: '40px', 'text-align': 'center' }}>
-                Citizen ID not found in database
+              <div class="empty-state" style={{ padding: '40px', 'text-align': 'center' }}>
+                Citizen ID not found in cached MDT records
               </div>
             </div>
           }
@@ -122,6 +145,23 @@ export function PersonSnapshot() {
                   <span class="meta-item">ID: {person()!.citizenid}</span>
                   <span class="meta-item">DOB: {formatDate(person()!.dateOfBirth)}</span>
                   <span class="meta-item">Gender: {person()!.gender}</span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', 'flex-wrap': 'wrap', 'margin-top': '8px' }}>
+                  <For each={statusBadges()}>
+                    {(badge) => (
+                      <span
+                        style={{
+                          padding: '2px 8px',
+                          border: `1px solid ${badge.tone}`,
+                          color: badge.tone,
+                          'font-size': '11px',
+                          'letter-spacing': '0.06em',
+                        }}
+                      >
+                        {badge.label}
+                      </span>
+                    )}
+                  </For>
                 </div>
                 
                 <Show when={warrants().length > 0 || bolo() || person()!.isDead}>
@@ -149,6 +189,25 @@ export function PersonSnapshot() {
                     </For>
                   </div>
                 </Show>
+
+                <div class="summary-stats" style={{ 'margin-top': '12px' }}>
+                  <div class="stat-box warrant">
+                    <div class="stat-number">{warrants().length}</div>
+                    <div class="stat-label">Warrants</div>
+                  </div>
+                  <div class="stat-box record">
+                    <div class="stat-number">{criminalRecords().length}</div>
+                    <div class="stat-label">Records</div>
+                  </div>
+                  <div class="stat-box vehicle">
+                    <div class="stat-number">{vehicles().length}</div>
+                    <div class="stat-label">Vehicles</div>
+                  </div>
+                  <div class="stat-box case">
+                    <div class="stat-number">{activeCases().length}</div>
+                    <div class="stat-label">Open Cases</div>
+                  </div>
+                </div>
               </div>
             </div>
             
@@ -158,6 +217,9 @@ export function PersonSnapshot() {
               </Button.Root>
               <Button.Root class="btn" onClick={createArrest}>
                 [ARREST]
+              </Button.Root>
+              <Button.Root class="btn" onClick={openPhoneIntel}>
+                [PHONE INTEL]
               </Button.Root>
               <Show when={cadState.currentCase}>
                 <Button.Root 
@@ -200,28 +262,15 @@ export function PersonSnapshot() {
                   <div class="info-row"><strong>Weight:</strong> {person()!.weight || 'N/A'}</div>
                   <div class="info-row"><strong>Eye Color:</strong> {person()!.eyeColor || 'N/A'}</div>
                   <div class="info-row"><strong>Hair Color:</strong> {person()!.hairColor || 'N/A'}</div>
+                  <div class="info-row"><strong>Phone Intel:</strong> Lookup by number/IMEI available</div>
                 </div>
 
                 <div class="info-section">
                   <h4>Summary</h4>
-                  <div class="summary-stats">
-                    <div class="stat-box warrant">
-                      <div class="stat-number">{warrants().length}</div>
-                      <div class="stat-label">Warrants</div>
-                    </div>
-                    <div class="stat-box record">
-                      <div class="stat-number">{criminalRecords().length}</div>
-                      <div class="stat-label">Records</div>
-                    </div>
-                    <div class="stat-box vehicle">
-                      <div class="stat-number">{vehicles().length}</div>
-                      <div class="stat-label">Vehicles</div>
-                    </div>
-                    <div class="stat-box case">
-                      <div class="stat-number">{activeCases().length}</div>
-                      <div class="stat-label">Active Cases</div>
-                    </div>
-                  </div>
+                  <div class="info-row"><strong>BOLO:</strong> {bolo() ? bolo()!.reason : 'No active BOLO'}</div>
+                  <div class="info-row"><strong>Status:</strong> {person()!.isDead ? 'DECEASED' : 'ACTIVE RECORD'}</div>
+                  <div class="info-row"><strong>Last Updated:</strong> {formatDate(person()!.lastUpdated)}</div>
+                  <div class="info-row"><strong>Phone Intel:</strong> Open phone tab for number/IMEI cross-check</div>
                 </div>
 
                 <div class="info-section">
@@ -236,7 +285,7 @@ export function PersonSnapshot() {
               <div class="records-list">
                 <h4>Criminal History</h4>
                 <Show when={criminalRecords().length === 0}>
-                  <div class="empty-state">No criminal records found</div>
+                  <div class="empty-state">No active criminal records on file</div>
                 </Show>
                 <For each={criminalRecords()}>
                   {(record) => (
@@ -253,7 +302,7 @@ export function PersonSnapshot() {
 
                 <h4 style={{ 'margin-top': '24px' }}>Active Warrants</h4>
                 <Show when={warrants().length === 0}>
-                  <div class="empty-state">No active warrants</div>
+                  <div class="empty-state">No active warrants on file</div>
                 </Show>
                 <For each={warrants()}>
                   {(warrant) => (
@@ -272,7 +321,7 @@ export function PersonSnapshot() {
             <Show when={activeTab() === 'vehicles'}>
               <div class="vehicles-list">
                 <Show when={vehicles().length === 0}>
-                  <div class="empty-state">No registered vehicles</div>
+                  <div class="empty-state">No registered vehicles linked to this citizen</div>
                 </Show>
                 <For each={vehicles()}>
                   {(vehicle) => (
@@ -301,7 +350,7 @@ export function PersonSnapshot() {
             <Show when={activeTab() === 'cases'}>
               <div class="cases-list">
                 <Show when={activeCases().length === 0}>
-                  <div class="empty-state">No active cases</div>
+                  <div class="empty-state">No open cases linked to this person</div>
                 </Show>
                 <For each={activeCases()}>
                   {(caseItem) => (

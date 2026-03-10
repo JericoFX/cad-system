@@ -31,6 +31,7 @@ client_scripts {
     'client/actions/ticket.lua',
     'client/actions/evidence.lua',
     'client/actions/photos.lua',
+    'client/actions/id_search.lua',
 
     'client/actions/forensics/index.lua',
     'client/actions/forensics/blood.lua',
@@ -70,6 +71,7 @@ server_scripts {
     'server/actions/forensics/decay.lua',
     'server/actions/id_reader.lua',
     'server/actions/vehicle_tablet.lua',
+    'server/actions/phone_lookup.lua',
     'server/infra/exports.lua',
     'server/infra/main.lua'
 }
