@@ -53,7 +53,7 @@ export function EMSDashboard() {
   const hasActiveBloodAnalysis = createMemo(() =>
     bloodRequests().some((request) => request.status === 'IN_PROGRESS')
   );
-  
+
   const [patientForm, setPatientForm] = createSignal({
     name: '',
     condition: 'STABLE' as PatientCondition,
@@ -253,7 +253,6 @@ export function EMSDashboard() {
   };
 
   const loadBloodRequests = async () => {
-    // Trae la cola desde backend y la manda a la pantalla.
     setBloodLoading(true);
 
     try {
@@ -517,6 +516,13 @@ export function EMSDashboard() {
     return counts;
   });
 
+  const dashboardSummary = createMemo(() => ({
+    admitted: patientsArray().filter((patient) => patient.status === 'ADMITTED').length,
+    treatment: inTreatmentPatients().length,
+    lowStock: inventoryList().filter((item) => item.quantity <= item.minStock).length,
+    pendingBlood: bloodRequests().filter((request) => request.status === 'PENDING' || request.status === 'ACKNOWLEDGED' || request.status === 'IN_PROGRESS').length,
+  }));
+
   return (
     <Modal.Root onClose={closeModal} useContentWrapper={false}>
       <div class="modal-content ems-dashboard" onClick={(e: any) => e.stopPropagation()}>
@@ -541,6 +547,25 @@ export function EMSDashboard() {
           <div class="stat-item total">
             <span class="stat-number">{activePatients().length}</span>
             <span class="stat-label">TOTAL</span>
+          </div>
+        </div>
+
+        <div class="summary-stats" style={{ 'margin': '0 10px 12px' }}>
+          <div class="stat-box case">
+            <div class="stat-number">{dashboardSummary().admitted}</div>
+            <div class="stat-label">Admitted</div>
+          </div>
+          <div class="stat-box vehicle">
+            <div class="stat-number">{dashboardSummary().treatment}</div>
+            <div class="stat-label">In Treatment</div>
+          </div>
+          <div class="stat-box warrant">
+            <div class="stat-number">{dashboardSummary().lowStock}</div>
+            <div class="stat-label">Low Stock</div>
+          </div>
+          <div class="stat-box record">
+            <div class="stat-number">{dashboardSummary().pendingBlood}</div>
+            <div class="stat-label">Blood Queue</div>
           </div>
         </div>
 
@@ -579,6 +604,7 @@ export function EMSDashboard() {
                 [CALL POLICE]
               </Button.Root>
             </div>
+            <div class="case-modal-hint">Search active patients, open treatment detail, or request police assistance from intake.</div>
             <Show when={patientSearchQuery()}>
               <div class="search-stats">
                 {filteredPatients().length} result(s) found
@@ -594,7 +620,7 @@ export function EMSDashboard() {
             </div>
             <Show when={filteredPatients().length === 0}>
               <div class="empty-state">
-                {patientSearchQuery() ? 'No patients match your search' : 'No active patients'}
+                {patientSearchQuery() ? 'No active patients match that search' : 'No active EMS patients in the queue'}
               </div>
             </Show>
             
@@ -619,7 +645,7 @@ export function EMSDashboard() {
               [PATIENTS CURRENTLY IN TREATMENT]
             </div>
             <Show when={inTreatmentPatients().length === 0}>
-              <div class="empty-state">No patients in treatment</div>
+              <div class="empty-state">No patients are currently in treatment</div>
             </Show>
             
             <For each={inTreatmentPatients()}>
@@ -779,6 +805,9 @@ export function EMSDashboard() {
             <div class="section-header">
               [MEDICAL SUPPLIES INVENTORY]
             </div>
+            <Show when={inventoryList().length === 0}>
+              <div class="empty-state">No EMS inventory items are loaded</div>
+            </Show>
             
             <div class="inventory-list">
               <For each={inventoryList()}>
@@ -814,13 +843,16 @@ export function EMSDashboard() {
 
           <Show when={activeTab() === 'blood'}>
             <div class="section-header">[POLICE BLOOD SAMPLE REQUESTS]</div>
+            <div class="case-modal-hint" style={{ 'margin-bottom': '10px' }}>
+              Acknowledge requests, start analysis, then release completed samples back to police.
+            </div>
 
             <Show when={bloodLoading()}>
               <div class="empty-state">Loading blood requests...</div>
             </Show>
 
             <Show when={!bloodLoading() && bloodRequests().length === 0}>
-              <div class="empty-state">No blood sample requests pending</div>
+              <div class="empty-state">No police blood sample requests are waiting</div>
             </Show>
 
             <div class="inventory-list">
@@ -1001,7 +1033,15 @@ export function EMSDashboard() {
           <div class="patient-detail-overlay" onClick={() => setSelectedPatient(null)}>
             <div class="patient-detail-panel" onClick={(e: any) => e.stopPropagation()}>
               <div class="patient-detail-header">
-                <h3>{selectedPatient()!.name}</h3>
+                <div>
+                  <h3 style={{ margin: 0 }}>{selectedPatient()!.name}</h3>
+                  <div style={{ display: 'flex', gap: '8px', 'flex-wrap': 'wrap', 'margin-top': '8px' }}>
+                    <span class="status-badge open">{selectedPatient()!.status}</span>
+                    <Show when={selectedPatient()!.caseId}>
+                      <span class="status-badge">CASE LINKED</span>
+                    </Show>
+                  </div>
+                </div>
                 <span 
                   class="condition-badge"
                   style={{ color: getConditionColor(selectedPatient()!.condition) }}
@@ -1011,6 +1051,25 @@ export function EMSDashboard() {
               </div>
               
               <div class="patient-detail-content">
+                <div class="summary-stats" style={{ 'margin-bottom': '12px' }}>
+                  <div class="stat-box case">
+                    <div class="stat-number">P{selectedPatient()!.triagePriority}</div>
+                    <div class="stat-label">Triage</div>
+                  </div>
+                  <div class="stat-box vehicle">
+                    <div class="stat-number">{selectedPatient()!.treatments.length}</div>
+                    <div class="stat-label">Treatments</div>
+                  </div>
+                  <div class="stat-box record">
+                    <div class="stat-number">{selectedPatient()!.allergies.length}</div>
+                    <div class="stat-label">Allergies</div>
+                  </div>
+                  <div class="stat-box warrant">
+                    <div class="stat-number">{selectedPatient()!.currentMedications.length}</div>
+                    <div class="stat-label">Meds</div>
+                  </div>
+                </div>
+
                 <div class="detail-section">
                   <h4>[VITALS]</h4>
                   <div class="vitals-grid">
@@ -1049,6 +1108,9 @@ export function EMSDashboard() {
                       </For>
                     </div>
                   </Show>
+                  <Show when={selectedPatient()!.symptoms.length === 0}>
+                    <p class="text-muted">No symptoms recorded during intake</p>
+                  </Show>
                 </div>
 
                 <div class="detail-section">
@@ -1062,7 +1124,7 @@ export function EMSDashboard() {
                 <div class="detail-section">
                   <h4>[TREATMENT LOG]</h4>
                   <Show when={selectedPatient()!.treatments.length === 0}>
-                    <p class="text-muted">No treatments recorded</p>
+                    <p class="text-muted">No treatments have been logged yet</p>
                   </Show>
                   <For each={selectedPatient()!.treatments}>
                     {(treatment) => (
