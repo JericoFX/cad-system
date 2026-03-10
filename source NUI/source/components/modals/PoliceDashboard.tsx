@@ -268,7 +268,7 @@ export function PoliceDashboard() {
   const handleCreateArrest = () => {
     const form = arrestForm();
     if (!form.citizenId || !form.personName || !form.charges) {
-      terminalActions.addLine('Error: Please fill all required fields', 'error');
+      terminalActions.addLine('Please fill all required fields', 'error');
       return;
     }
 
@@ -298,7 +298,7 @@ export function PoliceDashboard() {
   const handleCreateWarrant = () => {
     const form = warrantForm();
     if (!form.citizenId || !form.personName || !form.reason) {
-      terminalActions.addLine('Error: Please fill all required fields', 'error');
+      terminalActions.addLine('Please fill all required fields', 'error');
       return;
     }
 
@@ -328,13 +328,13 @@ export function PoliceDashboard() {
   const handleImpoundVehicle = () => {
     const form = impoundForm();
     if (!form.plate || !form.reason) {
-      terminalActions.addLine('Error: Please fill all required fields', 'error');
+      terminalActions.addLine('Please fill all required fields', 'error');
       return;
     }
 
     const vehicle = cadState.vehicles[form.plate.toUpperCase()];
     if (!vehicle) {
-      terminalActions.addLine(`Error: Vehicle ${form.plate} not found`, 'error');
+      terminalActions.addLine(`Vehicle ${form.plate} was not found`, 'error');
       return;
     }
 
@@ -375,12 +375,12 @@ export function PoliceDashboard() {
   const handleAddEvidence = () => {
     const form = evidenceForm();
     if (!form.caseId || !form.url) {
-      terminalActions.addLine('Error: Case ID and URL are required', 'error');
+      terminalActions.addLine('Case ID and URL are required', 'error');
       return;
     }
 
     if (!form.url.startsWith('http://') && !form.url.startsWith('https://')) {
-      terminalActions.addLine('Error: URL must start with http:// or https://', 'error');
+      terminalActions.addLine('URL must start with http:// or https://', 'error');
       return;
     }
 
@@ -406,13 +406,13 @@ export function PoliceDashboard() {
   const handleLogJailTransfer = async () => {
     const form = jailForm();
     if (!form.citizenId || !form.personName || !form.jailMonths || !form.reason) {
-      terminalActions.addLine('Error: fill citizen, name, jail months and reason', 'error');
+      terminalActions.addLine('Fill citizen, name, jail months, and reason', 'error');
       return;
     }
 
     const jailMonths = parseInt(form.jailMonths, 10);
     if (!Number.isFinite(jailMonths) || jailMonths <= 0) {
-      terminalActions.addLine('Error: jail months must be greater than 0', 'error');
+      terminalActions.addLine('Jail months must be greater than 0', 'error');
       return;
     }
 
@@ -503,7 +503,7 @@ export function PoliceDashboard() {
               [ACTIVE WARRANTS]
             </div>
             <Show when={activeWarrants().length === 0}>
-              <div class="empty-state">No active warrants</div>
+              <div class="empty-state">No active warrants on file</div>
             </Show>
             <For each={activeWarrants()}>
               {(warrant) => (
@@ -641,7 +641,7 @@ export function PoliceDashboard() {
             </Show>
 
             <Show when={evidenceForm().caseId && caseEvidence().length === 0}>
-              <div class="empty-state">No evidence found for this case</div>
+              <div class="empty-state">No evidence is linked to this case yet</div>
             </Show>
           </Show>
 
@@ -711,7 +711,7 @@ export function PoliceDashboard() {
             </div>
 
             <Show when={jailTransfers().length === 0}>
-              <div class="empty-state">No jail transfers logged yet</div>
+              <div class="empty-state">No jail transfers have been logged yet</div>
             </Show>
             <For each={jailTransfers()}>
               {(transfer) => (
