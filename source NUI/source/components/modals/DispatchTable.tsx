@@ -99,6 +99,13 @@ export function DispatchTable() {
 
   const metrics = createMemo(() => calculateDispatchMetrics(allCalls(), allUnits()));
 
+  const unitBoardSummary = createMemo(() => ({
+    total: allUnits().length,
+    available: allUnits().filter((unit) => unit.status === 'AVAILABLE').length,
+    busy: allUnits().filter((unit) => unit.status === 'BUSY').length,
+    enroute: allUnits().filter((unit) => unit.status === 'ENROUTE').length,
+  }));
+
   const visibleCalls = createMemo(() =>
     filterDispatchCalls(allCalls(), searchQuery(), statusFilter(), priorityFilter())
   );
@@ -108,6 +115,19 @@ export function DispatchTable() {
   const availableUnits = createMemo(() => filterAvailableDispatchUnits(allUnits(), unitTypeFilter()));
 
   const selectedCallAssignedUnits = createMemo(() => mapAssignedUnits(selectedCall(), cadState.dispatchUnits));
+
+  const selectedCallSummary = createMemo(() => {
+    const call = selectedCall();
+    if (!call) {
+      return null;
+    }
+
+    return {
+      assigned: Object.keys(call.assignedUnits).length,
+      availableMatches: availableUnits().length,
+      hasLinkedCase: caseByLinkedCallId()[call.callId] === true,
+    };
+  });
 
   const getCallSlaLevelFor = (call: DispatchCall) =>
     getCallSlaLevel(call, dispatchSettings(), nowMs());
@@ -621,9 +641,16 @@ export function DispatchTable() {
           </select>
         </div>
 
+        <div class="case-modal-hint" style={{ 'margin-bottom': '12px' }}>
+          Queue on the left, incident workspace in the center, unit board on the right.
+        </div>
+
         <div class="dispatch-v2-layout">
           <section class="dispatch-v2-column dispatch-v2-queue">
             <div class="dispatch-v2-section-title">CALL QUEUE ({visibleCalls().length})</div>
+            <Show when={visibleCalls().length > 0}>
+              <div class="case-modal-hint">Click a call to load unit assignment, case actions, and CCTV.</div>
+            </Show>
             <div class="dispatch-v2-call-list">
               <For each={visibleCalls()}>
                 {(call) => (
@@ -639,7 +666,7 @@ export function DispatchTable() {
                 )}
               </For>
               <Show when={visibleCalls().length === 0}>
-                <div class="empty-state">No calls match current filters</div>
+                <div class="empty-state">No dispatch calls match the current filters</div>
               </Show>
             </div>
           </section>
@@ -649,7 +676,7 @@ export function DispatchTable() {
               when={selectedCall()}
               fallback={
                 <>
-                  <div class="empty-state">Select a call to manage</div>
+                  <div class="empty-state">Select a dispatch call to open the incident workspace</div>
                   <div class="dispatch-v2-section-title">CCTV GRID ({cameraGrid().length})</div>
                   <DispatchCCTVGrid
                     cameras={cameraGrid()}
@@ -692,6 +719,20 @@ export function DispatchTable() {
                       <div class="dispatch-v2-incident-row">
                         <span>Location: {call.location || 'Unknown location'}</span>
                       </div>
+                      <div class="summary-stats" style={{ 'margin-top': '12px' }}>
+                        <div class="stat-box case">
+                          <div class="stat-number">{selectedCallSummary()?.assigned || 0}</div>
+                          <div class="stat-label">Assigned</div>
+                        </div>
+                        <div class="stat-box vehicle">
+                          <div class="stat-number">{selectedCallSummary()?.availableMatches || 0}</div>
+                          <div class="stat-label">Available Units</div>
+                        </div>
+                        <div class="stat-box record">
+                          <div class="stat-number">{selectedCallSummary()?.hasLinkedCase ? 'YES' : 'NO'}</div>
+                          <div class="stat-label">Linked Case</div>
+                        </div>
+                      </div>
                       <Show when={call.description?.trim()}>
                         <div class="dispatch-v2-call-description">{call.description}</div>
                       </Show>
@@ -729,7 +770,7 @@ export function DispatchTable() {
                         )}
                       </For>
                       <Show when={selectedCallAssignedUnits().length === 0}>
-                        <div class="empty-state">No units currently assigned</div>
+                        <div class="empty-state">No units currently assigned to this call</div>
                       </Show>
                     </div>
 
@@ -766,7 +807,7 @@ export function DispatchTable() {
                         )}
                       </For>
                       <Show when={availableUnits().length === 0}>
-                        <div class="empty-state">No available units with current type filter</div>
+                        <div class="empty-state">No available units match the current type filter</div>
                       </Show>
                     </div>
 
@@ -790,6 +831,20 @@ export function DispatchTable() {
 
           <section class="dispatch-v2-column dispatch-v2-units">
             <div class="dispatch-v2-section-title">UNIT BOARD ({allUnits().length})</div>
+            <div class="summary-stats" style={{ 'margin-bottom': '12px' }}>
+              <div class="stat-box vehicle">
+                <div class="stat-number">{unitBoardSummary().available}</div>
+                <div class="stat-label">Available</div>
+              </div>
+              <div class="stat-box warrant">
+                <div class="stat-number">{unitBoardSummary().busy}</div>
+                <div class="stat-label">Busy</div>
+              </div>
+              <div class="stat-box case">
+                <div class="stat-number">{unitBoardSummary().enroute}</div>
+                <div class="stat-label">Enroute</div>
+              </div>
+            </div>
             <div class="dispatch-v2-unit-board">
               <For each={allUnits()}>
                 {(unit) => (
@@ -814,12 +869,18 @@ export function DispatchTable() {
                   </div>
                 )}
               </For>
+              <Show when={allUnits().length === 0}>
+                <div class="empty-state">No dispatch units are connected right now</div>
+              </Show>
             </div>
           </section>
         </div>
 
         <div class="dispatch-v2-composer">
           <div class="dispatch-v2-section-title">CREATE INCIDENT</div>
+          <div class="case-modal-hint" style={{ 'margin-bottom': '10px' }}>
+            Use quick create for new 911 or officer-initiated incidents without leaving dispatch.
+          </div>
           <div class="dispatch-v2-composer-grid">
             <input
               class="input"

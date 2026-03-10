@@ -62,6 +62,17 @@ export function EvidenceManager() {
   const casesArray = createMemo(() => Object.values(cadState.cases));
   const stagingEvidenceArray = createMemo(() => cadState.stagingEvidence);
 
+  const evidenceSummary = createMemo(() => {
+    const totalCaseEvidence = casesArray().reduce((count, caseItem) => count + (caseItem.evidence?.length || 0), 0);
+    return {
+      staging: stagingEvidenceArray().length,
+      cases: casesArray().length,
+      totalCaseEvidence,
+      locker: lockerSlots().length,
+      photos: photoState.stagingPhotos.length,
+    };
+  });
+
   const selectedStagingPhoto = createMemo(() =>
     photoState.stagingPhotos.find((photo) => photo.photoId === selectedStagingPhotoId()) || null
   );
@@ -585,6 +596,29 @@ export function EvidenceManager() {
           </div>
         </div>
 
+        <div class="summary-stats" style={{ 'margin-bottom': '12px' }}>
+          <div class="stat-box vehicle">
+            <div class="stat-number">{evidenceSummary().staging}</div>
+            <div class="stat-label">Staging</div>
+          </div>
+          <div class="stat-box case">
+            <div class="stat-number">{evidenceSummary().totalCaseEvidence}</div>
+            <div class="stat-label">Case Evidence</div>
+          </div>
+          <div class="stat-box record">
+            <div class="stat-number">{evidenceSummary().locker}</div>
+            <div class="stat-label">Locker Slots</div>
+          </div>
+          <div class="stat-box warrant">
+            <div class="stat-number">{evidenceSummary().photos}</div>
+            <div class="stat-label">Photo Staging</div>
+          </div>
+        </div>
+
+        <div class="case-modal-hint" style={{ 'margin-bottom': '12px' }}>
+          Browse evidence on the left, review locker and photo staging in the center, then inspect selected evidence on the right.
+        </div>
+
         <div class="evidence-content">
           <div class="file-explorer-container">
             <FileExplorer
@@ -598,6 +632,9 @@ export function EvidenceManager() {
               onFileOpen={handleFileOpen}
               onNavigate={handleNavigate}
             />
+            <Show when={filteredFiles().length === 0}>
+              <div class="empty-state" style={{ margin: '12px 0 0' }}>No evidence items exist in this folder yet</div>
+            </Show>
           </div>
 
           <div class="evidence-preview" style={{ border: '2px solid #ffaa00', padding: '14px', 'max-width': '260px' }}>
@@ -605,11 +642,12 @@ export function EvidenceManager() {
             <div class="preview-content" style={{ 'font-size': '12px' }}>
               <div><strong>Terminal:</strong> {lockerTerminalId() || 'N/A'}</div>
               <div><strong>Slots:</strong> {lockerSlots().length}</div>
+              <div><strong>Status:</strong> {lockerTerminalId() ? 'ONLINE' : 'UNAVAILABLE'}</div>
             </div>
             <div style={{ 'margin-top': '10px', 'max-height': '280px', 'overflow-y': 'auto' }}>
               <Show
                 when={lockerSlots().length > 0}
-                fallback={<div style={{ color: '#808080' }}>Locker empty or unavailable</div>}
+                fallback={<div style={{ color: '#808080' }}>Locker empty or unavailable at this terminal</div>}
               >
                 <For each={lockerSlots()}>
                   {(slot) => (
@@ -638,11 +676,12 @@ export function EvidenceManager() {
             <h3>[PHOTO STAGING]</h3>
             <div class="preview-content" style={{ 'font-size': '12px' }}>
               <div><strong>Items:</strong> {photoState.stagingPhotos.length}</div>
+              <div><strong>Attach Target:</strong> {currentCase()?.caseId || 'Select a case'}</div>
             </div>
             <div style={{ 'margin-top': '10px', 'max-height': '280px', 'overflow-y': 'auto' }}>
               <Show
                 when={photoState.stagingPhotos.length > 0}
-                fallback={<div style={{ color: '#808080' }}>No staged photos</div>}
+                fallback={<div style={{ color: '#808080' }}>No staged photos ready for case attachment</div>}
               >
                 <For each={photoState.stagingPhotos}>
                   {(photo) => (
@@ -865,6 +904,12 @@ export function EvidenceManager() {
                   </Button.Root>
                 </Show>
               </div>
+            </div>
+          </Show>
+          <Show when={!selectedEvidence()}>
+            <div class="evidence-preview" style={{ border: '2px solid #00ff00', padding: '20px' }}>
+              <h3>[EVIDENCE DETAILS]</h3>
+              <div class="empty-state">Select an evidence item to inspect metadata, custody, and actions</div>
             </div>
           </Show>
         </div>
