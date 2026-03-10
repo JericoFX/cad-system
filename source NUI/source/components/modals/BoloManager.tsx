@@ -73,7 +73,7 @@ export function BoloManager() {
 
   const createBOLO = () => {
     if (!identifier().trim() || !reason().trim()) {
-      terminalActions.addLine('Error: Identifier and reason are required', 'error');
+      terminalActions.addLine('Identifier and reason are required', 'error');
       return;
     }
 
@@ -308,7 +308,7 @@ export function BoloManager() {
                           const person = Object.values(cadState.persons).find(p => p.citizenid === bolo.identifier);
                           terminalActions.setActiveModal('ARREST_WIZARD', { 
                             citizenId: bolo.identifier,
-                            personName: person ? `${person.firstName} ${person.lastName}` : 'Unknown',
+                            personName: person ? `${person.firstName} ${person.lastName}` : 'Unidentified subject',
                             boloId: bolo.boloId
                           });
                         }}

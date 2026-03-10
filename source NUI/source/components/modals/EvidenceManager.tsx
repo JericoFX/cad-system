@@ -722,7 +722,7 @@ export function EvidenceManager() {
             <Show when={selectedStagingPhoto()}>
               <div style={{ 'margin-top': '10px', 'border-top': '1px solid #444', padding: '8px 0 0' }}>
                 <div style={{ 'font-size': '11px', color: '#c0c0c0', 'margin-bottom': '6px' }}>
-                  {selectedStagingPhoto()!.description || 'No description'}
+                  {selectedStagingPhoto()!.description || 'No description provided'}
                 </div>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   <Button.Root class="btn" onClick={() => viewStagingPhoto(selectedStagingPhoto()!)}>[VIEW]</Button.Root>
@@ -792,8 +792,8 @@ export function EvidenceManager() {
                 
                 <Show when={('attachedBy' in selectedEvidence()!)}>
                   <div><strong>Attached By:</strong> {(selectedEvidence() as Evidence).attachedBy}</div>
-                  <div><strong>Current Location:</strong> {(selectedEvidence() as Evidence).currentLocation || 'Unknown'}</div>
-                  <div><strong>Custodian:</strong> {(selectedEvidence() as Evidence).currentCustodian || 'Unknown'}</div>
+                  <div><strong>Current Location:</strong> {(selectedEvidence() as Evidence).currentLocation || 'Not recorded'}</div>
+                  <div><strong>Custodian:</strong> {(selectedEvidence() as Evidence).currentCustodian || 'Not assigned'}</div>
                 </Show>
               </div>
 

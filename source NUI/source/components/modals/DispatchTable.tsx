@@ -586,7 +586,7 @@ export function DispatchTable() {
                 const camera = cameraAccessor();
                 return (
                   <div class="dispatch-cctv-crt-meta">
-                    CAM #{formatCameraNumber(camera.cameraNumber)} | {camera.street || 'Unknown street'}
+                     CAM #{formatCameraNumber(camera.cameraNumber)} | {camera.street || 'Street unavailable'}
                   </div>
                 );
               }}
@@ -717,7 +717,7 @@ export function DispatchTable() {
                         </span>
                       </div>
                       <div class="dispatch-v2-incident-row">
-                        <span>Location: {call.location || 'Unknown location'}</span>
+                        <span>Location: {call.location || 'Location unavailable'}</span>
                       </div>
                       <div class="summary-stats" style={{ 'margin-top': '12px' }}>
                         <div class="stat-box case">

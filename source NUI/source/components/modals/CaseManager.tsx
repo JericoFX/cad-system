@@ -736,7 +736,7 @@ export function CaseManager() {
                       <span class="evidence-type">[{ev.evidenceType}]</span>
                       <span class="evidence-id">{ev.evidenceId}</span>
                     </div>
-                    <div class="evidence-desc">{evidenceData.description || 'No description'}</div>
+                    <div class="evidence-desc">{evidenceData.description || 'No description provided'}</div>
                     <Show when={evidenceData.url && isViewable}>
                       <Button.Root 
                         class="btn-small"

@@ -275,7 +275,7 @@ export function PersonSnapshot() {
 
                 <div class="info-section">
                   <h4>Medical Info</h4>
-                  <div class="info-row"><strong>Blood Type:</strong> {person()!.bloodType || 'Unknown'}</div>
+                  <div class="info-row"><strong>Blood Type:</strong> {person()!.bloodType || 'Not recorded'}</div>
                   <div class="info-row"><strong>Allergies:</strong> {person()!.allergies || 'None recorded'}</div>
                 </div>
               </div>
@@ -374,7 +374,7 @@ export function PersonSnapshot() {
                 <div class="medical-section">
                   <h4>Emergency Medical Information</h4>
                   <div class="info-row warning">
-                    <strong>Blood Type:</strong> {person()!.bloodType || 'Unknown - CHECK ID CARD'}
+                    <strong>Blood Type:</strong> {person()!.bloodType || 'Not recorded - check ID card'}
                   </div>
                   <div class="info-row">
                     <strong>Allergies:</strong> {person()!.allergies || 'None recorded'}

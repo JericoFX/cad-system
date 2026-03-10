@@ -377,7 +377,7 @@ export function EMSDashboard() {
   const handleAdmitPatient = () => {
     const form = patientForm();
     if (!form.name) {
-      terminalActions.addLine('Error: Patient name is required', 'error');
+      terminalActions.addLine('Patient name is required', 'error');
       return;
     }
 
@@ -391,7 +391,7 @@ export function EMSDashboard() {
     const patient = emsActions.triagePatient({
       name: form.name,
       condition: form.condition,
-      chiefComplaint: form.chiefComplaint || 'Unknown',
+      chiefComplaint: form.chiefComplaint || 'Not recorded',
       symptoms: form.symptoms ? form.symptoms.split(',').map((s: string) => s.trim()) : [],
       vitals,
       allergies: form.allergies ? form.allergies.split(',').map((a: string) => a.trim()) : [],
@@ -434,7 +434,7 @@ export function EMSDashboard() {
   const useInventoryItem = (itemId: string) => {
     const result = emsActions.useInventory(itemId, 1, selectedPatient()?.patientId, 'Used in treatment');
     if (!result.success) {
-      terminalActions.addLine(`Error: ${result.error}`, 'error');
+      terminalActions.addLine(String(result.error), 'error');
       return;
     }
     
@@ -848,7 +848,7 @@ export function EMSDashboard() {
             </div>
 
             <Show when={bloodLoading()}>
-              <div class="empty-state">Loading blood requests...</div>
+              <div class="empty-state">Loading police blood requests...</div>
             </Show>
 
             <Show when={!bloodLoading() && bloodRequests().length === 0}>
@@ -866,10 +866,10 @@ export function EMSDashboard() {
                       </span>
                     </div>
                     <div class="inventory-category">
-                      Request: {request.requestId} {request.caseId ? `| Case: ${request.caseId}` : '| Case: AUTO/UNKNOWN'}
+                      Request: {request.requestId} {request.caseId ? `| Case: ${request.caseId}` : '| Case: Unlinked'}
                     </div>
                     <div class="inventory-category">
-                      By: {request.requestedByName || request.requestedBy || 'Unknown'} | {formatDateTime(request.requestedAt)}
+                      By: {request.requestedByName || request.requestedBy || 'UNSPECIFIED'} | {formatDateTime(request.requestedAt)}
                     </div>
                     <Show when={request.reason}>
                       <div class="inventory-category">Reason: {request.reason}</div>

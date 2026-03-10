@@ -769,23 +769,23 @@ export function PersonSearch() {
                     </div>
                     <div class="info-item">
                       <label>Blood Type:</label>
-                      <span class="value">{selectedPerson()!.bloodType || 'Unknown'}</span>
+                      <span class="value">{selectedPerson()!.bloodType || 'Not recorded'}</span>
                     </div>
                     <div class="info-item">
                       <label>Height:</label>
-                      <span class="value">{selectedPerson()!.height || 'Unknown'}</span>
+                      <span class="value">{selectedPerson()!.height || 'Not recorded'}</span>
                     </div>
                     <div class="info-item">
                       <label>Weight:</label>
-                      <span class="value">{selectedPerson()!.weight || 'Unknown'}</span>
+                      <span class="value">{selectedPerson()!.weight || 'Not recorded'}</span>
                     </div>
                     <div class="info-item">
                       <label>Eye Color:</label>
-                      <span class="value">{selectedPerson()!.eyeColor || 'Unknown'}</span>
+                      <span class="value">{selectedPerson()!.eyeColor || 'Not recorded'}</span>
                     </div>
                     <div class="info-item">
                       <label>Hair Color:</label>
-                      <span class="value">{selectedPerson()!.hairColor || 'Unknown'}</span>
+                      <span class="value">{selectedPerson()!.hairColor || 'Not recorded'}</span>
                     </div>
                     <Show when={selectedPerson()!.allergies}>
                       <div class="info-item full-width">
