@@ -5,17 +5,76 @@ import { fetchNui } from '~/utils/fetchNui';
 import { Button, Input, Modal, Tabs, Textarea } from '~/components/ui';
 import { PhotoGallery } from '~/components/ui/PhotoGallery';
 
+interface LookupPersonsResponse {
+  ok?: boolean;
+  persons?: Person[];
+  error?: string;
+}
+
+interface EntityNoteResponse {
+  ok?: boolean;
+  notes?: Array<{
+    id: string;
+    content: string;
+    author: string;
+    authorName?: string;
+    timestamp: string;
+    important?: boolean;
+  }>;
+  note?: {
+    id: string;
+    content: string;
+    author: string;
+    authorName?: string;
+    timestamp: string;
+    important?: boolean;
+  };
+  error?: string;
+}
+
+interface PhoneLookupResult {
+  identifier: string;
+  phoneNumber?: string;
+  imei?: string;
+  isStolen: boolean;
+  stolenAt?: string;
+  stolenReason?: string;
+  stolenReporter?: string;
+  ownerCitizenId?: string;
+  ownerName?: string;
+  placeholderActions?: boolean;
+  person?: Person;
+}
+
+interface PersonSearchModalData {
+  citizenId?: string;
+  query?: string;
+  tab?: 'info' | 'vehicles' | 'records' | 'warrants' | 'notes' | 'phone';
+  phoneNumber?: string;
+  imei?: string;
+}
+
+interface PhoneLookupResponse {
+  ok?: boolean;
+  result?: PhoneLookupResult;
+  error?: string;
+}
+
 export function PersonSearch() {
   const [searchQuery, setSearchQuery] = createSignal('');
   const [searchResults, setSearchResults] = createSignal<Person[]>([]);
   const [selectedPerson, setSelectedPerson] = createSignal<Person | null>(null);
-  const [activeTab, setActiveTab] = createSignal<'info' | 'vehicles' | 'records' | 'warrants' | 'notes'>('info');
+  const [activeTab, setActiveTab] = createSignal<'info' | 'vehicles' | 'records' | 'warrants' | 'notes' | 'phone'>('info');
   const [newPersonNote, setNewPersonNote] = createSignal('');
   const [showBloodRequestModal, setShowBloodRequestModal] = createSignal(false);
   const [bloodRequestReason, setBloodRequestReason] = createSignal('Forensic blood sample request');
+  const [searchLoading, setSearchLoading] = createSignal(false);
+  const [phoneNumberQuery, setPhoneNumberQuery] = createSignal('');
+  const [imeiQuery, setImeiQuery] = createSignal('');
+  const [phoneLookupResult, setPhoneLookupResult] = createSignal<PhoneLookupResult | null>(null);
+  const [phoneLookupLoading, setPhoneLookupLoading] = createSignal(false);
   const isSelectedPerson = createSelector(() => selectedPerson()?.citizenid || null);
 
-  const personsArray = createMemo(() => Object.values(cadState.persons));
   const vehiclesArray = createMemo(() => Object.values(cadState.vehicles));
   const criminalRecordsArray = createMemo(() => Object.values(cadState.criminalRecords));
   const warrantsArray = createMemo(() => Object.values(cadState.warrants));
@@ -52,61 +111,271 @@ export function PersonSearch() {
     return cadActions.checkBOLO('PERSON', person.citizenid);
   });
 
+  const personStatusBadges = createMemo(() => {
+    const person = selectedPerson();
+    if (!person) return [] as Array<{ label: string; tone: string }>;
+
+    const badges: Array<{ label: string; tone: string }> = [];
+    if (person.isDead) badges.push({ label: 'DECEASED', tone: '#ff7b72' });
+    if (hasWarrants()) badges.push({ label: 'ACTIVE WARRANT', tone: '#ffb86c' });
+    if (personBOLO()) badges.push({ label: 'BOLO', tone: '#ff5555' });
+    if (personVehicles().some((vehicle) => vehicle.stolen)) badges.push({ label: 'STOLEN VEHICLE LINK', tone: '#ffd166' });
+
+    return badges;
+  });
+
   const closeModal = () => {
     terminalActions.setActiveModal(null);
     cadActions.clearSearchResults();
   };
 
-  const handleSearch = () => {
-    const query = searchQuery().trim().toLowerCase();
+  const phoneIntelPhoto = createMemo(() => {
+    const result = phoneLookupResult();
+    if (!result) return null;
+    return result.person?.photo || selectedPerson()?.photo || null;
+  });
+
+  const applyPhoneLookupResult = async (result: PhoneLookupResult | null, preferPhoneTab = true) => {
+    setPhoneLookupResult(result);
+
+    if (!result) {
+      return;
+    }
+
+    if (result.person) {
+      cadActions.addPerson(result.person);
+      setSelectedPerson(result.person);
+    }
+
+    if (result.ownerCitizenId) {
+      const knownPerson = cadState.persons[result.ownerCitizenId];
+      if (knownPerson) {
+        setSelectedPerson(knownPerson);
+      }
+    }
+
+    if (preferPhoneTab) {
+      setActiveTab('phone');
+    }
+
+    const ownerId = result.ownerCitizenId || result.person?.citizenid;
+    if (ownerId) {
+      await loadPersonNotes(ownerId);
+    }
+  };
+
+  const selectPersonRecord = async (person: Person, tab?: 'info' | 'vehicles' | 'records' | 'warrants' | 'notes' | 'phone') => {
+    setSelectedPerson(person);
+    if (tab) {
+      setActiveTab(tab);
+    }
+
+    setPhoneLookupResult(null);
+    setPhoneNumberQuery(person.phone || '');
+    await loadPersonNotes(person.citizenid);
+  };
+
+  const handleSearch = async () => {
+    const query = searchQuery().trim();
     if (!query) {
       setSearchResults([]);
       return;
     }
-    
-    const results = personsArray().filter(p =>
-      p.firstName.toLowerCase().includes(query) ||
-      p.lastName.toLowerCase().includes(query) ||
-      p.citizenid.toLowerCase().includes(query) ||
-      p.ssn.includes(query)
-    );
-    
-    setSearchResults(results);
+
+    setSearchLoading(true);
+    try {
+      const response = await fetchNui<LookupPersonsResponse>('cad:lookup:searchPersons', {
+        query,
+        limit: 15,
+      });
+
+      const results = Array.isArray(response.persons) ? response.persons : [];
+      results.forEach((person) => cadActions.addPerson(person));
+      setSearchResults(results);
+
+      const modalData = (terminalState.modalData as PersonSearchModalData | null) || null;
+      const preferredCitizenId = modalData?.citizenId?.trim().toLowerCase() || '';
+      const normalizedQuery = query.toLowerCase();
+      const nextSelected =
+        results.find((person) => person.citizenid.toLowerCase() === preferredCitizenId) ||
+        results.find((person) => person.citizenid.toLowerCase() === normalizedQuery) ||
+        results[0] ||
+        null;
+
+      if (nextSelected) {
+        await selectPersonRecord(nextSelected, modalData?.tab === 'phone' ? 'phone' : 'info');
+      } else {
+        setSelectedPerson(null);
+      }
+    } catch (error) {
+      terminalActions.addLine(`Person search failed: ${String(error)}`, 'error');
+      setSearchResults([]);
+      setSelectedPerson(null);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const loadPersonNotes = async (citizenId: string) => {
+    const cleanId = citizenId.trim();
+    if (!cleanId) {
+      return;
+    }
+
+    try {
+      const response = await fetchNui<EntityNoteResponse>('cad:entityNotes:list', {
+        entityType: 'PERSON',
+        entityId: cleanId,
+        limit: 25,
+      });
+
+      const notes = Array.isArray(response.notes)
+        ? response.notes.map((note) => ({
+            id: note.id,
+            content: note.content,
+            author: note.authorName || note.author,
+            timestamp: note.timestamp,
+          }))
+        : [];
+
+      cadActions.updatePerson(cleanId, { notes });
+      const knownPerson = cadState.persons[cleanId];
+      if (knownPerson) {
+        setSelectedPerson({ ...knownPerson, notes });
+      }
+    } catch (error) {
+      terminalActions.addLine(`Person notes failed: ${String(error)}`, 'error');
+    }
+  };
+
+  const lookupPhoneByNumber = async () => {
+    const phoneNumber = phoneNumberQuery().trim();
+    if (!phoneNumber) {
+      terminalActions.addLine('Enter a phone number first', 'error');
+      return;
+    }
+
+    setPhoneLookupLoading(true);
+    try {
+      const response = await fetchNui<PhoneLookupResponse>('cad:phone:lookupByNumber', {
+        phoneNumber,
+      });
+
+      await applyPhoneLookupResult(response.result || null);
+      terminalActions.addLine(`Phone lookup loaded owner for ${phoneNumber}`, 'output');
+    } catch (error) {
+      setPhoneLookupResult(null);
+      terminalActions.addLine(`Phone lookup failed: ${String(error)}`, 'error');
+    } finally {
+      setPhoneLookupLoading(false);
+    }
+  };
+
+  const lookupPhoneByImei = async () => {
+    const imei = imeiQuery().trim();
+    if (!imei) {
+      terminalActions.addLine('Enter an IMEI first', 'error');
+      return;
+    }
+
+    setPhoneLookupLoading(true);
+    try {
+      const response = await fetchNui<PhoneLookupResponse>('cad:phone:lookupByImei', {
+        imei,
+      });
+
+      await applyPhoneLookupResult(response.result || null);
+      terminalActions.addLine(`IMEI lookup loaded owner for ${imei}`, 'output');
+    } catch (error) {
+      setPhoneLookupResult(null);
+      terminalActions.addLine(`IMEI lookup failed: ${String(error)}`, 'error');
+    } finally {
+      setPhoneLookupLoading(false);
+    }
+  };
+
+  const triggerPhonePlaceholder = async (action: 'MARK' | 'CLEAR') => {
+    const current = phoneLookupResult();
+    if (!current) {
+      terminalActions.addLine('Run a phone lookup first', 'error');
+      return;
+    }
+
+    try {
+      const response = await fetchNui<{ ok?: boolean; placeholder?: boolean; message?: string; result?: PhoneLookupResult }>('cad:phone:setStolenPlaceholder', {
+        action,
+        phoneNumber: current.phoneNumber,
+        imei: current.imei,
+      });
+
+      if (response.result) {
+        await applyPhoneLookupResult(response.result, true);
+      }
+
+      if (response.placeholder) {
+        terminalActions.addLine(
+          action === 'MARK'
+            ? 'Placeholder only: mark stolen is ready for wiring'
+            : 'Placeholder only: clear stolen is ready for wiring',
+          'system'
+        );
+      } else {
+        terminalActions.addLine(
+          action === 'MARK'
+            ? 'Phone marked as stolen'
+            : 'Phone stolen flag cleared',
+          'output'
+        );
+      }
+    } catch (error) {
+      terminalActions.addLine(`Phone action failed: ${String(error)}`, 'error');
+    }
   };
 
   onMount(() => {
-    const modalData = (terminalState.modalData as { citizenId?: string; query?: string } | null) || null;
-    if (!modalData) {
-      return;
-    }
+    void (async () => {
+      const modalData = (terminalState.modalData as PersonSearchModalData | null) || null;
+      if (!modalData) {
+        return;
+      }
 
-    const rawQuery = modalData.citizenId || modalData.query;
-    if (!rawQuery || rawQuery.trim() === '') {
-      return;
-    }
+      if (modalData.tab) {
+        setActiveTab(modalData.tab);
+      }
 
-    const query = rawQuery.trim();
-    const lowerQuery = query.toLowerCase();
-    setSearchQuery(query);
+      if (modalData.phoneNumber && modalData.phoneNumber.trim() !== '') {
+        setPhoneNumberQuery(modalData.phoneNumber.trim());
+      }
 
-    const person = personsArray().find((p) => {
-      return (
-        p.citizenid.toLowerCase() === lowerQuery ||
-        p.firstName.toLowerCase().includes(lowerQuery) ||
-        p.lastName.toLowerCase().includes(lowerQuery)
-      );
-    });
+      if (modalData.imei && modalData.imei.trim() !== '') {
+        setImeiQuery(modalData.imei.trim());
+      }
 
-    if (person) {
-      setSelectedPerson(person);
-    }
+      const rawQuery = modalData.citizenId || modalData.query;
+      if (rawQuery && rawQuery.trim() !== '') {
+        const query = rawQuery.trim();
+        setSearchQuery(query);
+        await handleSearch();
+      }
+
+      if (modalData.tab === 'phone') {
+        if (modalData.phoneNumber && modalData.phoneNumber.trim() !== '') {
+          await lookupPhoneByNumber();
+          return;
+        }
+
+        if (modalData.imei && modalData.imei.trim() !== '') {
+          await lookupPhoneByImei();
+        }
+      }
+    })();
   });
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString();
   };
 
-  const addPersonNote = () => {
+  const addPersonNote = async () => {
     const person = selectedPerson();
     const content = newPersonNote().trim();
     if (!person || !content) {
@@ -114,18 +383,35 @@ export function PersonSearch() {
       return;
     }
 
-    const note = {
-      id: `PNOTE_${Date.now()}`,
-      content,
-      author: 'OFFICER_001',
-      timestamp: new Date().toISOString(),
-    };
+    try {
+      const response = await fetchNui<EntityNoteResponse>('cad:entityNotes:add', {
+        entityType: 'PERSON',
+        entityId: person.citizenid,
+        content,
+        important: false,
+      });
 
-    cadActions.addPersonNote(person.citizenid, note);
-    setSelectedPerson({ ...person, notes: [...(person.notes || []), note] });
-    setNewPersonNote('');
-    setActiveTab('notes');
-    terminalActions.addLine(`✓ Note added to person ${person.citizenid}`, 'output');
+      const note = response.note;
+      if (!note) {
+        terminalActions.addLine('Failed to save note', 'error');
+        return;
+      }
+
+      const normalizedNote = {
+        id: note.id,
+        content: note.content,
+        author: note.authorName || note.author,
+        timestamp: note.timestamp,
+      };
+
+      cadActions.addPersonNote(person.citizenid, normalizedNote);
+      setSelectedPerson({ ...person, notes: [...(person.notes || []), normalizedNote] });
+      setNewPersonNote('');
+      setActiveTab('notes');
+      terminalActions.addLine(`✓ Note added to person ${person.citizenid}`, 'output');
+    } catch (error) {
+      terminalActions.addLine(`Failed to save note: ${String(error)}`, 'error');
+    }
   };
 
   const openBloodRequestModal = () => {
@@ -235,8 +521,8 @@ export function PersonSearch() {
 
       cadActions.addPerson(response.person);
       setSearchQuery(response.person.citizenid);
-      setSelectedPerson(response.person);
-      setActiveTab('info');
+      setSearchResults([response.person]);
+      await selectPersonRecord(response.person, 'info');
 
       terminalActions.addLine(
         `✓ ID read from slot ${response.item?.slot || '?'} (${response.item?.name || 'document'}) [${response.source || 'generic'}]`,
@@ -263,9 +549,9 @@ export function PersonSearch() {
               value={searchQuery()}
               onInput={(e) => setSearchQuery(e.currentTarget.value)}
               placeholder="Enter name, citizen ID, or SSN..."
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+              onKeyPress={(e) => e.key === 'Enter' && void handleSearch()}
             />
-            <Button.Root class="btn btn-primary" onClick={handleSearch}>
+            <Button.Root class="btn btn-primary" onClick={() => void handleSearch()} disabled={searchLoading()}>
               [SEARCH]
             </Button.Root>
             <Button.Root class="btn" onClick={() => void readFromIdReader()}>
@@ -277,20 +563,23 @@ export function PersonSearch() {
               {searchResults().length} result(s) found
             </div>
           </Show>
+          <Show when={searchResults().length === 0 && !searchQuery()}>
+            <div class="search-stats">Enter a citizen ID, name, or SSN to open a live record.</div>
+          </Show>
         </div>
 
         <div class="search-content">
           <div class="search-results-panel">
             <Show when={searchResults().length === 0 && searchQuery()}>
-              <div class="empty-state">No persons found</div>
+              <div class="empty-state">No MDT person match for that query</div>
             </Show>
             
             <For each={searchResults()}>
               {(person) => (
                 <div 
                   class={`result-item ${isSelectedPerson(person.citizenid) ? 'selected' : ''}`}
-                  onClick={() => setSelectedPerson(person)}
-                >
+                   onClick={() => void selectPersonRecord(person)}
+                 >
                   <div class="result-name">
                     {person.firstName} {person.lastName}
                     <Show when={person.isDead}>
@@ -309,16 +598,75 @@ export function PersonSearch() {
           <Show when={selectedPerson()}>
             <div class="person-details-panel">
               <div class="person-header">
-                <h3>
-                  {selectedPerson()!.firstName} {selectedPerson()!.lastName}
-                  <Show when={hasWarrants()}>
-                    <span class="warrant-badge">ACTIVE WARRANT</span>
-                  </Show>
-                  <Show when={personBOLO()}>
-                    <span class="bolo-badge">🔴 BOLO: {personBOLO()!.reason.substring(0, 30)}</span>
-                  </Show>
-                </h3>
-                <div class="person-id">{selectedPerson()!.citizenid}</div>
+                <div style={{ display: 'flex', gap: '12px', 'align-items': 'flex-start' }}>
+                  <div
+                    style={{
+                      width: '84px',
+                      height: '84px',
+                      border: '1px solid var(--terminal-border)',
+                      display: 'flex',
+                      'align-items': 'center',
+                      'justify-content': 'center',
+                      'background-color': 'rgba(255,255,255,0.03)',
+                      overflow: 'hidden',
+                      'flex-shrink': 0,
+                    }}
+                  >
+                    <Show when={selectedPerson()!.photo} fallback={<span style={{ color: 'var(--terminal-text-dim)' }}>NO IMG</span>}>
+                      <img
+                        src={selectedPerson()!.photo!}
+                        alt="Person mugshot"
+                        style={{ width: '100%', height: '100%', 'object-fit': 'cover' }}
+                      />
+                    </Show>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <h3 style={{ margin: 0 }}>
+                      {selectedPerson()!.firstName} {selectedPerson()!.lastName}
+                    </h3>
+                    <div class="person-id">{selectedPerson()!.citizenid}</div>
+                    <div style={{ display: 'flex', gap: '8px', 'flex-wrap': 'wrap', 'margin-top': '8px' }}>
+                      <For each={personStatusBadges()}>
+                        {(badge) => (
+                          <span
+                            style={{
+                              padding: '2px 8px',
+                              border: `1px solid ${badge.tone}`,
+                              color: badge.tone,
+                              'font-size': '11px',
+                              'letter-spacing': '0.06em',
+                            }}
+                          >
+                            {badge.label}
+                          </span>
+                        )}
+                      </For>
+                    </div>
+                    <Show when={personBOLO()}>
+                      <div style={{ 'margin-top': '8px', color: '#ff8b8b' }}>
+                        BOLO: {personBOLO()!.reason}
+                      </div>
+                    </Show>
+                  </div>
+                </div>
+                <div class="info-grid" style={{ 'margin-top': '12px' }}>
+                  <div class="info-item">
+                    <label>Open Warrants:</label>
+                    <span class="value">{personWarrants().length}</span>
+                  </div>
+                  <div class="info-item">
+                    <label>Vehicles:</label>
+                    <span class="value">{personVehicles().length}</span>
+                  </div>
+                  <div class="info-item">
+                    <label>Records:</label>
+                    <span class="value">{personRecords().length}</span>
+                  </div>
+                  <div class="info-item">
+                    <label>Notes:</label>
+                    <span class="value">{personNotes().length}</span>
+                  </div>
+                </div>
               </div>
 
               <div class="person-actions">
@@ -384,7 +732,7 @@ export function PersonSearch() {
 
               <Tabs.Root
                 value={activeTab()}
-                onValueChange={(value) => setActiveTab(value as 'info' | 'vehicles' | 'records' | 'warrants' | 'notes')}
+                onValueChange={(value) => setActiveTab(value as 'info' | 'vehicles' | 'records' | 'warrants' | 'notes' | 'phone')}
               >
                 <Tabs.List>
                   <Tabs.Trigger value='info' label='INFO' />
@@ -392,6 +740,7 @@ export function PersonSearch() {
                   <Tabs.Trigger value='records' label='RECORDS' badge={personRecords().length} />
                   <Tabs.Trigger value='warrants' label='WARRANTS' badge={personWarrants().length} />
                   <Tabs.Trigger value='notes' label='NOTES' badge={personNotes().length} />
+                  <Tabs.Trigger value='phone' label='PHONE INTEL' />
                 </Tabs.List>
               </Tabs.Root>
 
@@ -457,7 +806,7 @@ export function PersonSearch() {
                 <Show when={activeTab() === 'vehicles'}>
                   <div class="vehicles-list">
                     <Show when={personVehicles().length === 0}>
-                      <div class="empty-state">No registered vehicles</div>
+                      <div class="empty-state">No registered vehicles linked to this citizen</div>
                     </Show>
                     <For each={personVehicles()}>
                       {(vehicle) => (
@@ -491,7 +840,7 @@ export function PersonSearch() {
                 <Show when={activeTab() === 'records'}>
                   <div class="records-list">
                     <Show when={personRecords().length === 0}>
-                      <div class="empty-state">No criminal record</div>
+                      <div class="empty-state">No criminal record entries on file</div>
                     </Show>
                     <For each={personRecords()}>
                       {(record) => (
@@ -512,7 +861,7 @@ export function PersonSearch() {
                 <Show when={activeTab() === 'warrants'}>
                   <div class="warrants-list">
                     <Show when={personWarrants().length === 0}>
-                      <div class="empty-state">No active warrants</div>
+                      <div class="empty-state">No active warrants on file</div>
                     </Show>
                     <For each={personWarrants()}>
                       {(warrant) => (
@@ -542,7 +891,7 @@ export function PersonSearch() {
                     </div>
 
                     <Show when={personNotes().length === 0}>
-                      <div class="empty-state">No person notes yet</div>
+                      <div class="empty-state">No investigator notes saved for this person</div>
                     </Show>
 
                     <For each={personNotes()}>
@@ -554,6 +903,140 @@ export function PersonSearch() {
                         </div>
                       )}
                     </For>
+                  </div>
+                </Show>
+
+                <Show when={activeTab() === 'phone'}>
+                  <div class="records-list">
+                    <div class="add-note-form">
+                      <div class="search-input-group">
+                        <Input.Root
+                          type="text"
+                          class="dos-input"
+                          value={phoneNumberQuery()}
+                          onInput={(e) => setPhoneNumberQuery(e.currentTarget.value)}
+                          placeholder="Phone number"
+                        />
+                        <Button.Root class="btn btn-primary" onClick={() => void lookupPhoneByNumber()} disabled={phoneLookupLoading()}>
+                          [LOOKUP NUMBER]
+                        </Button.Root>
+                      </div>
+                      <div class="search-input-group" style={{ 'margin-top': '8px' }}>
+                        <Input.Root
+                          type="text"
+                          class="dos-input"
+                          value={imeiQuery()}
+                          onInput={(e) => setImeiQuery(e.currentTarget.value)}
+                          placeholder="IMEI"
+                        />
+                        <Button.Root class="btn btn-primary" onClick={() => void lookupPhoneByImei()} disabled={phoneLookupLoading()}>
+                          [LOOKUP IMEI]
+                        </Button.Root>
+                      </div>
+                    </div>
+
+                    <Show when={!phoneLookupResult()}>
+                      <div class="empty-state">Run a number or IMEI lookup to load phone intelligence</div>
+                    </Show>
+
+                    <Show when={phoneLookupResult()}>
+                      <div style={{ display: 'flex', gap: '12px', 'align-items': 'flex-start', 'margin-bottom': '12px' }}>
+                        <div
+                          style={{
+                            width: '72px',
+                            height: '72px',
+                            border: '1px solid var(--terminal-border)',
+                            display: 'flex',
+                            'align-items': 'center',
+                            'justify-content': 'center',
+                            'background-color': 'rgba(255,255,255,0.03)',
+                            overflow: 'hidden',
+                            'flex-shrink': 0,
+                          }}
+                        >
+                          <Show
+                            when={phoneIntelPhoto()}
+                            fallback={<span style={{ color: 'var(--terminal-text-dim)' }}>NO IMG</span>}
+                          >
+                            <img
+                              src={phoneIntelPhoto()!}
+                              alt="Owner mugshot"
+                              style={{ width: '100%', height: '100%', 'object-fit': 'cover' }}
+                            />
+                          </Show>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div class="record-item">
+                            <div class="record-sentence">Phone intelligence match loaded</div>
+                            <div class="record-officer">Owner record cross-linked to MDT</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="info-grid">
+                        <div class="info-item">
+                          <label>Owner:</label>
+                          <span class="value">{phoneLookupResult()!.ownerName || 'UNKNOWN'}</span>
+                        </div>
+                        <div class="info-item">
+                          <label>Citizen ID:</label>
+                          <span class="value">{phoneLookupResult()!.ownerCitizenId || phoneLookupResult()!.identifier || 'N/A'}</span>
+                        </div>
+                        <div class="info-item">
+                          <label>Phone:</label>
+                          <span class="value">{phoneLookupResult()!.phoneNumber || 'N/A'}</span>
+                        </div>
+                        <div class="info-item">
+                          <label>IMEI:</label>
+                          <span class="value">{phoneLookupResult()!.imei || 'N/A'}</span>
+                        </div>
+                        <div class="info-item">
+                          <label>Stolen:</label>
+                          <span class="value">{phoneLookupResult()!.isStolen ? 'YES' : 'NO'}</span>
+                        </div>
+                        <div class="info-item">
+                          <label>Reported At:</label>
+                          <span class="value">{phoneLookupResult()!.stolenAt ? formatDate(phoneLookupResult()!.stolenAt!) : 'N/A'}</span>
+                        </div>
+                        <Show when={phoneLookupResult()!.stolenReason}>
+                          <div class="info-item full-width">
+                            <label>Stolen Reason:</label>
+                            <span class="value">{phoneLookupResult()!.stolenReason}</span>
+                          </div>
+                        </Show>
+                        <Show when={phoneLookupResult()!.stolenReporter}>
+                          <div class="info-item full-width">
+                            <label>Reporter:</label>
+                            <span class="value">{phoneLookupResult()!.stolenReporter}</span>
+                          </div>
+                        </Show>
+                      </div>
+
+                      <div class="person-actions" style={{ 'margin-top': '12px' }}>
+                        <Button.Root class="btn" onClick={() => void triggerPhonePlaceholder('MARK')}>
+                          [MARK STOLEN]
+                        </Button.Root>
+                        <Button.Root class="btn" onClick={() => void triggerPhonePlaceholder('CLEAR')}>
+                          [CLEAR STOLEN]
+                        </Button.Root>
+                        <Show when={phoneLookupResult()!.ownerCitizenId}>
+                          <Button.Root
+                            class="btn btn-primary"
+                            onClick={() => {
+                              const ownerId = phoneLookupResult()!.ownerCitizenId;
+                              if (ownerId) {
+                                const knownPerson = cadState.persons[ownerId];
+                                if (knownPerson) {
+                                  void selectPersonRecord(knownPerson, 'info');
+                                }
+                              }
+                            }}
+                          >
+                            [OPEN OWNER]
+                          </Button.Root>
+                        </Show>
+                      </div>
+                    </Show>
                   </div>
                 </Show>
               </div>

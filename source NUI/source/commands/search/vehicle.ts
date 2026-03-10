@@ -1,71 +1,14 @@
 
 import { createCommandWithSubcommands } from '../commandBuilder';
-import { cadState, type Vehicle, type Person } from '~/stores/cadStore';
+import { cadState, cadActions, type Vehicle, type Person } from '~/stores/cadStore';
 import { hackerActions } from '~/stores/hackerStore';
+import { fetchNui } from '~/utils/fetchNui';
 
-const mockVehicles: Vehicle[] = [
-  {
-    plate: 'ABC123',
-    model: 'Buffalo',
-    make: 'Bravado',
-    year: 2020,
-    color: 'Black',
-    ownerId: 'CID001',
-    ownerName: 'John Doe',
-    vin: '1HGBH41JXMN109186',
-    registrationStatus: 'VALID',
-    insuranceStatus: 'VALID',
-    stolen: false,
-    flags: [],
-    createdAt: '2020-03-15'
-  },
-  {
-    plate: 'XYZ789',
-    model: 'Sentinel',
-    make: 'Ubermacht',
-    year: 2019,
-    color: 'Silver',
-    ownerId: 'CID002',
-    ownerName: 'Jane Smith',
-    vin: '2BCDE2345678901234',
-    registrationStatus: 'VALID',
-    insuranceStatus: 'EXPIRED',
-    stolen: false,
-    flags: [],
-    createdAt: '2019-08-22'
-  },
-  {
-    plate: 'STOLEN1',
-    model: 'Banshee',
-    make: 'Bravado',
-    year: 2021,
-    color: 'Red',
-    ownerId: 'CID003',
-    ownerName: 'Michael Johnson',
-    vin: '3FGHI3456789012345',
-    registrationStatus: 'VALID',
-    insuranceStatus: 'VALID',
-    stolen: true,
-    stolenReportedAt: new Date().toISOString(),
-    flags: ['STOLEN'],
-    createdAt: '2021-01-10'
-  },
-  {
-    plate: 'WANTED5',
-    model: 'Sultan',
-    make: 'Karin',
-    year: 2018,
-    color: 'Blue',
-    ownerId: 'CID001',
-    ownerName: 'John Doe',
-    vin: '4JKLM4567890123456',
-    registrationStatus: 'SUSPENDED',
-    insuranceStatus: 'NONE',
-    stolen: false,
-    flags: ['WANTED', 'SUSPENDED_REG'],
-    createdAt: '2018-05-30'
-  }
-];
+interface LookupVehiclesResponse {
+  ok?: boolean;
+  vehicles?: Vehicle[];
+  error?: string;
+}
 
 export function registerVehicleSearchCommand() {
   createCommandWithSubcommands({
@@ -85,8 +28,8 @@ export function registerVehicleSearchCommand() {
       },
       search: {
         description: 'Search vehicles (CLI mode)',
-        handler: async ({ args, terminal }: { args: any, terminal: any }) => {
-          let plate = args.plate as string;
+        handler: async ({ rawArgs, terminal }: { rawArgs: string[]; terminal: any }) => {
+          let plate = rawArgs[1] as string | undefined;
 
           if (!plate) {
             plate = await terminal.prompt('Enter license plate:');
@@ -101,19 +44,21 @@ export function registerVehicleSearchCommand() {
 
           const stopLoading = terminal.showLoading('Searching vehicle database');
 
-          const upperPlate = plate.toUpperCase();
-          const results = mockVehicles.filter(vehicle =>
-            vehicle.plate.toUpperCase().includes(upperPlate)
-          );
+          let uniqueResults: Vehicle[] = [];
 
-          const stateResults = (Object.values(cadState.vehicles) as Vehicle[]).filter(vehicle =>
-            vehicle.plate.toUpperCase().includes(upperPlate)
-          );
+          try {
+            const response = await fetchNui<LookupVehiclesResponse>('cad:lookup:searchVehicles', {
+              query: plate,
+              limit: 15,
+            });
 
-          const allResults = [...results, ...stateResults];
-          const uniqueResults = allResults.filter((vehicle, index, self) =>
-            index === self.findIndex(v => v.plate === vehicle.plate)
-          );
+            uniqueResults = Array.isArray(response.vehicles) ? response.vehicles : [];
+            uniqueResults.forEach((vehicle) => cadActions.addVehicle(vehicle));
+          } catch (error) {
+            stopLoading();
+            terminal.print(`Vehicle search failed: ${String(error)}`, 'error');
+            return;
+          }
 
           stopLoading();
 
@@ -140,7 +85,7 @@ export function registerVehicleSearchCommand() {
 
             terminal.printTable(headers, rows);
             
-            terminal.print('\nUse "search-vehicle <PLATE>" for full details', 'info');
+            terminal.print('\nUse "search-vehicle search <PLATE>" for full details', 'info');
           }
         }
       }
@@ -202,7 +147,7 @@ async function showVehicleDetails(terminal: any, vehicle: Vehicle) {
     }
   }
 
-  const otherVehicles = [...mockVehicles, ...(Object.values(cadState.vehicles) as Vehicle[])]
+  const otherVehicles = (Object.values(cadState.vehicles) as Vehicle[])
     .filter(v => v.ownerId === vehicle.ownerId && v.plate !== vehicle.plate);
   
   if (otherVehicles.length > 0) {

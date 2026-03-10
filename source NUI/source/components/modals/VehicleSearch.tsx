@@ -1,8 +1,34 @@
 import { createSignal, createMemo, createSelector, For, Show, onMount } from 'solid-js';
 import { terminalActions, terminalState } from '~/stores/terminalStore';
 import { cadState, cadActions, type Vehicle } from '~/stores/cadStore';
+import { fetchNui } from '~/utils/fetchNui';
 import { Button, Input, Modal, Tabs, Textarea } from '~/components/ui';
 import { PhotoGallery } from '~/components/ui/PhotoGallery';
+
+interface LookupVehiclesResponse {
+  ok?: boolean;
+  vehicles?: Vehicle[];
+  error?: string;
+}
+
+interface EntityNoteResponse {
+  ok?: boolean;
+  notes?: Array<{
+    id: string;
+    content: string;
+    author: string;
+    authorName?: string;
+    timestamp: string;
+  }>;
+  note?: {
+    id: string;
+    content: string;
+    author: string;
+    authorName?: string;
+    timestamp: string;
+  };
+  error?: string;
+}
 
 export function VehicleSearch() {
   const [searchQuery, setSearchQuery] = createSignal('');
@@ -10,8 +36,26 @@ export function VehicleSearch() {
   const [selectedVehicle, setSelectedVehicle] = createSignal<Vehicle | null>(null);
   const [activeTab, setActiveTab] = createSignal<'info' | 'owner' | 'notes'>('info');
   const [newVehicleNote, setNewVehicleNote] = createSignal('');
-  const vehiclesArray = createMemo(() => Object.values(cadState.vehicles));
+  const [searchLoading, setSearchLoading] = createSignal(false);
   const isSelectedVehicle = createSelector(() => selectedVehicle()?.plate || null);
+
+  const ownerRecord = createMemo(() => {
+    const ownerId = selectedVehicle()?.ownerId;
+    if (!ownerId) return null;
+    return cadState.persons[ownerId] || null;
+  });
+
+  const vehicleStatusBadges = createMemo(() => {
+    const vehicle = selectedVehicle();
+    if (!vehicle) return [] as Array<{ label: string; tone: string }>;
+
+    const badges: Array<{ label: string; tone: string }> = [];
+    if (vehicle.stolen) badges.push({ label: 'STOLEN', tone: '#ff5555' });
+    if (vehicle.registrationStatus !== 'VALID') badges.push({ label: `REG ${vehicle.registrationStatus}`, tone: '#ffb86c' });
+    if (vehicle.insuranceStatus !== 'VALID') badges.push({ label: `INS ${vehicle.insuranceStatus}`, tone: '#ffd166' });
+
+    return badges;
+  });
 
   const closeModal = () => {
     terminalActions.setActiveModal(null);
@@ -28,25 +72,86 @@ export function VehicleSearch() {
     return (vehicle.notes || []).slice().sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   });
 
-  const handleSearch = () => {
-    const query = searchQuery().trim().toLowerCase();
+  const loadVehicleNotes = async (plate: string) => {
+    const cleanPlate = plate.trim();
+    if (!cleanPlate) return;
+
+    try {
+      const response = await fetchNui<EntityNoteResponse>('cad:entityNotes:list', {
+        entityType: 'VEHICLE',
+        entityId: cleanPlate,
+        limit: 25,
+      });
+
+      const notes = Array.isArray(response.notes)
+        ? response.notes.map((note) => ({
+            id: note.id,
+            content: note.content,
+            author: note.authorName || note.author,
+            timestamp: note.timestamp,
+          }))
+        : [];
+
+      cadActions.updateVehicle(cleanPlate, { notes });
+      const knownVehicle = cadState.vehicles[cleanPlate];
+      if (knownVehicle) {
+        setSelectedVehicle({ ...knownVehicle, notes });
+      }
+    } catch (error) {
+      terminalActions.addLine(`Vehicle notes failed: ${String(error)}`, 'error');
+    }
+  };
+
+  const selectVehicleRecord = async (vehicle: Vehicle, tab: 'info' | 'owner' | 'notes' = 'info') => {
+    setSelectedVehicle(vehicle);
+    setActiveTab(tab);
+    await loadVehicleNotes(vehicle.plate);
+  };
+
+  const handleSearch = async () => {
+    const query = searchQuery().trim();
     if (!query) {
       setSearchResults([]);
       return;
     }
-    
-    const results = vehiclesArray().filter(v =>
-      v.plate.toLowerCase().includes(query) ||
-      v.model.toLowerCase().includes(query) ||
-      v.make.toLowerCase().includes(query) ||
-      v.vin.toLowerCase().includes(query) ||
-      v.ownerName.toLowerCase().includes(query)
-    );
-    
-    setSearchResults(results);
+
+    setSearchLoading(true);
+    try {
+      const response = await fetchNui<LookupVehiclesResponse>('cad:lookup:searchVehicles', {
+        query,
+        limit: 15,
+      });
+
+      const results = Array.isArray(response.vehicles) ? response.vehicles : [];
+      results.forEach((vehicle) => cadActions.addVehicle(vehicle));
+      setSearchResults(results);
+
+      const modalData = (terminalState.modalData as { plate?: string; ownerId?: string; query?: string } | null) || null;
+      const preferredPlate = modalData?.plate?.trim().toLowerCase() || '';
+      const preferredOwnerId = modalData?.ownerId?.trim().toLowerCase() || '';
+      const normalizedQuery = query.toLowerCase();
+      const nextSelected =
+        results.find((vehicle) => vehicle.plate.toLowerCase() === preferredPlate) ||
+        results.find((vehicle) => vehicle.ownerId.toLowerCase() === preferredOwnerId) ||
+        results.find((vehicle) => vehicle.plate.toLowerCase() === normalizedQuery) ||
+        results[0] ||
+        null;
+
+      if (nextSelected) {
+        await selectVehicleRecord(nextSelected, preferredOwnerId !== '' ? 'owner' : 'info');
+      } else {
+        setSelectedVehicle(null);
+      }
+    } catch (error) {
+      terminalActions.addLine(`Vehicle search failed: ${String(error)}`, 'error');
+      setSearchResults([]);
+      setSelectedVehicle(null);
+    } finally {
+      setSearchLoading(false);
+    }
   };
 
-  const addVehicleNote = () => {
+  const addVehicleNote = async () => {
     const vehicle = selectedVehicle();
     const content = newVehicleNote().trim();
     if (!vehicle || !content) {
@@ -54,57 +159,52 @@ export function VehicleSearch() {
       return;
     }
 
-    const note = {
-      id: `VNOTE_${Date.now()}`,
-      content,
-      author: 'OFFICER_001',
-      timestamp: new Date().toISOString(),
-    };
+    try {
+      const response = await fetchNui<EntityNoteResponse>('cad:entityNotes:add', {
+        entityType: 'VEHICLE',
+        entityId: vehicle.plate,
+        content,
+        important: false,
+      });
 
-    cadActions.addVehicleNote(vehicle.plate, note);
-    setSelectedVehicle({ ...vehicle, notes: [...(vehicle.notes || []), note] });
-    setNewVehicleNote('');
-    setActiveTab('notes');
-    terminalActions.addLine(`✓ Note added to vehicle ${vehicle.plate}`, 'output');
+      const note = response.note;
+      if (!note) {
+        terminalActions.addLine('Failed to save note', 'error');
+        return;
+      }
+
+      const normalizedNote = {
+        id: note.id,
+        content: note.content,
+        author: note.authorName || note.author,
+        timestamp: note.timestamp,
+      };
+
+      cadActions.addVehicleNote(vehicle.plate, normalizedNote);
+      setSelectedVehicle({ ...vehicle, notes: [...(vehicle.notes || []), normalizedNote] });
+      setNewVehicleNote('');
+      setActiveTab('notes');
+      terminalActions.addLine(`✓ Note added to vehicle ${vehicle.plate}`, 'output');
+    } catch (error) {
+      terminalActions.addLine(`Failed to save note: ${String(error)}`, 'error');
+    }
   };
 
   onMount(() => {
-    const modalData = (terminalState.modalData as { plate?: string; ownerId?: string; query?: string } | null) || null;
-    if (!modalData) {
-      return;
-    }
-
-    const vehicles = vehiclesArray();
-
-    if (modalData.plate && modalData.plate.trim() !== '') {
-      const plateQuery = modalData.plate.trim();
-      const lowerPlate = plateQuery.toLowerCase();
-      setSearchQuery(plateQuery);
-
-      const exact = vehicles.find((v) => v.plate.toLowerCase() === lowerPlate);
-      if (exact) {
-        setSelectedVehicle(exact);
-        setActiveTab('info');
+    void (async () => {
+      const modalData = (terminalState.modalData as { plate?: string; ownerId?: string; query?: string } | null) || null;
+      if (!modalData) {
         return;
       }
-    }
 
-    if (modalData.ownerId && modalData.ownerId.trim() !== '') {
-      const ownerQuery = modalData.ownerId.trim();
-      const lowerOwner = ownerQuery.toLowerCase();
-      setSearchQuery(ownerQuery);
-
-      const ownerVehicle = vehicles.find((v) => v.ownerId.toLowerCase() === lowerOwner);
-      if (ownerVehicle) {
-        setSelectedVehicle(ownerVehicle);
-        setActiveTab('owner');
+      const rawQuery = modalData.plate || modalData.ownerId || modalData.query;
+      if (!rawQuery || rawQuery.trim() === '') {
         return;
       }
-    }
 
-    if (modalData.query && modalData.query.trim() !== '') {
-      setSearchQuery(modalData.query.trim());
-    }
+      setSearchQuery(rawQuery.trim());
+      await handleSearch();
+    })();
   });
 
   return (
@@ -122,10 +222,10 @@ export function VehicleSearch() {
               class="dos-input search-input"
               value={searchQuery()}
               onInput={(e) => setSearchQuery(e.currentTarget.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+              onKeyPress={(e) => e.key === 'Enter' && void handleSearch()}
               placeholder="Enter plate, model, or owner name..."
             />
-            <Button.Root class="btn btn-primary" onClick={handleSearch}>
+            <Button.Root class="btn btn-primary" onClick={() => void handleSearch()} disabled={searchLoading()}>
               [SEARCH]
             </Button.Root>
           </div>
@@ -134,19 +234,22 @@ export function VehicleSearch() {
               {searchResults().length} result(s) found
             </div>
           </Show>
+          <Show when={searchResults().length === 0 && !searchQuery()}>
+            <div class="search-stats">Enter a plate, VIN, model, or owner reference to query the DMV.</div>
+          </Show>
         </div>
 
         <div class="search-content">
           <div class="search-results-panel">
             <Show when={searchResults().length === 0 && searchQuery()}>
-              <div class="empty-state">No vehicles found</div>
+              <div class="empty-state">No DMV vehicle match for that query</div>
             </Show>
             
             <For each={searchResults()}>
               {(vehicle) => (
                 <div 
                   class={`result-item ${isSelectedVehicle(vehicle.plate) ? 'selected' : ''}`}
-                  onClick={() => { setSelectedVehicle(vehicle); setActiveTab('info'); }}
+                  onClick={() => { void selectVehicleRecord(vehicle, 'info'); }}
                 >
                   <div class="result-plate">
                     {vehicle.plate}
@@ -166,14 +269,44 @@ export function VehicleSearch() {
           <Show when={selectedVehicle()}>
             <div class="vehicle-details-panel">
               <div class="vehicle-header">
-                <h3>
-                  {selectedVehicle()!.plate}
-                  <Show when={selectedVehicle()!.stolen}>
-                    <span class="stolen-badge-large">STOLEN VEHICLE</span>
-                  </Show>
-                </h3>
+                <h3>{selectedVehicle()!.plate}</h3>
                 <div class="vehicle-model">
                   {selectedVehicle()!.year} {selectedVehicle()!.make} {selectedVehicle()!.model}
+                </div>
+                <div style={{ display: 'flex', gap: '8px', 'flex-wrap': 'wrap', 'margin-top': '8px' }}>
+                  <For each={vehicleStatusBadges()}>
+                    {(badge) => (
+                      <span
+                        style={{
+                          padding: '2px 8px',
+                          border: `1px solid ${badge.tone}`,
+                          color: badge.tone,
+                          'font-size': '11px',
+                          'letter-spacing': '0.06em',
+                        }}
+                      >
+                        {badge.label}
+                      </span>
+                    )}
+                  </For>
+                </div>
+                <div class="info-grid" style={{ 'margin-top': '12px' }}>
+                  <div class="info-item">
+                    <label>Flags:</label>
+                    <span class="value">{selectedVehicle()!.flags.length}</span>
+                  </div>
+                  <div class="info-item">
+                    <label>Notes:</label>
+                    <span class="value">{vehicleNotes().length}</span>
+                  </div>
+                  <div class="info-item">
+                    <label>Owner:</label>
+                    <span class="value">{selectedVehicle()!.ownerName || 'UNKNOWN'}</span>
+                  </div>
+                  <div class="info-item">
+                    <label>Status:</label>
+                    <span class="value">{selectedVehicle()!.stolen ? 'HIGH RISK' : 'CLEAR'}</span>
+                  </div>
                 </div>
               </div>
 
@@ -270,18 +403,64 @@ export function VehicleSearch() {
 
                 <Show when={activeTab() === 'owner'}>
                   <div class="owner-info">
-                    <div class="owner-name">{selectedVehicle()!.ownerName}</div>
-                    <div class="owner-id">Citizen ID: {selectedVehicle()!.ownerId}</div>
+                    <div style={{ display: 'flex', gap: '12px', 'align-items': 'flex-start', 'margin-bottom': '12px' }}>
+                      <div
+                        style={{
+                          width: '72px',
+                          height: '72px',
+                          border: '1px solid var(--terminal-border)',
+                          display: 'flex',
+                          'align-items': 'center',
+                          'justify-content': 'center',
+                          'background-color': 'rgba(255,255,255,0.03)',
+                          overflow: 'hidden',
+                          'flex-shrink': 0,
+                        }}
+                      >
+                        <Show when={ownerRecord()?.photo} fallback={<span style={{ color: 'var(--terminal-text-dim)' }}>NO IMG</span>}>
+                          <img
+                            src={ownerRecord()!.photo}
+                            alt="Owner mugshot"
+                            style={{ width: '100%', height: '100%', 'object-fit': 'cover' }}
+                          />
+                        </Show>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div class="owner-name">{selectedVehicle()!.ownerName}</div>
+                        <div class="owner-id">Citizen ID: {selectedVehicle()!.ownerId}</div>
+                    <Show when={ownerRecord()?.phone}>
+                      <div class="owner-id">Phone: {ownerRecord()!.phone}</div>
+                    </Show>
+                    <Show when={ownerRecord()?.address}>
+                      <div class="owner-id">Address: {ownerRecord()!.address}</div>
+                    </Show>
+                    <Show when={!ownerRecord()}>
+                      <div class="owner-id">Live owner profile not cached yet - open owner record to hydrate details.</div>
+                    </Show>
+                  </div>
+                </div>
                     <div class="owner-actions">
                       <Button.Root 
                         class="btn btn-primary"
                         onClick={() => {
-                          terminalActions.setActiveModal('PERSON_SNAPSHOT', {
+                          terminalActions.setActiveModal('PERSON_SEARCH', {
                             citizenId: selectedVehicle()!.ownerId,
+                            query: selectedVehicle()!.ownerId,
                           });
                         }}
                       >
                         [VIEW OWNER RECORD]
+                      </Button.Root>
+                      <Button.Root
+                        class="btn"
+                        onClick={() => {
+                          terminalActions.setActiveModal('PERSON_SEARCH', {
+                            citizenId: selectedVehicle()!.ownerId,
+                            tab: 'phone',
+                          });
+                        }}
+                      >
+                        [PHONE INTEL]
                       </Button.Root>
                       <Button.Root
                         class="btn"
@@ -322,11 +501,11 @@ export function VehicleSearch() {
                         onInput={(e) => setNewVehicleNote(e.currentTarget.value)}
                         placeholder="Write a quick note for this vehicle..."
                       />
-                      <Button.Root class="btn btn-primary" onClick={addVehicleNote}>[SAVE NOTE]</Button.Root>
+                      <Button.Root class="btn btn-primary" onClick={() => void addVehicleNote()}>[SAVE NOTE]</Button.Root>
                     </div>
 
                     <Show when={vehicleNotes().length === 0}>
-                      <div class="empty-state">No vehicle notes yet</div>
+                      <div class="empty-state">No investigator notes saved for this vehicle</div>
                     </Show>
 
                     <For each={vehicleNotes()}>

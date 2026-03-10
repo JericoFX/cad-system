@@ -38,25 +38,29 @@ function CAD.Core.Server.QB.ResolveIdentity(source, fallbackIdentifier)
     end
 
     local pd = qbPlayer.PlayerData
+    local metadata = type(pd.metadata) == 'table' and pd.metadata or {}
+    local jobData = type(pd.job) == 'table' and pd.job or {}
+    local gradeData = type(jobData.grade) == 'table' and jobData.grade or {}
     local firstName = pd.charinfo and pd.charinfo.firstname or 'Officer'
     local lastName = pd.charinfo and pd.charinfo.lastname or tostring(source)
     local fullName = ('%s %s'):format(firstName, lastName)
 
-    local callsign = CAD.Officers.GetCallsign(pd.citizenid or fallbackIdentifier)
+    local callsign = CAD.Officers and CAD.Officers.GetCallsign and CAD.Officers.GetCallsign(pd.citizenid or fallbackIdentifier)
     if not callsign then
-        callsign = (pd.metadata and pd.metadata.callsign)
-            or (pd.job and pd.job.grade and ('B-%s'):format(pd.job.grade.level or 0))
+        callsign = metadata.callsign or ('B-%s'):format(gradeData.level or 0)
     end
+
+    local jobName = jobData.name or ''
 
     return {
         source = source,
         identifier = pd.citizenid or fallbackIdentifier,
         callsign = callsign or ('B-%s'):format(source),
         name = fullName,
-        job = pd.job and pd.job.name or 'police',
-        jobLabel = pd.job and pd.job.label or 'Police',
-        grade = pd.job and pd.job.grade and pd.job.grade.level or 0,
-        isAdmin = CAD.Config.Security.AdminJobs[pd.job and pd.job.name or ''] or false,
+        job = jobName,
+        jobLabel = jobData.label or 'Unknown',
+        grade = gradeData.level or 0,
+        isAdmin = ((CAD.Config and CAD.Config.Security and CAD.Config.Security.AdminJobs) or {})[jobName] or false,
     }
 end
 

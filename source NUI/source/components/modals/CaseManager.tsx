@@ -1,4 +1,3 @@
-
 import { createSignal, createMemo, createEffect, createSelector, For, Show } from 'solid-js';
 import { terminalActions, terminalState } from '~/stores/terminalStore';
 import { cadState, cadActions, type Case, type Note, type Evidence } from '~/stores/cadStore';
@@ -84,6 +83,12 @@ export function CaseManager() {
     const types = new Set(allCases().map(c => c.caseType));
     return Array.from(types);
   });
+
+  const caseSummary = createMemo(() => ({
+    open: allCases().filter((item) => item.status === 'OPEN').length,
+    closed: allCases().filter((item) => item.status === 'CLOSED').length,
+    critical: allCases().filter((item) => item.priority === 1).length,
+  }));
 
   const closeModal = () => {
     terminalActions.setActiveModal(null);
@@ -425,6 +430,25 @@ export function CaseManager() {
               </div>
             </Show>
 
+            <div class="summary-stats" style={{ 'margin-bottom': '12px' }}>
+              <div class="stat-box case">
+                <div class="stat-number">{caseSummary().open}</div>
+                <div class="stat-label">Open Cases</div>
+              </div>
+              <div class="stat-box warrant">
+                <div class="stat-number">{caseSummary().critical}</div>
+                <div class="stat-label">Critical</div>
+              </div>
+              <div class="stat-box record">
+                <div class="stat-number">{caseSummary().closed}</div>
+                <div class="stat-label">Closed</div>
+              </div>
+              <div class="stat-box vehicle">
+                <div class="stat-number">{filteredCases().length}</div>
+                <div class="stat-label">Visible</div>
+              </div>
+            </div>
+
          <div class="case-filters">
            <Input.Root
              type="text"
@@ -438,10 +462,10 @@ export function CaseManager() {
              <Button.Root class="btn btn-primary" onClick={createNewCase}>
                [+ NEW CASE]
              </Button.Root>
-             <Button.Root class="btn" onClick={requestHelp}>
-               [REQUEST HELP]
-             </Button.Root>
-           </div>
+              <Button.Root class="btn" onClick={requestHelp} disabled={!selectedCase()}>
+                [REQUEST HELP]
+              </Button.Root>
+            </div>
            
            <Select.Root 
              class="dos-select"
@@ -476,8 +500,11 @@ export function CaseManager() {
          </div>
 
             <div class="cases-list">
+              <Show when={!searchQuery() && filteredCases().length > 0}>
+                <div class="case-modal-hint">Select a case to inspect notes, evidence, and tasks.</div>
+              </Show>
               <Show when={filteredCases().length === 0}>
-                <div class="empty-state">No cases found</div>
+                <div class="empty-state">No case records match the current filters</div>
               </Show>
               
               <For each={filteredCases()}>
@@ -516,7 +543,18 @@ export function CaseManager() {
         <Show when={activeTab() === 'detail' && selectedCase()}>
           <div class="case-detail">
             <div class="detail-header">
-              <h3>{selectedCase()!.caseId}</h3>
+              <div>
+                <h3 style={{ margin: 0 }}>{selectedCase()!.caseId}</h3>
+                <div style={{ display: 'flex', gap: '8px', 'flex-wrap': 'wrap', 'margin-top': '8px' }}>
+                  <span class={`status-badge ${selectedCase()!.status.toLowerCase()}`}>{selectedCase()!.status}</span>
+                  <span class="priority-badge" style={{ color: getPriorityColor(selectedCase()!.priority) }}>
+                    PRIORITY {selectedCase()!.priority}
+                  </span>
+                  <Show when={selectedCase()!.linkedCallId}>
+                    <span class="status-badge open">DISPATCH LINKED</span>
+                  </Show>
+                </div>
+              </div>
               <div class="detail-actions">
                 <Button.Root 
                   class="btn btn-primary"
@@ -537,6 +575,9 @@ export function CaseManager() {
             </div>
             
             <div class="detail-info">
+              <div class="info-row">
+                <strong>Summary:</strong> {(selectedCase()!.notes?.length || 0)} notes | {(selectedCase()!.evidence?.length || 0)} evidence | {(selectedCase()!.tasks?.length || 0)} tasks
+              </div>
               <div class="info-row">
                 <strong>Title:</strong> {selectedCase()!.title}
               </div>
@@ -615,7 +656,7 @@ export function CaseManager() {
             <div class="notes-list">
               <h4>Case Notes ({selectedCase()!.notes?.length || 0})</h4>
               <Show when={!selectedCase()!.notes?.length}>
-                <div class="empty-state">No notes yet</div>
+                <div class="empty-state">No investigator notes saved for this case</div>
               </Show>
               <For each={selectedCase()!.notes || []}>
                 {note => (
@@ -676,7 +717,7 @@ export function CaseManager() {
             <div class="evidence-list">
               <h4>Case Evidence ({selectedCase()!.evidence?.length || 0})</h4>
               <Show when={!selectedCase()!.evidence?.length}>
-                <div class="empty-state">No evidence yet</div>
+                <div class="empty-state">No evidence attached to this case yet</div>
               </Show>
               <For each={selectedCase()!.evidence || []}>
                 {ev => (
@@ -746,7 +787,7 @@ export function CaseManager() {
             <div class="tasks-list">
               <h4>Case Tasks</h4>
               <Show when={!selectedCase()!.tasks?.length}>
-                <div class="empty-state">No tasks yet</div>
+                <div class="empty-state">No case tasks assigned yet</div>
               </Show>
               <For each={selectedCase()!.tasks || []}>
                 {task => (

@@ -102,6 +102,15 @@ local function boolFromAny(value)
     return false
 end
 
+local function stringOrFallback(value, fallback)
+    local text = CAD.Server.SanitizeString(value, 128)
+    if text == '' then
+        return fallback
+    end
+
+    return text
+end
+
 local function decodeVehicleModel(vehicleRaw)
     local decoded = safeJsonDecode(vehicleRaw, nil)
     if type(decoded) ~= 'table' then
@@ -217,7 +226,7 @@ local function getVehicleByPlate(plate, source)
 
     return {
         plate = plateText,
-        model = rawModel or CAD.Server.SanitizeString(row.vehicle_name or row.model, 64) or 'UNKNOWN',
+        model = rawModel or stringOrFallback(row.vehicle_name or row.model, 'UNKNOWN'),
         make = CAD.Server.SanitizeString(row.make or row.brand, 64),
         year = tonumber(row.year) or tonumber(os.date('%Y')),
         color = CAD.Server.SanitizeString(row.color, 32),

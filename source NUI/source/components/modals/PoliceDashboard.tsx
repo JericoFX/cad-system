@@ -217,6 +217,20 @@ export function PoliceDashboard() {
     terminalActions.setActiveModal('PERSON_SEARCH', query ? { query } : undefined);
   };
 
+  const openPhoneIntel = () => {
+    const query = lookupQuery().trim();
+    const phoneLike = query.replace(/\s+/g, '');
+    const isNumericPhone = /^\+?[\d-]{5,20}$/.test(phoneLike);
+    const isImei = /^\d{10,20}$/.test(phoneLike);
+
+    terminalActions.setActiveModal('PERSON_SEARCH', {
+      tab: 'phone',
+      query: lookupMode() === 'PERSON' ? query : undefined,
+      phoneNumber: isNumericPhone && !isImei ? query : undefined,
+      imei: isImei ? phoneLike : undefined,
+    });
+  };
+
   const openVehicleSearch = () => {
     const query = lookupQuery().trim();
     terminalActions.setActiveModal('VEHICLE_SEARCH', query ? { plate: query } : undefined);
@@ -742,7 +756,16 @@ export function PoliceDashboard() {
                   <Button.Root class="btn" onClick={() => lookupMode() === 'PERSON' ? openPersonSearch() : openVehicleSearch()}>
                     [OPEN SEARCH]
                   </Button.Root>
+                  <Show when={lookupMode() === 'PERSON'}>
+                    <Button.Root class="btn" onClick={openPhoneIntel}>
+                      [PHONE INTEL]
+                    </Button.Root>
+                  </Show>
                 </div>
+
+                <Show when={lookupResults().length === 0 && !lookupQuery().trim()}>
+                  <div class="empty-state">Quick lookup can autofill arrests, warrants, impounds, and phone intel.</div>
+                </Show>
 
                 <Show when={lookupResults().length > 0}>
                   <div class="records-list">

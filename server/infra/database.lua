@@ -12,6 +12,19 @@ local function execute(query)
     end
 end
 
+local function executeOptional(query, context)
+    local ok, err = pcall(function()
+        MySQL.query.await(query)
+    end)
+
+    if not ok then
+        CAD.Log('warn', 'Optional schema query skipped (%s): %s', tostring(context or 'unknown'), tostring(err))
+        return false
+    end
+
+    return true
+end
+
 function CAD.Database.EnsureSchema()
     execute([[
         CREATE TABLE IF NOT EXISTS cad_cases (
@@ -266,27 +279,27 @@ function CAD.Database.EnsureSchema()
         )
     ]])
 
-    execute([[SET GLOBAL event_scheduler = ON]])
+    executeOptional([[SET GLOBAL event_scheduler = ON]], 'event_scheduler')
 
-    execute([[
+    executeOptional([[
         CREATE EVENT IF NOT EXISTS ev_cleanup_stale_evidence
         ON SCHEDULE EVERY 6 HOUR
         DO
             DELETE FROM cad_evidence
             WHERE case_id = ''
             AND STR_TO_DATE(attached_at, '%Y-%m-%dT%H:%i:%s') < DATE_SUB(NOW(), INTERVAL 24 HOUR)
-    ]])
+    ]], 'ev_cleanup_stale_evidence')
 
-    execute([[
+    executeOptional([[
         CREATE EVENT IF NOT EXISTS ev_cleanup_closed_calls
         ON SCHEDULE EVERY 24 HOUR
         DO
             DELETE FROM cad_dispatch_calls
             WHERE status = 'CLOSED'
             AND STR_TO_DATE(created_at, '%Y-%m-%dT%H:%i:%s') < DATE_SUB(NOW(), INTERVAL 10 DAY)
-    ]])
+    ]], 'ev_cleanup_closed_calls')
 
-    execute([[
+    executeOptional([[
         CREATE EVENT IF NOT EXISTS ev_cleanup_closed_cases
         ON SCHEDULE EVERY 24 HOUR
         DO
@@ -297,34 +310,34 @@ function CAD.Database.EnsureSchema()
             LEFT JOIN cad_evidence e ON c.case_id = e.case_id
             WHERE c.status = 'CLOSED'
             AND STR_TO_DATE(c.created_at, '%Y-%m-%dT%H:%i:%s') < DATE_SUB(NOW(), INTERVAL 10 DAY)
-    ]])
+    ]], 'ev_cleanup_closed_cases')
 
-    execute([[
+    executeOptional([[
         CREATE EVENT IF NOT EXISTS ev_cleanup_paid_fines
         ON SCHEDULE EVERY 24 HOUR
         DO
             DELETE FROM cad_fines
             WHERE status = 'PAID'
             AND STR_TO_DATE(paid_at, '%Y-%m-%dT%H:%i:%s') < DATE_SUB(NOW(), INTERVAL 10 DAY)
-    ]])
+    ]], 'ev_cleanup_paid_fines')
 
-    execute([[
+    executeOptional([[
         CREATE EVENT IF NOT EXISTS ev_cleanup_expired_alerts
         ON SCHEDULE EVERY 1 HOUR
         DO
             DELETE FROM cad_ems_alerts
             WHERE status IN ('EXPIRED','RESOLVED')
             AND STR_TO_DATE(created_at, '%Y-%m-%dT%H:%i:%s') < DATE_SUB(NOW(), INTERVAL 1 HOUR)
-    ]])
+    ]], 'ev_cleanup_expired_alerts')
 
-    execute([[
+    executeOptional([[
         CREATE EVENT IF NOT EXISTS ev_cleanup_completed_blood_requests
         ON SCHEDULE EVERY 24 HOUR
         DO
             DELETE FROM cad_ems_blood_requests
             WHERE status IN ('COMPLETED', 'DECLINED', 'CANCELLED')
             AND STR_TO_DATE(COALESCE(analysis_completed_at, handled_at, requested_at), '%Y-%m-%dT%H:%i:%s') < DATE_SUB(NOW(), INTERVAL 14 DAY)
-    ]])
+    ]], 'ev_cleanup_completed_blood_requests')
 
     CAD.Log('success', 'Database schema and cleanup events ensured')
 end

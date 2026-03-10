@@ -1,64 +1,14 @@
 
 import { createCommandWithSubcommands } from '../commandBuilder';
-import { cadState, type Person, type CriminalRecord, type Warrant, type Fine } from '~/stores/cadStore';
+import { cadState, cadActions, type Person, type CriminalRecord, type Warrant, type Fine } from '~/stores/cadStore';
 import { hackerActions } from '~/stores/hackerStore';
+import { fetchNui } from '~/utils/fetchNui';
 
-const mockPersons: Person[] = [
-  {
-    citizenid: 'CID001',
-    firstName: 'John',
-    lastName: 'Doe',
-    dateOfBirth: '1990-05-15',
-    ssn: '123-45-6789',
-    phone: '555-0101',
-    address: '123 Main St, Los Santos',
-    bloodType: 'O+',
-    allergies: 'Penicillin',
-    gender: 'MALE',
-    height: '6\'0"',
-    weight: '180 lbs',
-    eyeColor: 'Brown',
-    hairColor: 'Black',
-    createdAt: '2020-01-15',
-    lastUpdated: '2024-01-20',
-    isDead: false
-  },
-  {
-    citizenid: 'CID002',
-    firstName: 'Jane',
-    lastName: 'Smith',
-    dateOfBirth: '1985-08-22',
-    ssn: '987-65-4321',
-    phone: '555-0102',
-    address: '456 Oak Ave, Los Santos',
-    bloodType: 'A+',
-    gender: 'FEMALE',
-    height: '5\'6"',
-    weight: '140 lbs',
-    eyeColor: 'Blue',
-    hairColor: 'Blonde',
-    createdAt: '2019-03-10',
-    lastUpdated: '2024-02-15',
-    isDead: false
-  },
-  {
-    citizenid: 'CID003',
-    firstName: 'Michael',
-    lastName: 'Johnson',
-    dateOfBirth: '1978-12-03',
-    ssn: '456-78-9123',
-    phone: '555-0103',
-    address: '789 Pine Rd, Los Santos',
-    gender: 'MALE',
-    height: '5\'10"',
-    weight: '200 lbs',
-    eyeColor: 'Green',
-    hairColor: 'Brown',
-    createdAt: '2018-07-22',
-    lastUpdated: '2024-01-10',
-    isDead: false
-  }
-];
+interface LookupPersonsResponse {
+  ok?: boolean;
+  persons?: Person[];
+  error?: string;
+}
 
 export function registerPersonSearchCommand() {
   createCommandWithSubcommands({
@@ -78,8 +28,8 @@ export function registerPersonSearchCommand() {
       },
       search: {
         description: 'Search persons (CLI mode)',
-        handler: async ({ args, terminal }: { args: any, terminal: any }) => {
-          let query = args.query as string;
+        handler: async ({ rawArgs, terminal }: { rawArgs: string[]; terminal: any }) => {
+          let query = rawArgs[1] as string | undefined;
 
           if (!query) {
             query = await terminal.prompt('Enter name or Citizen ID:');
@@ -94,25 +44,21 @@ export function registerPersonSearchCommand() {
 
           const stopLoading = terminal.showLoading('Searching database');
 
-          const lowerQuery = query.toLowerCase();
-          const results = mockPersons.filter(person =>
-            person.citizenid.toLowerCase().includes(lowerQuery) ||
-            person.firstName.toLowerCase().includes(lowerQuery) ||
-            person.lastName.toLowerCase().includes(lowerQuery) ||
-            `${person.firstName} ${person.lastName}`.toLowerCase().includes(lowerQuery) ||
-            person.ssn.includes(query)
-          );
+          let uniqueResults: Person[] = [];
 
-          const stateResults = (Object.values(cadState.persons) as Person[]).filter(person =>
-            person.citizenid.toLowerCase().includes(lowerQuery) ||
-            person.firstName.toLowerCase().includes(lowerQuery) ||
-            person.lastName.toLowerCase().includes(lowerQuery)
-          );
+          try {
+            const response = await fetchNui<LookupPersonsResponse>('cad:lookup:searchPersons', {
+              query,
+              limit: 15,
+            });
 
-          const allResults = [...results, ...stateResults];
-          const uniqueResults = allResults.filter((person, index, self) =>
-            index === self.findIndex(p => p.citizenid === person.citizenid)
-          );
+            uniqueResults = Array.isArray(response.persons) ? response.persons : [];
+            uniqueResults.forEach((person) => cadActions.addPerson(person));
+          } catch (error) {
+            stopLoading();
+            terminal.print(`Person search failed: ${String(error)}`, 'error');
+            return;
+          }
 
           stopLoading();
 
@@ -138,7 +84,7 @@ export function registerPersonSearchCommand() {
 
             terminal.printTable(headers, rows);
             
-            terminal.print('\nUse "search-person <CitizenID>" for full details', 'info');
+            terminal.print('\nUse "search-person search <CitizenID>" for full details', 'info');
           }
         }
       }

@@ -1,5 +1,3 @@
--- Modulo forence, intento hacer mas de lo que puedo, para que verga lo hago?
-
 CAD = CAD or {}
 CAD.ForensicClient = CAD.ForensicClient or {}
 
@@ -162,15 +160,16 @@ RegisterCommand('forensiclab', function()
         type = 'inform',
     })
 end, false)
--- Esto se tiene que quitar por puntos de ox
+
 CreateThread(function()
     while true do
         if CAD.IsFeatureEnabled and not CAD.IsFeatureEnabled('Forensics') then
             closeTraceTextUi()
-            Wait(1000)
+            Wait(1500)
         else
             refreshNearbyTraces(false)
-            local nearest = getNearestTrace()
+            local traceCount = #cachedTraces
+            local nearest = traceCount > 0 and getNearestTrace() or nil
             local interactRadius = tonumber(CAD.Config.Forensics.WorldTraceInteractRadius) or 1.8
 
             if nearest and nearest.distance and nearest.distance <= interactRadius then
@@ -187,9 +186,12 @@ CreateThread(function()
                 end
 
                 Wait(0)
+            elseif traceCount > 0 then
+                closeTraceTextUi()
+                Wait(400)
             else
                 closeTraceTextUi()
-                Wait(250)
+                Wait(1000)
             end
         end
     end

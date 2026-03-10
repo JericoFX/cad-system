@@ -1,5 +1,3 @@
--- Function that i get invented because why not.
-
 local function wrapNui(name, handler)
     RegisterNUICallback(name, function(data, cb)
         local ok, result = pcall(handler, data or {})
@@ -292,6 +290,9 @@ end)
 
 wrapNui('cad:lookup:searchPersons', bridge('cad:lookup:searchPersons'))
 wrapNui('cad:lookup:searchVehicles', bridge('cad:lookup:searchVehicles'))
+wrapNui('cad:phone:lookupByNumber', bridge('cad:phone:lookupByNumber'))
+wrapNui('cad:phone:lookupByImei', bridge('cad:phone:lookupByImei'))
+wrapNui('cad:phone:setStolenPlaceholder', bridge('cad:phone:setStolenPlaceholder'))
 wrapNui('cad:entityNotes:list', bridge('cad:entityNotes:list'))
 wrapNui('cad:entityNotes:add', bridge('cad:entityNotes:add'))
 wrapNui('cad:vehicle:quickSummary', bridge('cad:vehicle:quickSummary'))

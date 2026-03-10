@@ -6,6 +6,12 @@ CAD.Auth = CAD.Auth or {}
 local officerCache = {}
 local rateLimits = {}
 
+local function getRateLimitConfig(bucket)
+    local security = CAD.Config and CAD.Config.Security or {}
+    local perMinute = security.RateLimitPerMinute or {}
+    return tonumber(perMinute[bucket] or perMinute.default) or 60
+end
+
 local function getBucket(source, bucket)
     rateLimits[source] = rateLimits[source] or {}
     rateLimits[source][bucket] = rateLimits[source][bucket] or {
@@ -21,12 +27,19 @@ function CAD.Auth.GetOfficerData(source)
         return nil
     end
 
+    local cached = officerCache[src]
+    if cached and (os.time() - (cached.updatedAt or 0)) < 15 then
+        return cached
+    end
+
     local identity = CAD.Server.GetPlayerIdentity(src)
     if not identity then
+        officerCache[src] = nil
         return nil
     end
 
     if not CAD.Server.IsAllowedJob(identity.job) then
+        officerCache[src] = nil
         return nil
     end
 
@@ -71,7 +84,7 @@ function CAD.Auth.CheckRate(source, bucket)
         state.resetAt = now + 60
     end
 
-    local limit = CAD.Config.Security.RateLimitPerMinute[key] or CAD.Config.Security.RateLimitPerMinute.default
+    local limit = getRateLimitConfig(key)
     if state.count >= limit then
         return false, {
             ok = false,

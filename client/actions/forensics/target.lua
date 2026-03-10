@@ -21,6 +21,7 @@ CAD.Forensic.Visuals = CAD.Forensic.Visuals or {
 }
 
 local CASING_MODEL = joaat('prop_cs_casing_01')
+local lastFingerprintTargetRefresh = 0
 
 local function deepCopy(value)
     if CAD.DeepCopy then
@@ -160,21 +161,34 @@ local function removeTargetZone(zoneId)
     exports.ox_target:removeZone(zoneId)
 end
 
+local function removeTargetEntry(entry)
+    if type(entry) == 'table' then
+        removeTargetZone(entry.zoneId)
+        return
+    end
+
+    removeTargetZone(entry)
+end
+
+local function clearTargetMap(targetMap)
+    for evidenceId, entry in pairs(targetMap) do
+        removeTargetEntry(entry)
+        targetMap[evidenceId] = nil
+    end
+end
+
+local function coordsChanged(previousCoords, currentCoords, threshold)
+    if not previousCoords or not currentCoords then
+        return true
+    end
+
+    return #(previousCoords - currentCoords) > (threshold or 0.15)
+end
+
 local function clearAllTargets()
-    for bloodId, zoneId in pairs(CAD.Forensic.Targets.blood) do
-        removeTargetZone(zoneId)
-        CAD.Forensic.Targets.blood[bloodId] = nil
-    end
-
-    for fpId, zoneId in pairs(CAD.Forensic.Targets.fingerprints) do
-        removeTargetZone(zoneId)
-        CAD.Forensic.Targets.fingerprints[fpId] = nil
-    end
-
-    for casingId, zoneId in pairs(CAD.Forensic.Targets.casings) do
-        removeTargetZone(zoneId)
-        CAD.Forensic.Targets.casings[casingId] = nil
-    end
+    clearTargetMap(CAD.Forensic.Targets.blood)
+    clearTargetMap(CAD.Forensic.Targets.fingerprints)
+    clearTargetMap(CAD.Forensic.Targets.casings)
 end
 
 local function createBloodDecal(coords, visibility)
@@ -341,202 +355,134 @@ local function clearAllVisuals()
     end
 end
 
-local function setupBloodTargets()
+local function createBloodTarget(bloodId, blood)
     if not isOxTargetReady() then
         return
     end
 
-    local ped = getPed()
-    if not ped or ped == 0 then
+    local coords = asVector3Coords(blood.coords)
+    if not coords or clampVisibility(blood.visibility) <= 0.01 then
         return
     end
 
-    local pedCoords = GetEntityCoords(ped)
-    for bloodId, blood in pairs(CAD.Forensic.Blood.Evidence or {}) do
-        if CAD.Forensic.Targets.blood[bloodId] then
-            goto continue
-        end
-
-        local coords = asVector3Coords(blood.coords)
-        if not coords then
-            goto continue
-        end
-
-        local visibility = clampVisibility(blood.visibility)
-        if visibility <= 0.01 then
-            goto continue
-        end
-
-        if #(pedCoords - coords) > 2.0 then
-            goto continue
-        end
-
-        local config = CAD.EvidenceTypes.GetType('blood')
-        if not config then
-            goto continue
-        end
-
-        local options = {}
-
-        if hasTool(config.requiredTool) then
-            options[#options + 1] = {
-                icon = config.icon,
-                label = 'Collect Blood Sample',
-                onSelect = function()
-                    local completed = showProgress(5000, 'Collecting blood sample...')
-                    if not completed then
-                        return
-                    end
-
-                    TriggerServerEvent('cad:forensic:collect', 'blood', bloodId)
-                end,
-            }
-        end
-
-        if hasTool('hydrogen_peroxide') then
-            options[#options + 1] = {
-                icon = 'fa-broom',
-                label = 'Clean Blood',
-                onSelect = function()
-                    local completed = showProgress(3000, 'Cleaning blood...')
-                    if not completed then
-                        return
-                    end
-
-                    TriggerServerEvent('cad:forensic:destroy', 'blood', bloodId)
-                end,
-            }
-        end
-
-        if #options > 0 then
-            CAD.Forensic.Targets.blood[bloodId] = exports.ox_target:addSphereZone({
-                coords = coords,
-                radius = 1.0,
-                debug = false,
-                options = options,
-            })
-        end
-
-        ::continue::
+    local config = CAD.EvidenceTypes.GetType('blood')
+    if not config then
+        return
     end
+
+    CAD.Forensic.Targets.blood[bloodId] = {
+        zoneId = exports.ox_target:addSphereZone({
+            coords = coords,
+            radius = 1.0,
+            debug = false,
+            options = {
+                {
+                    icon = config.icon,
+                    label = 'Collect Blood Sample',
+                    canInteract = function()
+                        return hasTool(config.requiredTool)
+                    end,
+                    onSelect = function()
+                        local completed = showProgress(5000, 'Collecting blood sample...')
+                        if not completed then
+                            return
+                        end
+
+                        TriggerServerEvent('cad:forensic:collect', 'blood', bloodId)
+                    end,
+                },
+                {
+                    icon = 'fa-broom',
+                    label = 'Clean Blood',
+                    canInteract = function()
+                        return hasTool('hydrogen_peroxide')
+                    end,
+                    onSelect = function()
+                        local completed = showProgress(3000, 'Cleaning blood...')
+                        if not completed then
+                            return
+                        end
+
+                        TriggerServerEvent('cad:forensic:destroy', 'blood', bloodId)
+                    end,
+                },
+            },
+        }),
+    }
 end
 
-local function setupFingerprintTargets()
+local function createFingerprintTarget(fpId, fingerprint, coords)
     if not isOxTargetReady() then
         return
     end
 
-    local ped = getPed()
-    if not ped or ped == 0 then
+    local config = CAD.EvidenceTypes.GetType('fingerprint')
+    if not config or not coords or clampVisibility(fingerprint.visibility) <= 0.01 then
         return
     end
 
-    local pedCoords = GetEntityCoords(ped)
-    for fpId, fingerprint in pairs(CAD.Forensic.Fingerprints.Evidence or {}) do
-        if CAD.Forensic.Targets.fingerprints[fpId] then
-            goto continue
-        end
+    CAD.Forensic.Targets.fingerprints[fpId] = {
+        zoneId = exports.ox_target:addBoxZone({
+            coords = coords,
+            size = vec3(0.5, 0.5, 0.5),
+            rotation = 0.0,
+            debug = false,
+            options = {
+                {
+                    icon = 'fa-magnifying-glass',
+                    label = 'Dust for Fingerprints',
+                    canInteract = function()
+                        local current = CAD.Forensic.Fingerprints.Evidence[fpId]
+                        return current ~= nil and current.revealed ~= true and hasTool(config.revealTool)
+                    end,
+                    onSelect = function()
+                        local completed = showProgress(5000, 'Dusting surface...')
+                        if not completed then
+                            return
+                        end
 
-        local coords = getFingerprintCoords(fingerprint)
-        if not coords then
-            goto continue
-        end
+                        TriggerServerEvent('cad:forensic:reveal', 'fingerprint', fpId)
+                    end,
+                },
+                {
+                    icon = config.icon,
+                    label = 'Lift Fingerprint',
+                    canInteract = function()
+                        local current = CAD.Forensic.Fingerprints.Evidence[fpId]
+                        return current ~= nil and current.revealed == true and hasTool(config.requiredTool)
+                    end,
+                    onSelect = function()
+                        local completed = showProgress(8000, 'Lifting fingerprint...')
+                        if not completed then
+                            return
+                        end
 
-        local visibility = clampVisibility(fingerprint.visibility)
-        if visibility <= 0.01 then
-            goto continue
-        end
-
-        if #(pedCoords - coords) > 1.5 then
-            goto continue
-        end
-
-        local config = CAD.EvidenceTypes.GetType('fingerprint')
-        if not config then
-            goto continue
-        end
-
-        local options = {}
-        if hasTool(config.revealTool) and not fingerprint.revealed then
-            options[#options + 1] = {
-                icon = 'fa-magnifying-glass',
-                label = 'Dust for Fingerprints',
-                onSelect = function()
-                    local completed = showProgress(5000, 'Dusting surface...')
-                    if not completed then
-                        return
-                    end
-
-                    TriggerServerEvent('cad:forensic:reveal', 'fingerprint', fpId)
-                end,
-            }
-        end
-
-        if hasTool(config.requiredTool) and fingerprint.revealed then
-            options[#options + 1] = {
-                icon = config.icon,
-                label = 'Lift Fingerprint',
-                onSelect = function()
-                    local completed = showProgress(8000, 'Lifting fingerprint...')
-                    if not completed then
-                        return
-                    end
-
-                    TriggerServerEvent('cad:forensic:collect', 'fingerprint', fpId)
-                end,
-            }
-        end
-
-        if #options > 0 then
-            CAD.Forensic.Targets.fingerprints[fpId] = exports.ox_target:addBoxZone({
-                coords = coords,
-                size = vec3(0.5, 0.5, 0.5),
-                rotation = 0.0,
-                debug = false,
-                options = options,
-            })
-        end
-
-        ::continue::
-    end
+                        TriggerServerEvent('cad:forensic:collect', 'fingerprint', fpId)
+                    end,
+                },
+            },
+        }),
+        coords = coords,
+    }
 end
 
-local function setupCasingTargets()
+local function createCasingTarget(casingId, casing)
     if not isOxTargetReady() then
         return
     end
 
-    local ped = getPed()
-    if not ped or ped == 0 then
+    local coords = asVector3Coords(casing.coords)
+    if not coords or clampVisibility(casing.visibility) <= 0.01 then
         return
     end
 
-    local pedCoords = GetEntityCoords(ped)
-    for casingId, casing in pairs(CAD.Forensic.Casings.Evidence or {}) do
-        if CAD.Forensic.Targets.casings[casingId] then
-            goto continue
-        end
+    local config = CAD.EvidenceTypes.GetType('casing')
+    if not config then
+        return
+    end
 
-        local coords = asVector3Coords(casing.coords)
-        if not coords then
-            goto continue
-        end
-
-        local visibility = clampVisibility(casing.visibility)
-        if visibility <= 0.01 then
-            goto continue
-        end
-
-        if #(pedCoords - coords) > 1.0 then
-            goto continue
-        end
-
-        local config = CAD.EvidenceTypes.GetType('casing')
-        if not config or not hasTool(config.requiredTool) then
-            goto continue
-        end
-
-        CAD.Forensic.Targets.casings[casingId] = exports.ox_target:addSphereZone({
+    CAD.Forensic.Targets.casings[casingId] = {
+        zoneId = exports.ox_target:addSphereZone({
             coords = coords,
             radius = 0.5,
             debug = false,
@@ -544,6 +490,9 @@ local function setupCasingTargets()
                 {
                     icon = config.icon,
                     label = 'Collect Casing',
+                    canInteract = function()
+                        return hasTool(config.requiredTool)
+                    end,
                     onSelect = function()
                         local completed = showProgress(3000, 'Collecting casing...')
                         if not completed then
@@ -554,31 +503,64 @@ local function setupCasingTargets()
                     end,
                 },
             },
-        })
+        }),
+    }
+end
 
-        ::continue::
+local function rebuildBloodTargets()
+    clearTargetMap(CAD.Forensic.Targets.blood)
+
+    if not isOxTargetReady() then
+        return
+    end
+
+    for bloodId, blood in pairs(CAD.Forensic.Blood.Evidence or {}) do
+        createBloodTarget(bloodId, blood)
     end
 end
 
-local function cleanupRemovedTargets()
-    for bloodId, zoneId in pairs(CAD.Forensic.Targets.blood) do
-        if not CAD.Forensic.Blood.Evidence[bloodId] then
-            removeTargetZone(zoneId)
-            CAD.Forensic.Targets.blood[bloodId] = nil
-        end
+local function rebuildCasingTargets()
+    clearTargetMap(CAD.Forensic.Targets.casings)
+
+    if not isOxTargetReady() then
+        return
     end
 
-    for fpId, zoneId in pairs(CAD.Forensic.Targets.fingerprints) do
+    for casingId, casing in pairs(CAD.Forensic.Casings.Evidence or {}) do
+        createCasingTarget(casingId, casing)
+    end
+end
+
+local function refreshFingerprintTargets(force)
+    if not isOxTargetReady() then
+        clearTargetMap(CAD.Forensic.Targets.fingerprints)
+        return
+    end
+
+    for fpId, entry in pairs(CAD.Forensic.Targets.fingerprints) do
         if not CAD.Forensic.Fingerprints.Evidence[fpId] then
-            removeTargetZone(zoneId)
+            removeTargetEntry(entry)
             CAD.Forensic.Targets.fingerprints[fpId] = nil
         end
     end
 
-    for casingId, zoneId in pairs(CAD.Forensic.Targets.casings) do
-        if not CAD.Forensic.Casings.Evidence[casingId] then
-            removeTargetZone(zoneId)
-            CAD.Forensic.Targets.casings[casingId] = nil
+    for fpId, fingerprint in pairs(CAD.Forensic.Fingerprints.Evidence or {}) do
+        local coords = getFingerprintCoords(fingerprint)
+        local visibility = clampVisibility(fingerprint.visibility)
+        local entry = CAD.Forensic.Targets.fingerprints[fpId]
+
+        if not coords or visibility <= 0.01 then
+            if entry then
+                removeTargetEntry(entry)
+                CAD.Forensic.Targets.fingerprints[fpId] = nil
+            end
+        elseif force or not entry or coordsChanged(entry.coords, coords, 0.2) then
+            if entry then
+                removeTargetEntry(entry)
+                CAD.Forensic.Targets.fingerprints[fpId] = nil
+            end
+
+            createFingerprintTarget(fpId, fingerprint, coords)
         end
     end
 end
@@ -633,6 +615,21 @@ local function drawFingerprintMarkers()
     return drawn
 end
 
+local function reconcileSceneEvidence()
+    syncBloodVisuals()
+    syncCasingVisuals()
+
+    if not isOxTargetReady() then
+        clearAllTargets()
+        return
+    end
+
+    rebuildBloodTargets()
+    rebuildCasingTargets()
+    refreshFingerprintTargets(true)
+    lastFingerprintTargetRefresh = GetGameTimer()
+end
+
 if type(AddStateBagChangeHandler) == 'function' then
     AddStateBagChangeHandler('evidences', nil, function(bagName, key, value)
         if bagName ~= 'global' or key ~= 'evidences' then
@@ -640,6 +637,7 @@ if type(AddStateBagChangeHandler) == 'function' then
         end
 
         applySceneEvidenceState(value)
+        reconcileSceneEvidence()
     end)
 else
     print('[CAD] AddStateBagChangeHandler unavailable; forensic scene evidence sync disabled')
@@ -648,33 +646,23 @@ end
 CreateThread(function()
     Wait(500)
     refreshSceneEvidenceFromStateBag()
+    reconcileSceneEvidence()
 end)
 
 CreateThread(function()
     while true do
-        Wait(1000)
+        if next(CAD.Forensic.Fingerprints.Evidence or {}) == nil then
+            Wait(1000)
+        else
+            local now = GetGameTimer()
+            if now - lastFingerprintTargetRefresh >= 1000 then
+                refreshFingerprintTargets(false)
+                lastFingerprintTargetRefresh = now
+            end
 
-        syncBloodVisuals()
-        syncCasingVisuals()
-
-        if not isOxTargetReady() then
-            clearAllTargets()
-            goto continue
+            local drawn = drawFingerprintMarkers()
+            Wait(drawn and 0 or 350)
         end
-
-        cleanupRemovedTargets()
-        setupBloodTargets()
-        setupFingerprintTargets()
-        setupCasingTargets()
-
-        ::continue::
-    end
-end)
-
-CreateThread(function()
-    while true do
-        local drawn = drawFingerprintMarkers()
-        Wait(drawn and 0 or 250)
     end
 end)
 
