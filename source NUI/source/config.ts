@@ -85,6 +85,7 @@ const newsFeature = parseBoolean(env.VITE_FEATURE_NEWS, true);
 const emsFeature = parseBoolean(env.VITE_FEATURE_EMS, true);
 const mapFeature = parseBoolean(env.VITE_FEATURE_MAP, true);
 const radioFeature = parseBoolean(env.VITE_FEATURE_RADIO, true);
+const phoneIntelFeature = parseBoolean(env.VITE_FEATURE_PHONE_INTEL, true);
 const vehicleDockFeature = parseBoolean(env.VITE_FEATURE_VEHICLE_DOCK, true);
 const bootEnabled = parseBoolean(env.VITE_BOOT_ENABLED, true);
 const bootSkippable = parseBoolean(env.VITE_BOOT_SKIPPABLE, true);
@@ -105,6 +106,7 @@ export const CONFIG = {
     EMS: emsFeature,
     MAP: mapFeature,
     RADIO: radioFeature,
+    PHONE_INTEL: phoneIntelFeature,
     VEHICLE_DOCK: vehicleDockFeature,
   },
 
