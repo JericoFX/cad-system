@@ -117,6 +117,20 @@ source NUI/source/
     custom.css         - Estilos custom (crear)
 ```
 
+## Guía de Integración Frontend
+
+Para una guía completa de integración con modals y NUI, ver:
+- `INTEGRACION_FRONTEND.md` - Guía completa de integración
+
+Esta guía incluye:
+- Cómo integrar modals en el sistema
+- Eventos NUI y callbacks
+- Hooks disponibles (useNuiEvent, fetchNUI)
+- Stores y estado del sistema
+- Estilos y CSS
+- Integración con backend Lua
+- Debug y testing
+
 ---
 
 **Last Updated**: 2026-03-16
