@@ -1,6 +1,7 @@
 import { createSignal, createMemo, createSelector, For, Show, onMount } from 'solid-js';
 import { terminalActions, terminalState } from '~/stores/terminalStore';
 import { cadState, cadActions, type Person } from '~/stores/cadStore';
+import { featureState } from '~/stores/featureStore';
 import { fetchNui } from '~/utils/fetchNui';
 import { Button, Input, Modal, Tabs, Textarea } from '~/components/ui';
 import { PhotoGallery } from '~/components/ui/PhotoGallery';
@@ -359,6 +360,11 @@ export function PersonSearch() {
       }
 
       if (modalData.tab === 'phone') {
+        if (!featureState.phoneIntel.enabled || !featureState.phoneIntel.visible) {
+          terminalActions.addLine('Phone intel feature unavailable', 'error');
+          return;
+        }
+
         if (modalData.phoneNumber && modalData.phoneNumber.trim() !== '') {
           await lookupPhoneByNumber();
           return;
@@ -732,7 +738,12 @@ export function PersonSearch() {
 
               <Tabs.Root
                 value={activeTab()}
-                onValueChange={(value) => setActiveTab(value as 'info' | 'vehicles' | 'records' | 'warrants' | 'notes' | 'phone')}
+                onValueChange={(value) => {
+                  if (value === 'phone' && (!featureState.phoneIntel.enabled || !featureState.phoneIntel.visible)) {
+                    return;
+                  }
+                  setActiveTab(value as 'info' | 'vehicles' | 'records' | 'warrants' | 'notes' | 'phone');
+                }}
               >
                 <Tabs.List>
                   <Tabs.Trigger value='info' label='INFO' />
@@ -740,7 +751,9 @@ export function PersonSearch() {
                   <Tabs.Trigger value='records' label='RECORDS' badge={personRecords().length} />
                   <Tabs.Trigger value='warrants' label='WARRANTS' badge={personWarrants().length} />
                   <Tabs.Trigger value='notes' label='NOTES' badge={personNotes().length} />
-                  <Tabs.Trigger value='phone' label='PHONE INTEL' />
+                  <Show when={featureState.phoneIntel.enabled && featureState.phoneIntel.visible}>
+                    <Tabs.Trigger value='phone' label='PHONE INTEL' />
+                  </Show>
                 </Tabs.List>
               </Tabs.Root>
 

@@ -23,7 +23,7 @@ client_scripts {
     'client/core/qb.lua',
     'client/core/init.lua',
 
-    'client/shared/functions.lua',
+    'client/shared functions.lua',
 
     'client/app/main.lua',
     'client/app/nui.lua',
@@ -71,6 +71,7 @@ server_scripts {
     'server/actions/forensics/decay.lua',
     'server/actions/id_reader.lua',
     'server/actions/vehicle_tablet.lua',
+    'addons/gcphone.lua',
     'server/actions/phone_lookup.lua',
     'server/infra/exports.lua',
     'server/infra/main.lua'

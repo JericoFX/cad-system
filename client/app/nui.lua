@@ -57,6 +57,9 @@ wrapNui('cad:getUiFeatures', function()
     local radioEnabled = featureEnabled('Radio')
     local radioVisible = radioEnabled and featureVisible('Radio', true)
 
+    local phoneIntelEnabled = GetResourceState('gcphone-next') == 'started'
+    local phoneIntelVisible = phoneIntelEnabled and featureVisible('PhoneIntel', true)
+
     return {
         dispatch = {
             enabled = dispatchEnabled,
@@ -82,6 +85,10 @@ wrapNui('cad:getUiFeatures', function()
         radio = {
             enabled = radioEnabled,
             visible = radioVisible,
+        },
+        phoneIntel = {
+            enabled = phoneIntelEnabled,
+            visible = phoneIntelVisible,
         },
     }
 end)

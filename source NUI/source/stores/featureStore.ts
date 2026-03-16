@@ -14,6 +14,7 @@ type FeaturePayload = {
   ems?: Partial<ModuleFeature>;
   map?: Partial<ModuleFeature>;
   radio?: Partial<ModuleFeature>;
+  phoneIntel?: Partial<ModuleFeature>;
 };
 
 interface FeatureState {
@@ -25,6 +26,7 @@ interface FeatureState {
   ems: ModuleFeature;
   map: ModuleFeature;
   radio: ModuleFeature;
+  phoneIntel: ModuleFeature;
 }
 
 const defaultFeature: ModuleFeature = {
@@ -59,6 +61,10 @@ const initialState: FeatureState = {
     enabled: CONFIG.FEATURES.RADIO,
     visible: CONFIG.FEATURES.RADIO,
   },
+  phoneIntel: {
+    enabled: CONFIG.FEATURES.PHONE_INTEL,
+    visible: CONFIG.FEATURES.PHONE_INTEL,
+  },
 };
 
 export const [featureState, setFeatureState] = createStore<FeatureState>(initialState);
@@ -76,6 +82,7 @@ const newsModals = new Set(['NEWS_MANAGER']);
 const emsModals = new Set(['EMS_DASHBOARD']);
 const mapModals = new Set(['MAP']);
 const radioModals = new Set(['RADIO_PANEL', 'RADIO_MARKERS']);
+const phoneIntelModals = new Set(['PERSON_SEARCH']);
 
 export const featureActions = {
   load: async () => {
@@ -96,6 +103,7 @@ export const featureActions = {
         ems: normalizeFeature(payload?.ems, featureState.ems),
         map: normalizeFeature(payload?.map, featureState.map),
         radio: normalizeFeature(payload?.radio, featureState.radio),
+        phoneIntel: normalizeFeature(payload?.phoneIntel, featureState.phoneIntel),
       });
     } catch (error) {
       console.error('[FeatureStore] Failed to load feature flags', error);
@@ -130,6 +138,10 @@ export const featureActions = {
 
     if (radioModals.has(modalName)) {
       return featureState.radio.enabled && featureState.radio.visible;
+    }
+
+    if (phoneIntelModals.has(modalName)) {
+      return featureState.phoneIntel.enabled && featureState.phoneIntel.visible;
     }
 
     return true;
