@@ -430,7 +430,6 @@ local function uploadToExternalAPI(imageData, metadata)
     local apiType = apiConfig.Type or 'discord'
 
     if apiType == 'discord' and apiConfig.DiscordWebhook and apiConfig.DiscordWebhook ~= '' then
-
         local boundary = '----CADBoundary' .. os.time()
         local filename = 'evidence_' .. os.time() .. '.jpg'
 
@@ -451,11 +450,29 @@ local function uploadToExternalAPI(imageData, metadata)
 
         local formData = table.concat(body, '\r\n')
 
-        return 'https://cdn.discordapp.com/attachments/.../photo.jpg', nil
+        local response = performHttpRequestAwait(
+            apiConfig.DiscordWebhook .. '?wait=true',
+            'POST',
+            formData,
+            { ['Content-Type'] = 'multipart/form-data; boundary=' .. boundary }
+        )
+
+        local statusCode = tonumber(response and response.statusCode) or 0
+        if statusCode < 200 or statusCode >= 300 then
+            CAD.Log('error', 'Discord upload failed with status %d', statusCode)
+            return nil, 'discord_upload_http_' .. tostring(statusCode)
+        end
+
+        local url = extractUploadedUrl(response and response.responseText)
+        if not url then
+            return nil, 'discord_response_invalid'
+        end
+
+        return url, nil
     end
 
-    if apiType == 'imgur' and apiConfig.ImgurClientId and apiConfig.ImgurClientId ~= '' then
-
+    if apiType == 'imgur' then
+        CAD.Log('warn', 'Imgur upload provider is not yet implemented')
         return nil, 'imgur_not_implemented'
     end
 

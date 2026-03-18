@@ -35,35 +35,44 @@ local function findFineDefinition(code)
 end
 
 local function saveFineDb(fine)
-    MySQL.insert.await([[
-        INSERT INTO cad_fines (
-            fine_id, target_type, target_id, target_name, fine_code, description,
-            amount, jail_time, issued_by, issued_by_name, issued_at,
-            paid, paid_at, paid_method, status, is_bail
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-            paid = VALUES(paid),
-            paid_at = VALUES(paid_at),
-            paid_method = VALUES(paid_method),
-            status = VALUES(status)
-    ]], {
-        fine.fineId,
-        fine.targetType,
-        fine.targetId,
-        fine.targetName,
-        fine.fineCode,
-        fine.description,
-        fine.amount,
-        fine.jailTime,
-        fine.issuedBy,
-        fine.issuedByName,
-        fine.issuedAt,
-        fine.paid and 1 or 0,
-        fine.paidAt,
-        fine.paidMethod,
-        fine.status,
-        fine.isBail and 1 or 0,
-    })
+    local ok, err = pcall(function()
+        MySQL.insert.await([[
+            INSERT INTO cad_fines (
+                fine_id, target_type, target_id, target_name, fine_code, description,
+                amount, jail_time, issued_by, issued_by_name, issued_at,
+                paid, paid_at, paid_method, status, is_bail
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                paid = VALUES(paid),
+                paid_at = VALUES(paid_at),
+                paid_method = VALUES(paid_method),
+                status = VALUES(status)
+        ]], {
+            fine.fineId,
+            fine.targetType,
+            fine.targetId,
+            fine.targetName,
+            fine.fineCode,
+            fine.description,
+            fine.amount,
+            fine.jailTime,
+            fine.issuedBy,
+            fine.issuedByName,
+            fine.issuedAt,
+            fine.paid and 1 or 0,
+            fine.paidAt,
+            fine.paidMethod,
+            fine.status,
+            fine.isBail and 1 or 0,
+        })
+    end)
+
+    if not ok then
+        CAD.Log('error', 'Failed saving fine %s: %s', tostring(fine and fine.fineId), tostring(err))
+        return false, 'db_write_failed'
+    end
+
+    return true
 end
 
 local function getSourceByIdentifier(identifier)
@@ -108,8 +117,12 @@ local function issueFine(payload, officer)
         return { ok = false, error = 'invalid_fine' }
     end
 
+    local saved, saveErr = saveFineDb(fine)
+    if not saved then
+        return { ok = false, error = saveErr or 'db_write_failed' }
+    end
+
     fines[fine.fineId] = fine
-    saveFineDb(fine)
 
     local targetSource = getSourceByIdentifier(fine.targetId)
     if targetSource then
@@ -174,11 +187,24 @@ local function payFine(source, fineId, method)
         return { ok = false, error = 'forbidden' }
     end
 
+    local previousPaid = fine.paid
+    local previousPaidAt = fine.paidAt
+    local previousPaidMethod = fine.paidMethod
+    local previousStatus = fine.status
+
     fine.paid = true
     fine.paidAt = CAD.Server.ToIso()
     fine.paidMethod = tostring(method or 'BANK')
     fine.status = 'PAID'
-    saveFineDb(fine)
+
+    local saved, saveErr = saveFineDb(fine)
+    if not saved then
+        fine.paid = previousPaid
+        fine.paidAt = previousPaidAt
+        fine.paidMethod = previousPaidMethod
+        fine.status = previousStatus
+        return { ok = false, error = saveErr or 'db_write_failed' }
+    end
 
     CAD.Server.BroadcastToJobs(
         {'police', 'sheriff'},
