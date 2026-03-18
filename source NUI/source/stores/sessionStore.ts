@@ -1,6 +1,6 @@
 
 import { createStore } from 'solid-js/store';
-import { createEffect, batch } from 'solid-js';
+import { createEffect, createRoot, batch } from 'solid-js';
 import { cadState } from './cadStore';
 import { userState } from './userStore';
 
@@ -48,7 +48,9 @@ const initialState: SessionState = {
 
 export const [sessionState, setSessionState] = createStore(initialState);
 
-export function syncSessionWithCAD() {
+let sessionEffectsDisposer: (() => void) | null = null;
+
+function syncSessionWithCAD() {
   createEffect(() => {
     const currentCase = cadState.currentCase;
     if (currentCase) {
@@ -63,7 +65,7 @@ export function syncSessionWithCAD() {
       });
     }
   });
-  
+
   createEffect(() => {
     const currentCall = cadState.currentCall;
     if (currentCall) {
@@ -80,7 +82,7 @@ export function syncSessionWithCAD() {
   });
 }
 
-export function syncSessionWithUser() {
+function syncSessionWithUser() {
   createEffect(() => {
     const user = userState.currentUser;
     if (user) {
@@ -97,6 +99,13 @@ export function syncSessionWithUser() {
       });
     }
   });
+}
+
+export function disposeSessionEffects() {
+  if (sessionEffectsDisposer) {
+    sessionEffectsDisposer();
+    sessionEffectsDisposer = null;
+  }
 }
 
 export const sessionActions = {
@@ -156,8 +165,12 @@ export const sessionActions = {
   },
   
   initialize: () => {
-    syncSessionWithCAD();
-    syncSessionWithUser();
+    disposeSessionEffects();
+    sessionEffectsDisposer = createRoot((dispose) => {
+      syncSessionWithCAD();
+      syncSessionWithUser();
+      return dispose;
+    });
   },
   
   hasActiveContext: (): boolean => {

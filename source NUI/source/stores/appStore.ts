@@ -5,7 +5,6 @@
  */
 
 import { createStore } from 'solid-js/store';
-import { isEnvBrowser } from '~/utils/misc';
 import { CONFIG } from '~/config';
 
 interface AppState {
@@ -101,8 +100,7 @@ export const appActions = {
    * Called when receiving 'cad:opened' from Lua
    */
   show: () => {
-    setAppState('isVisible', isEnvBrowser() || true);
-    console.log('[AppStore] CAD shown');
+    setAppState('isVisible', true);
   },
 
   /**
@@ -120,7 +118,6 @@ export const appActions = {
       bootStartedAt: null,
       bootOfficer: null,
     });
-    console.log('[AppStore] CAD hidden');
   },
 
   /**

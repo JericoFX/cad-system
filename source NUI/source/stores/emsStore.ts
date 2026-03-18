@@ -553,6 +553,10 @@ Time: ${new Date().toLocaleString()}`;
   },
 };
 
+let emsPersistInterval: number | null = null;
+let emsVisibilityHandler: (() => void) | null = null;
+let emsUnloadHandler: (() => void) | null = null;
+
 if (typeof window !== 'undefined') {
   let lastPersistedPayload = '';
 
@@ -571,7 +575,7 @@ if (typeof window !== 'undefined') {
     lastPersistedPayload = payload;
   };
 
-  setInterval(() => {
+  emsPersistInterval = window.setInterval(() => {
     if (document.hidden) {
       return;
     }
@@ -579,15 +583,18 @@ if (typeof window !== 'undefined') {
     persistEmsState();
   }, 30000);
 
-  window.addEventListener('visibilitychange', () => {
+  emsVisibilityHandler = () => {
     if (document.hidden) {
       persistEmsState();
     }
-  });
+  };
 
-  window.addEventListener('beforeunload', () => {
+  emsUnloadHandler = () => {
     persistEmsState();
-  });
+  };
+
+  window.addEventListener('visibilitychange', emsVisibilityHandler);
+  window.addEventListener('beforeunload', emsUnloadHandler);
 
   const saved = localStorage.getItem('cad_ems');
   if (saved) {
@@ -602,5 +609,20 @@ if (typeof window !== 'undefined') {
     } catch (e) {
       console.error('[EMS] Failed to load saved data:', e);
     }
+  }
+}
+
+export function cleanupEmsTimers() {
+  if (emsPersistInterval !== null) {
+    clearInterval(emsPersistInterval);
+    emsPersistInterval = null;
+  }
+  if (emsVisibilityHandler) {
+    window.removeEventListener('visibilitychange', emsVisibilityHandler);
+    emsVisibilityHandler = null;
+  }
+  if (emsUnloadHandler) {
+    window.removeEventListener('beforeunload', emsUnloadHandler);
+    emsUnloadHandler = null;
   }
 }
