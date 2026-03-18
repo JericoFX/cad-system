@@ -83,7 +83,9 @@ export function initCadHandlers(): void {
 
     const { sessionActions } = await import('~/stores/sessionStore');
     const { terminalActions } = await import('~/stores/terminalStore');
+    const { restartRadioTimers } = await import('~/stores/radioStore');
 
+    restartRadioTimers();
     terminalActions.setVehicleOverlayOwned(false);
 
     if (data.terminalId) {
@@ -194,13 +196,21 @@ export function initCadHandlers(): void {
     appActions.hide();
 
     const { homeActions } = await import('~/stores/homeStore');
-    const { sessionActions } = await import('~/stores/sessionStore');
+    const { sessionActions, disposeSessionEffects } = await import('~/stores/sessionStore');
     const { terminalActions } = await import('~/stores/terminalStore');
+    const { cleanupRadioTimers } = await import('~/stores/radioStore');
+    const { cleanupEmsTimers } = await import('~/stores/emsStore');
+    const { hackerEffects } = await import('~/stores/hackerStore');
 
     terminalActions.setVehicleOverlayOwned(false);
     homeActions.reset();
     sessionActions.clearTerminalContext();
     terminalActions.setActiveModal(null);
+
+    cleanupRadioTimers();
+    cleanupEmsTimers();
+    hackerEffects.stopNoise();
+    disposeSessionEffects();
   });
 
   onNuiMessage<{ citizenId?: string; name?: string }>('searchPerson', async (data) => {

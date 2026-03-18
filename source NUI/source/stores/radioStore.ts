@@ -151,21 +151,28 @@ function cleanupExpiredChannels() {
   });
 }
 
-setInterval(() => {
-  if (typeof document !== 'undefined' && document.hidden) {
-    return;
-  }
+let channelCleanupInterval: number | null = null;
 
-  const hasTemporaryChannels = Object.values(radioState.channels).some(
-    (channel) => channel.type === 'TEMPORARY'
-  );
+function startChannelCleanup() {
+  if (channelCleanupInterval) return;
+  channelCleanupInterval = window.setInterval(() => {
+    if (typeof document !== 'undefined' && document.hidden) {
+      return;
+    }
 
-  if (!hasTemporaryChannels) {
-    return;
-  }
+    const hasTemporaryChannels = Object.values(radioState.channels).some(
+      (channel) => channel.type === 'TEMPORARY'
+    );
 
-  cleanupExpiredChannels();
-}, 60000);
+    if (!hasTemporaryChannels) {
+      return;
+    }
+
+    cleanupExpiredChannels();
+  }, 60000);
+}
+
+startChannelCleanup();
 
 export const radioActions = {
   setCurrentUser(user: RadioUser) {
@@ -518,19 +525,19 @@ export const radioActions = {
 
     const scheduleNextChatter = () => {
       if (!radioState.chatterEnabled) return;
-      
+
       const delay = Math.random() * 40000 + 20000; // 20-60 seconds
-      setTimeout(() => {
+      chatterTimeoutId = window.setTimeout(() => {
         if (!radioState.chatterEnabled) return;
-        
+
         const isEmergency = Math.random() > 0.95;
         const type = isEmergency ? 'emergency' : (Math.random() > 0.5 ? 'dispatch' : 'unit');
         const messages = phrases[type];
         const message = messages[Math.floor(Math.random() * messages.length)];
         const unit = type === 'dispatch' ? 'DISPATCH' : `UNIT-${Math.floor(Math.random() * 20) + 1}`;
-        
+
         this.addChatter(message, unit, type);
-        
+
         // Also add as system message if connected
         if (radioState.currentChannel && radioState.isConnected) {
           this.injectSystemMessage(
@@ -541,7 +548,7 @@ export const radioActions = {
             type === 'dispatch' ? 'DSP' : 'UNIT'
           );
         }
-        
+
         scheduleNextChatter();
       }, delay);
     };
@@ -550,11 +557,39 @@ export const radioActions = {
   },
 
   stopChatter() {
-    // Chatter stops on next cycle check
+    if (chatterTimeoutId !== null) {
+      clearTimeout(chatterTimeoutId);
+      chatterTimeoutId = null;
+    }
   }
 };
 
+let chatterTimeoutId: number | null = null;
+let chatterAutoStartId: number | null = null;
+
 // Auto-start radio chatter on import
 if (typeof window !== 'undefined') {
-  setTimeout(() => radioActions.startChatter(), 5000);
+  chatterAutoStartId = window.setTimeout(() => radioActions.startChatter(), 5000);
+}
+
+export function cleanupRadioTimers() {
+  if (channelCleanupInterval) {
+    clearInterval(channelCleanupInterval);
+    channelCleanupInterval = null;
+  }
+  if (chatterTimeoutId !== null) {
+    clearTimeout(chatterTimeoutId);
+    chatterTimeoutId = null;
+  }
+  if (chatterAutoStartId !== null) {
+    clearTimeout(chatterAutoStartId);
+    chatterAutoStartId = null;
+  }
+  setRadioState('chatterEnabled', false);
+}
+
+export function restartRadioTimers() {
+  startChannelCleanup();
+  setRadioState('chatterEnabled', true);
+  radioActions.startChatter();
 }
