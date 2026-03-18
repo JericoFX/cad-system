@@ -392,8 +392,6 @@ lib.callback.register('cad:updateCase', CAD.Auth.WithGuard('heavy', function(_, 
     if payload.assignedTo ~= nil then caseObj.assignedTo = payload.assignedTo end
     if payload.linkedCallId ~= nil then caseObj.linkedCallId = payload.linkedCallId end
     if payload.linkedUnits ~= nil and type(payload.linkedUnits) == 'table' then caseObj.linkedUnits = payload.linkedUnits end
-    if payload.tasks ~= nil and type(payload.tasks) == 'table' then caseObj.tasks = payload.tasks end
-    if payload.notes ~= nil and type(payload.notes) == 'table' then caseObj.notes = payload.notes end
 
     if caseObj.status == 'CLOSED' then
         caseObj.closedAt = caseObj.closedAt or CAD.Server.ToIso()
@@ -459,6 +457,11 @@ lib.callback.register("cad:case:printReport", CAD.Auth.WithGuard("default", func
         return { ok = false, error = "officer_not_found" }
     end
 
+    local caseObj = ensureCase(caseId)
+    if not caseObj then
+        return { ok = false, error = "case_not_found" }
+    end
+
     local reportContent = string.format([[
 === CASE REPORT ===
 Case ID: %s
@@ -479,14 +482,14 @@ Printed by: %s
 Badge: %s
 ]],
         caseId,
-        payload.caseType or "N/A",
-        payload.priority or 1,
-        payload.status or "UNKNOWN",
-        payload.createdAt or "N/A",
-        payload.title or "N/A",
-        payload.description or "No description",
-        payload.notesCount or 0,
-        payload.evidenceCount or 0,
+        caseObj.caseType or "N/A",
+        tonumber(caseObj.priority) or 1,
+        caseObj.status or "UNKNOWN",
+        caseObj.createdAt or "N/A",
+        caseObj.title or "N/A",
+        caseObj.description or "No description",
+        #(caseObj.notes or {}),
+        #(caseObj.evidence or {}),
         officer.name or "Unknown",
         officer.badge or "N/A"
     )
