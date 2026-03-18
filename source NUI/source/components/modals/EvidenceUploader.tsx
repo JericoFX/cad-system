@@ -35,14 +35,6 @@ const sanitizeUrl = (url: string): { valid: boolean; sanitized: string; error?: 
     return { valid: false, sanitized: '', error: 'URL too long (max 2048 characters)' };
   }
   
-  const pathname = urlObj.pathname.toLowerCase();
-  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'];
-  const hasImageExtension = imageExtensions.some(ext => pathname.endsWith(ext));
-
-  if (!hasImageExtension && !urlObj.search.toLowerCase().includes('image')) {
-    console.log('[EvidenceUploader] URL without image extension, will validate by loading');
-  }
-
   return { valid: true, sanitized };
 };
 
@@ -125,7 +117,7 @@ export function EvidenceUploader() {
       setSelectedFile(file);
       setValidationError('');
       
-      if (file.type.startsWith('image/')) {
+      if (file.type.startsWith('image/') || file.type.startsWith('video/') || file.type.startsWith('audio/')) {
         const reader = new FileReader();
         reader.onload = (event) => {
           setPreviewUrl(event.target?.result as string);
@@ -162,11 +154,13 @@ export function EvidenceUploader() {
         return;
       }
       finalUrl = sanitization.sanitized;
-      
-      const contentValidation = await validateImageContent(finalUrl);
-      if (!contentValidation.valid) {
-        setValidationError(contentValidation.error || 'Invalid image content');
-        return;
+
+      if (evidenceType() === 'PHOTO') {
+        const contentValidation = await validateImageContent(finalUrl);
+        if (!contentValidation.valid) {
+          setValidationError(contentValidation.error || 'Invalid image content');
+          return;
+        }
       }
     }
 
@@ -398,12 +392,38 @@ export function EvidenceUploader() {
               </Show>
               <Show when={evidenceType() === 'PHOTO'}>
                 <div class="image-preview-container">
-                  <img 
-                    src={previewUrl()} 
-                    alt="Preview" 
+                  <img
+                    src={previewUrl()}
+                    alt="Preview"
                     class="image-preview"
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                </div>
+              </Show>
+              <Show when={evidenceType() === 'VIDEO'}>
+                <div class="video-preview-container" style={{ 'max-width': '100%', 'margin-top': '8px' }}>
+                  <video
+                    src={previewUrl()}
+                    controls
+                    preload="metadata"
+                    style={{ width: '100%', 'max-height': '280px', background: '#000', 'border': '1px solid var(--cad-border, #333)' }}
+                    onError={(e) => {
+                      (e.target as HTMLVideoElement).style.display = 'none';
+                    }}
+                  />
+                </div>
+              </Show>
+              <Show when={evidenceType() === 'AUDIO'}>
+                <div class="audio-preview-container" style={{ 'max-width': '100%', 'margin-top': '8px' }}>
+                  <audio
+                    src={previewUrl()}
+                    controls
+                    preload="metadata"
+                    style={{ width: '100%' }}
+                    onError={(e) => {
+                      (e.target as HTMLAudioElement).style.display = 'none';
                     }}
                   />
                 </div>
