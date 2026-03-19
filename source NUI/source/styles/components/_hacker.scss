@@ -1,0 +1,40 @@
+.hacker-background {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 0; pointer-events: none; overflow: hidden; opacity: 0.12;
+  &.active { animation: hackerPulse 2s ease-in-out; }
+}
+
+.hacker-terminal {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  padding: 20px; font-family: var(--font-terminal); font-size: 13px;
+  line-height: 1.4; overflow: hidden;
+}
+
+.hacker-lines { display: flex; flex-direction: column; justify-content: flex-end; min-height: 100%; }
+
+.hacker-line {
+  margin-bottom: 2px; white-space: pre-wrap; word-wrap: break-word;
+  animation: hackerFadeIn 0.1s ease-out;
+
+  &--command {
+    color: var(--terminal-fg-bright); text-shadow: 0 0 5px rgba(192, 192, 192, 0.3);
+    &::before { content: '$ '; color: var(--terminal-fg-dim); }
+  }
+  &--output { color: var(--terminal-fg); opacity: 0.8; padding-left: 16px; }
+  &--system { color: var(--terminal-fg-bright); text-shadow: 0 0 5px rgba(255, 255, 255, 0.2); }
+  &--error { color: var(--terminal-error); text-shadow: 0 0 5px rgba(255, 0, 0, 0.3); }
+}
+
+.hacker-content { font-family: inherit; margin: 0; white-space: pre-wrap; word-wrap: break-word; }
+
+.hacker-scanlines {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.15) 1px, transparent 1px, transparent 2px);
+  pointer-events: none;
+}
+
+.hacker-glow {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at center, rgba(192, 192, 192, 0.03) 0%, transparent 70%);
+  pointer-events: none;
+}

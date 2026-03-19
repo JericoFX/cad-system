@@ -3,7 +3,8 @@ import { terminalActions, terminalState } from '~/stores/terminalStore';
 import { cadState, cadActions } from '~/stores/cadStore';
 import { userActions } from '~/stores/userStore';
 import type { BOLO } from '~/stores/cadStore';
-import { Button, Input, Modal, Select, Tabs, Textarea } from '~/components/ui';
+import { Button, Input, Modal, Select, Tabs, Textarea, getPriorityColor } from '~/components/ui';
+import { formatDateTime } from '~/utils/storeHelpers/dateHelpers';
 
 export function BoloManager() {
   const [activeTab, setActiveTab] = createSignal<'all' | 'person' | 'vehicle'>('all');
@@ -104,18 +105,7 @@ export function BoloManager() {
     terminalActions.addLine('BOLO removed', 'system');
   };
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleString();
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'HIGH': return '#ff0000';
-      case 'MEDIUM': return '#ff8800';
-      case 'LOW': return '#ffff00';
-      default: return '#808080';
-    }
-  };
+  const formatDate = (dateStr: string) => formatDateTime(dateStr);
 
   return (
         <Modal.Root onClose={closeModal} useContentWrapper={false}>

@@ -1,0 +1,65 @@
+@mixin dos-scrollbar($width: 12px, $track-bg: var(--terminal-bg), $thumb-bg: var(--terminal-border-dim), $thumb-hover: var(--terminal-border)) {
+  &::-webkit-scrollbar {
+    width: $width;
+    height: $width;
+  }
+  &::-webkit-scrollbar-track {
+    background: $track-bg;
+    border-left: 2px solid var(--terminal-border);
+  }
+  &::-webkit-scrollbar-thumb {
+    background: $thumb-bg;
+    border: 2px solid var(--terminal-border);
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background: $thumb-hover;
+  }
+}
+
+@mixin input-base($bg: var(--terminal-bg), $fg: var(--terminal-fg-bright), $border-color: var(--terminal-border)) {
+  background-color: $bg;
+  border: 2px solid $border-color;
+  color: $fg;
+  font-family: var(--font-terminal);
+  font-size: var(--font-size-base);
+  padding: 10px 14px;
+  outline: none;
+
+  &:focus {
+    border-color: var(--terminal-system);
+    box-shadow: 0 0 8px rgba(255, 255, 0, 0.2);
+  }
+
+  &:disabled {
+    pointer-events: none;
+    opacity: 0.5;
+  }
+
+  &::placeholder {
+    color: var(--terminal-fg-dim);
+  }
+}
+
+@mixin hover-state($bg: var(--bg-subtle)) {
+  &:hover {
+    background-color: $bg;
+  }
+}
+
+@mixin status-badge-variant($name, $color) {
+  &.#{$name} {
+    background: rgba($color, 0.2);
+    color: $color;
+  }
+}
+
+@mixin section-header() {
+  padding: 10px 14px;
+  border-bottom: 2px solid var(--terminal-border);
+  font-weight: bold;
+  text-transform: uppercase;
+  font-size: var(--font-size-base);
+  letter-spacing: 1px;
+  background-color: var(--terminal-border);
+  color: var(--terminal-bg);
+}

@@ -6,7 +6,6 @@ import {
   onMount,
   onCleanup,
 } from 'solid-js';
-import './DosSelect.css';
 
 export interface SelectOption {
   value: string;

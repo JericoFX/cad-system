@@ -1,0 +1,99 @@
+// DosSelect component styles (merged from DosSelect.css)
+
+.dos-select-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dos-select-label {
+  color: var(--terminal-fg-bright);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.dos-select {
+  position: relative;
+  background-color: var(--terminal-bg);
+  border: 2px solid var(--terminal-border);
+  cursor: pointer;
+  user-select: none;
+  min-width: 200px;
+
+  &:hover { border-color: var(--terminal-fg); }
+  &.open { border-color: var(--terminal-system); }
+  &.disabled { opacity: 0.5; cursor: not-allowed; }
+}
+
+.dos-select-trigger {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  color: var(--terminal-fg);
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.dos-select-arrow {
+  font-size: 10px;
+  color: var(--terminal-fg-dim);
+  transition: transform 0.2s;
+}
+
+.dos-select.open .dos-select-arrow {
+  transform: rotate(180deg);
+}
+
+.dos-select-dropdown {
+  background-color: var(--terminal-bg);
+  border: 2px solid var(--terminal-border);
+  border-top: none;
+  max-height: 200px;
+  overflow-y: auto;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+}
+
+.dos-select-option {
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background-color 0.1s;
+  border-bottom: 1px solid rgba(192, 192, 192, 0.1);
+
+  &:hover { background-color: rgba(192, 192, 192, 0.2); }
+  &.selected { background-color: rgba(255, 255, 0, 0.2); }
+  &:last-child { border-bottom: none; }
+}
+
+.dos-select .priority-high,
+.dos-select-option .priority-high {
+  color: var(--terminal-error);
+  font-weight: bold;
+}
+
+.dos-select .priority-med,
+.dos-select-option .priority-med {
+  color: var(--terminal-system);
+  font-weight: bold;
+}
+
+.dos-select .priority-low,
+.dos-select-option .priority-low {
+  color: var(--terminal-success);
+}
+
+.dos-select .type-police,
+.dos-select-option .type-police {
+  color: #00ffff;
+}
+
+.dos-select .type-ems,
+.dos-select-option .type-ems {
+  color: #ff6600;
+}
+
+.dos-select .type-fire,
+.dos-select-option .type-fire {
+  color: #ff0000;
+}

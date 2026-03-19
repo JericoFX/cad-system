@@ -4,7 +4,8 @@ import { cadState, cadActions, type Case, type Note, type Evidence } from '~/sto
 import { userActions } from '~/stores/userStore';
 import { viewerActions } from '~/stores/viewerStore';
 import { fetchNui } from '~/utils/fetchNui';
-import { Button, Input, Modal, Select, Tabs, Text, Textarea } from '~/components/ui';
+import { Button, Input, Modal, Select, Tabs, Text, Textarea, getPriorityColor } from '~/components/ui';
+import { formatDate as formatDateUtil } from '~/utils/storeHelpers/dateHelpers';
 
 type CaseApiError = {
   ok: false;
@@ -326,19 +327,7 @@ export function CaseManager() {
     terminalActions.addLine('Task completed', 'output');
   };
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString();
-  };
-
-  const getPriorityColor = (priority: number) => {
-    switch (priority) {
-      case 1: return '#ff0000';
-      case 2: return '#ff8800';
-      case 3: return '#ffff00';
-      case 4: return '#00ff00';
-      default: return '#808080';
-    }
-  };
+  const formatDate = (dateStr: string) => formatDateUtil(dateStr);
 
   const createNewCase = () => {
     terminalActions.setActiveModal('CASE_CREATOR');

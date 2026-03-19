@@ -1,0 +1,27 @@
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--terminal-border) var(--terminal-bg);
+}
+
+*::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--terminal-bg);
+  border: 1px solid var(--terminal-border-dim);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    to bottom,
+    var(--terminal-border-dim),
+    var(--terminal-border)
+  );
+  border: 1px solid var(--terminal-bg);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--terminal-fg-bright);
+}

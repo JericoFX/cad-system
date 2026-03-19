@@ -7,6 +7,8 @@ import { featureActions } from './stores/featureStore';
 import { codeCatalogActions } from './stores/codeCatalogStore';
 import { UIProvider } from './components/ui';
 
+import './styles/main.scss';
+
 import { initNuiSystem } from './hooks/useNui';
 
 const root = document.getElementById('root');
