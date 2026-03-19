@@ -9,6 +9,7 @@ import {
 import { radioActions } from '~/stores/radioStore';
 import { fetchNui } from '~/utils/fetchNui';
 import { useNui } from '~/hooks/useNui';
+import { newsActions } from '~/stores/newsStore';
 import { Button, Modal } from '~/components/ui';
 import {
   DEFAULT_DISPATCH_SETTINGS,
@@ -748,6 +749,19 @@ export function DispatchTable() {
                             [NOTIFY UNITS]
                           </Button.Root>
                         </Show>
+                        <Button.Root
+                          class="btn"
+                          onClick={() => {
+                            newsActions.prefillFromDispatch({
+                              title: call.title,
+                              description: call.description,
+                              type: call.type,
+                            });
+                            terminalActions.setActiveModal('NEWS_MANAGER');
+                          }}
+                        >
+                          [PUBLISH NEWS]
+                        </Button.Root>
                         <Show when={call.status !== 'CLOSED'}>
                           <Button.Root class="btn btn-danger" onClick={() => void closeCall(call.callId)}>
                             [CLOSE CALL]

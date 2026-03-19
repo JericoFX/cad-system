@@ -6,7 +6,7 @@ import { cadActions } from './cadStore';
 
 export type PatientCondition = 'CRITICAL' | 'SERIOUS' | 'STABLE' | 'DECEASED';
 
-export type PatientStatus = 
+export type PatientStatus =
   | 'TRIAGE'      // Initial assessment
   | 'ADMITTED'    // Waiting for treatment
   | 'IN_TREATMENT' // Currently being treated
@@ -41,9 +41,10 @@ export interface PatientTreatment {
 export interface Patient {
   patientId: string;
   name: string;
+  citizenId?: string;
   dob?: string;
   gender?: 'M' | 'F' | 'OTHER';
-  
+
   condition: PatientCondition;
   triagePriority: TriagePriority;
   chiefComplaint: string;        // Main symptom/reason
@@ -51,49 +52,50 @@ export interface Patient {
   allergies: string[];
   currentMedications: string[];
   medicalHistory?: string;
-  
+
   vitals: PatientVitals;
   vitalsHistory: Array<{
     timestamp: string;
     vitals: PatientVitals;
     takenBy: string;
   }>;
-  
+
   status: PatientStatus;
-  
+
   triagedAt: string;
   triagedBy: string;
   admittedAt?: string;
   treatmentStartedAt?: string;
   dischargedAt?: string;
-  
+
   treatments: PatientTreatment[];
-  
+
   caseId?: string;              // Linked CAD case
   callId?: string;              // Linked dispatch call
-  
+
   dischargeNotes?: string;
   dischargeDisposition?: 'HOME' | 'HOSPITAL' | 'POLICE' | 'MORGUE';
   handoffToCase?: boolean;      // Handoff report sent to case
 }
 
-export interface InventoryItem {
-  itemId: string;
-  name: string;
-  category: 'MEDICATION' | 'EQUIPMENT' | 'SUPPLIES' | 'BLOOD';
-  quantity: number;
-  unit: string;
-  minStock: number;             // Alert threshold
-  usedToday: number;
-  lastRestocked: string;
-  
-  usageHistory: Array<{
-    timestamp: string;
-    patientId?: string;
-    medicId: string;
-    quantity: number;
-    reason: string;
-  }>;
+export interface SimplePrescription {
+  medication: string;
+  instructions: string;
+}
+
+export interface MedicalRecord {
+  recordId: string;
+  citizenId: string;
+  citizenName: string;
+  visitDate: string;
+  diagnosis: string;
+  treatmentSummary: string;
+  prescriptions: SimplePrescription[];
+  treatingMedic: string;
+  treatingMedicName: string;
+  vitalsSnapshot?: PatientVitals;
+  notes?: string;
+  createdAt: string;
 }
 
 export interface EMSUnit {
@@ -108,44 +110,46 @@ export interface EMSUnit {
 export interface EMSState {
   patients: Record<string, Patient>;
   units: Record<string, EMSUnit>;
-  inventory: Record<string, InventoryItem>;
   currentUser: {
     id: string;
     name: string;
     badge: string;
     unit?: string;
   } | null;
-  
+
   activeFilter: 'ALL' | 'TRIAGE' | 'TREATMENT' | 'CRITICAL' | 'MY_PATIENTS';
   sortBy: 'PRIORITY' | 'TIME' | 'NAME';
-  
+
   selectedPatient: string | null;
   selectedUnit: string | null;
+
+  medicalHistory: MedicalRecord[];
+  dischargePrescriptions: SimplePrescription[];
 }
 
 export function calculateTriagePriority(
-  condition: PatientCondition, 
-  vitals: PatientVitals, 
+  condition: PatientCondition,
+  vitals: PatientVitals,
   chiefComplaint: string
 ): TriagePriority {
   if (condition === 'CRITICAL' || condition === 'DECEASED') return 1;
-  
+
   const hr = vitals.hr;
   const o2 = vitals.o2;
-  
+
   if (hr > 130 || hr < 40 || o2 < 85) return 1;
-  
+
   if (condition === 'SERIOUS') return 2;
-  
+
   if (hr > 110 || hr < 50 || o2 < 90) return 2;
-  
+
   const urgentKeywords = ['chest pain', 'not breathing', 'unconscious', 'bleeding', 'trauma', 'stroke'];
-  const isUrgent = urgentKeywords.some(kw => 
+  const isUrgent = urgentKeywords.some(kw =>
     chiefComplaint.toLowerCase().includes(kw)
   );
-  
+
   if (isUrgent && condition === 'STABLE') return 2;
-  
+
   return 3;
 }
 
@@ -165,57 +169,13 @@ const initialState: EMSState = {
       crew: [],
     },
   },
-  inventory: {
-    'MORPHINE': {
-      itemId: 'MORPHINE',
-      name: 'Morphine',
-      category: 'MEDICATION',
-      quantity: 50,
-      unit: 'mg',
-      minStock: 10,
-      usedToday: 0,
-      lastRestocked: new Date().toISOString(),
-      usageHistory: [],
-    },
-    'EPINEPHRINE': {
-      itemId: 'EPINEPHRINE',
-      name: 'Epinephrine',
-      category: 'MEDICATION',
-      quantity: 20,
-      unit: 'doses',
-      minStock: 5,
-      usedToday: 0,
-      lastRestocked: new Date().toISOString(),
-      usageHistory: [],
-    },
-    'BANDAGES': {
-      itemId: 'BANDAGES',
-      name: 'Bandages',
-      category: 'SUPPLIES',
-      quantity: 100,
-      unit: 'units',
-      minStock: 20,
-      usedToday: 0,
-      lastRestocked: new Date().toISOString(),
-      usageHistory: [],
-    },
-    'SALINE': {
-      itemId: 'SALINE',
-      name: 'IV Saline',
-      category: 'SUPPLIES',
-      quantity: 40,
-      unit: 'bags',
-      minStock: 10,
-      usedToday: 0,
-      lastRestocked: new Date().toISOString(),
-      usageHistory: [],
-    },
-  },
   currentUser: null,
   activeFilter: 'ALL',
   sortBy: 'PRIORITY',
   selectedPatient: null,
   selectedUnit: null,
+  medicalHistory: [],
+  dischargePrescriptions: [],
 };
 
 export const [emsState, setEmsState] = createStore<EMSState>(initialState);
@@ -226,7 +186,7 @@ function autoTriagePatient(patient: Patient): Patient {
     patient.vitals,
     patient.chiefComplaint
   );
-  
+
   return {
     ...patient,
     triagePriority: priority,
@@ -241,10 +201,11 @@ export const emsActions = {
   triagePatient(patientData: Partial<Patient>): Patient {
     const patientId = `PAT_${Date.now()}`;
     const now = new Date().toISOString();
-    
+
     const patient: Patient = {
       patientId,
       name: patientData.name || 'John Doe',
+      citizenId: patientData.citizenId,
       dob: patientData.dob,
       gender: patientData.gender,
       condition: patientData.condition || 'STABLE',
@@ -277,13 +238,13 @@ export const emsActions = {
     };
 
     const triagedPatient = autoTriagePatient(patient);
-    
+
     setEmsState('patients', patientId, triagedPatient);
-    
+
     if (triagedPatient.triagePriority <= 2) {
       this.emitEMSEvent('critical_patient', triagedPatient);
     }
-    
+
     return triagedPatient;
   },
 
@@ -317,15 +278,9 @@ export const emsActions = {
       timestamp: new Date().toISOString(),
     };
 
-    batch(() => {
-      setEmsState('patients', patientId, 'treatments', 
-        [...patient.treatments, newTreatment]
-      );
-
-      treatment.medications.forEach(med => {
-        this.useInventory(med, 1, patientId, treatment.action);
-      });
-    });
+    setEmsState('patients', patientId, 'treatments',
+      [...patient.treatments, newTreatment]
+    );
   },
 
   updateVitals(patientId: string, vitals: PatientVitals) {
@@ -333,7 +288,7 @@ export const emsActions = {
     if (!patient) return;
 
     const now = new Date().toISOString();
-    
+
     batch(() => {
       setEmsState('patients', patientId, 'vitals', vitals);
       setEmsState('patients', patientId, 'vitalsHistory', [
@@ -383,7 +338,7 @@ Symptoms: ${patient.symptoms.join(', ')}
 VITALS (Latest):
 BP: ${patient.vitals.bp}
 HR: ${patient.vitals.hr}
-Temp: ${patient.vitals.temp}°F
+Temp: ${patient.vitals.temp}\u00B0F
 O2: ${patient.vitals.o2}%
 
 TREATMENTS PROVIDED:
@@ -418,57 +373,6 @@ Time: ${new Date().toLocaleString()}`;
     return handoffReport;
   },
 
-  useInventory(itemId: string, quantity: number, patientId?: string, reason?: string) {
-    const item = emsState.inventory[itemId];
-    if (!item) return { success: false, error: 'Item not found' };
-    
-    if (item.quantity < quantity) {
-      return { success: false, error: 'Insufficient stock' };
-    }
-
-    const now = new Date().toISOString();
-    const newQuantity = item.quantity - quantity;
-    
-    batch(() => {
-      setEmsState('inventory', itemId, {
-        quantity: newQuantity,
-        usedToday: item.usedToday + quantity,
-        usageHistory: [
-          ...item.usageHistory,
-          {
-            timestamp: now,
-            patientId,
-            medicId: emsState.currentUser?.id || 'UNKNOWN',
-            quantity,
-            reason: reason || 'Used in treatment',
-          }
-        ]
-      });
-
-      if (newQuantity <= item.minStock) {
-        this.emitEMSEvent('low_stock', { itemId, currentStock: newQuantity });
-      }
-    });
-
-    return { success: true };
-  },
-
-  restockInventory(itemId: string, quantity: number) {
-    const item = emsState.inventory[itemId];
-    if (!item) return;
-
-    setEmsState('inventory', itemId, {
-      quantity: item.quantity + quantity,
-      lastRestocked: new Date().toISOString(),
-    });
-  },
-
-  resetDailyUsage() {
-    Object.keys(emsState.inventory).forEach(itemId => {
-      setEmsState('inventory', itemId, 'usedToday', 0);
-    });
-  },
-
   assignUnitToCall(unitId: string, callId: string) {
     setEmsState('units', unitId, {
       status: 'EN_ROUTE',
@@ -482,7 +386,7 @@ Time: ${new Date().toLocaleString()}`;
 
   getSortedPatients(): Patient[] {
     const patients = Object.values(emsState.patients);
-    
+
     let filtered = patients;
     switch (emsState.activeFilter) {
       case 'TRIAGE':
@@ -496,7 +400,7 @@ Time: ${new Date().toLocaleString()}`;
         break;
       case 'MY_PATIENTS':
         const myId = emsState.currentUser?.id;
-        filtered = patients.filter(p => 
+        filtered = patients.filter(p =>
           p.treatments.some(t => t.medicId === myId)
         );
         break;
@@ -525,11 +429,6 @@ Time: ${new Date().toLocaleString()}`;
       .sort((a, b) => new Date(a.triagedAt).getTime() - new Date(b.triagedAt).getTime());
   },
 
-  getLowStockItems(): InventoryItem[] {
-    return Object.values(emsState.inventory)
-      .filter(item => item.quantity <= item.minStock);
-  },
-
   selectPatient(patientId: string | null) {
     setEmsState('selectedPatient', patientId);
   },
@@ -542,11 +441,75 @@ Time: ${new Date().toLocaleString()}`;
     setEmsState('sortBy', sortBy);
   },
 
+  // Prescription management for discharge flow
+  addDischargePrescription(prescription: SimplePrescription) {
+    setEmsState('dischargePrescriptions', prev => [...prev, prescription]);
+  },
+
+  removeDischargePrescription(index: number) {
+    setEmsState('dischargePrescriptions', prev => prev.filter((_, i) => i !== index));
+  },
+
+  clearDischargePrescriptions() {
+    setEmsState('dischargePrescriptions', []);
+  },
+
+  // Medical history
+  async fetchMedicalHistory(citizenId: string) {
+    try {
+      const response = await fetchNui<{
+        ok: boolean;
+        records?: MedicalRecord[];
+      }>('cad:ems:getMedicalHistory', { citizenId });
+
+      if (response?.ok && Array.isArray(response.records)) {
+        setEmsState('medicalHistory', response.records);
+      } else {
+        setEmsState('medicalHistory', []);
+      }
+    } catch {
+      setEmsState('medicalHistory', []);
+    }
+  },
+
+  async createMedicalRecord(patient: Patient, prescriptions: SimplePrescription[], dischargeNotes?: string): Promise<boolean> {
+    const citizenId = patient.citizenId;
+    if (!citizenId) return false;
+
+    const treatmentSummary = patient.treatments
+      .map(t => `${t.action} (${t.medications.join(', ')}) - ${t.notes}`)
+      .join('\n') || 'No treatments recorded';
+
+    const lastVitals = patient.vitalsHistory.length > 0
+      ? patient.vitalsHistory[patient.vitalsHistory.length - 1].vitals
+      : patient.vitals;
+
+    const record: Omit<MedicalRecord, 'recordId' | 'createdAt'> = {
+      citizenId,
+      citizenName: patient.name,
+      visitDate: new Date().toISOString(),
+      diagnosis: `${patient.chiefComplaint}${dischargeNotes ? ` - ${dischargeNotes}` : ''}`,
+      treatmentSummary,
+      prescriptions,
+      treatingMedic: emsState.currentUser?.id || 'UNKNOWN',
+      treatingMedicName: emsState.currentUser?.name || 'Unknown',
+      vitalsSnapshot: lastVitals,
+      notes: dischargeNotes,
+    };
+
+    try {
+      const response = await fetchNui<{ ok: boolean }>('cad:ems:createMedicalRecord', record);
+      return response?.ok === true;
+    } catch {
+      return false;
+    }
+  },
+
   emitEMSEvent(event: string, data: unknown) {
     if (typeof window !== 'undefined') {
       fetchNui(`cad:ems:${event}`, data).catch(console.error);
     }
-    
+
     window.dispatchEvent(new CustomEvent(`ems:${event}`, {
       detail: data,
     }));
@@ -563,7 +526,6 @@ if (typeof window !== 'undefined') {
   const persistEmsState = () => {
     const payload = JSON.stringify({
       patients: emsState.patients,
-      inventory: emsState.inventory,
       units: emsState.units,
     });
 
@@ -602,7 +564,6 @@ if (typeof window !== 'undefined') {
       const parsed = JSON.parse(saved);
       setEmsState({
         patients: parsed.patients || {},
-        inventory: parsed.inventory || initialState.inventory,
         units: parsed.units || initialState.units,
       });
       lastPersistedPayload = saved;

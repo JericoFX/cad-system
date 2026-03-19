@@ -1106,24 +1106,129 @@ lib.callback.register('cad:ems:critical_patient', CAD.Auth.WithGuard('default', 
     return alert
 end))
 
-lib.callback.register('cad:ems:low_stock', CAD.Auth.WithGuard('default', function(_, payload)
+lib.callback.register('cad:ems:getMedicalHistory', CAD.Auth.WithGuard('default', function(source, payload)
+    if not isEmsEnabled() then
+        return { ok = true, records = {} }
+    end
+
+    if not CAD.Server.HasRole(source, { 'ambulance', 'ems', 'police', 'sheriff', 'admin' }) then
+        return { ok = false, error = 'forbidden' }
+    end
+
+    local citizenId = CAD.Server.SanitizeString(payload and payload.citizenId, 64)
+    if citizenId == '' then
+        return { ok = false, error = 'citizen_id_required' }
+    end
+
+    local ok, rows = pcall(function()
+        return MySQL.query.await(
+            'SELECT record_id, citizen_id, citizen_name, visit_date, diagnosis, treatment_summary, prescriptions, treating_medic, treating_medic_name, vitals_snapshot, notes, created_at FROM cad_medical_records WHERE citizen_id = ? ORDER BY visit_date DESC',
+            { citizenId }
+        )
+    end)
+
+    if not ok then
+        CAD.Log('error', 'Failed loading medical records for %s: %s', citizenId, tostring(rows))
+        return { ok = false, error = 'db_read_failed' }
+    end
+
+    local records = {}
+    for i = 1, #(rows or {}) do
+        local row = rows[i]
+        local prescriptions = {}
+        if type(row.prescriptions) == 'string' and row.prescriptions ~= '' then
+            local decodeOk, decoded = pcall(json.decode, row.prescriptions)
+            if decodeOk and type(decoded) == 'table' then
+                prescriptions = decoded
+            end
+        end
+
+        local vitalsSnapshot = nil
+        if type(row.vitals_snapshot) == 'string' and row.vitals_snapshot ~= '' then
+            local decodeOk, decoded = pcall(json.decode, row.vitals_snapshot)
+            if decodeOk and type(decoded) == 'table' then
+                vitalsSnapshot = decoded
+            end
+        end
+
+        records[#records + 1] = {
+            recordId = row.record_id,
+            citizenId = row.citizen_id,
+            citizenName = row.citizen_name,
+            visitDate = row.visit_date,
+            diagnosis = row.diagnosis,
+            treatmentSummary = row.treatment_summary,
+            prescriptions = prescriptions,
+            treatingMedic = row.treating_medic,
+            treatingMedicName = row.treating_medic_name,
+            vitalsSnapshot = vitalsSnapshot,
+            notes = row.notes,
+            createdAt = row.created_at,
+        }
+    end
+
+    return { ok = true, records = records }
+end))
+
+lib.callback.register('cad:ems:createMedicalRecord', CAD.Auth.WithGuard('heavy', function(source, payload)
     if not isEmsEnabled() then
         return emsDisabledResponse()
     end
 
-    local alert, alertErr = createAlert(
-        ('Low Stock: %s'):format(payload.itemId or 'Unknown'),
-        ('Current stock: %s'):format(tostring(payload.currentStock or 'N/A')),
-        'MEDIUM',
-        nil,
-        'system'
-    )
-
-    if not alert then
-        return { ok = false, error = alertErr or 'cannot_create_alert' }
+    if not CAD.Server.HasRole(source, { 'ambulance', 'ems', 'admin' }) then
+        return { ok = false, error = 'forbidden' }
     end
 
-    return alert
+    local citizenId = CAD.Server.SanitizeString(payload and payload.citizenId, 64)
+    if citizenId == '' then
+        return { ok = false, error = 'citizen_id_required' }
+    end
+
+    local recordId = CAD.Server.GenerateId('MEDREC')
+    local nowIso = CAD.Server.ToIso()
+
+    local prescriptionsJson = nil
+    if type(payload.prescriptions) == 'table' and #payload.prescriptions > 0 then
+        local encodeOk, encoded = pcall(json.encode, payload.prescriptions)
+        if encodeOk then
+            prescriptionsJson = encoded
+        end
+    end
+
+    local vitalsJson = nil
+    if type(payload.vitalsSnapshot) == 'table' then
+        local encodeOk, encoded = pcall(json.encode, payload.vitalsSnapshot)
+        if encodeOk then
+            vitalsJson = encoded
+        end
+    end
+
+    local ok, err = pcall(function()
+        MySQL.insert.await([[
+            INSERT INTO cad_medical_records (record_id, citizen_id, citizen_name, visit_date, diagnosis, treatment_summary, prescriptions, treating_medic, treating_medic_name, vitals_snapshot, notes, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ]], {
+            recordId,
+            citizenId,
+            CAD.Server.SanitizeString(payload.citizenName, 128),
+            CAD.Server.SanitizeString(payload.visitDate, 32) ~= '' and payload.visitDate or nowIso,
+            CAD.Server.SanitizeString(payload.diagnosis, 500),
+            CAD.Server.SanitizeString(payload.treatmentSummary, 10000),
+            prescriptionsJson,
+            CAD.Server.SanitizeString(payload.treatingMedic, 128),
+            CAD.Server.SanitizeString(payload.treatingMedicName, 128),
+            vitalsJson,
+            CAD.Server.SanitizeString(payload.notes, 5000),
+            nowIso,
+        })
+    end)
+
+    if not ok then
+        CAD.Log('error', 'Failed saving medical record %s: %s', recordId, tostring(err))
+        return { ok = false, error = 'db_write_failed' }
+    end
+
+    return { ok = true, recordId = recordId }
 end))
 
 lib.callback.register('cad:ems:handoff_complete', CAD.Auth.WithGuard('default', function(_, payload)

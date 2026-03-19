@@ -1,7 +1,7 @@
 import { createSignal, createMemo, createEffect, For, Show, onMount, onCleanup } from 'solid-js';
 import { terminalActions } from '~/stores/terminalStore';
 import { cadState } from '~/stores/cadStore';
-import { emsState, emsActions, Patient, PatientCondition } from '~/stores/emsStore';
+import { emsState, emsActions, Patient, PatientCondition, type SimplePrescription } from '~/stores/emsStore';
 import { notificationActions } from '~/stores/notificationStore';
 import { fetchNui } from '~/utils/fetchNui';
 import { Button, Input, Modal, Tabs, Textarea } from '~/components/ui';
@@ -39,7 +39,7 @@ type BloodSampleRequest = {
 };
 
 export function EMSDashboard() {
-  const [activeTab, setActiveTab] = createSignal<'patients' | 'treatment' | 'admit' | 'inventory' | 'blood'>('patients');
+  const [activeTab, setActiveTab] = createSignal<'patients' | 'treatment' | 'admit' | 'blood'>('patients');
   const [selectedPatient, setSelectedPatient] = createSignal<Patient | null>(null);
   const [bloodRequests, setBloodRequests] = createSignal<BloodSampleRequest[]>([]);
   const [bloodLoading, setBloodLoading] = createSignal(false);
@@ -54,8 +54,17 @@ export function EMSDashboard() {
     bloodRequests().some((request) => request.status === 'IN_PROGRESS')
   );
 
+  // Discharge flow state
+  const [showDischargeModal, setShowDischargeModal] = createSignal(false);
+  const [dischargeDisposition, setDischargeDisposition] = createSignal<'HOME' | 'HOSPITAL' | 'POLICE' | 'MORGUE'>('HOME');
+  const [dischargeNotes, setDischargeNotes] = createSignal('');
+  const [dischargeCitizenId, setDischargeCitizenId] = createSignal('');
+  const [prescriptionMedication, setPrescriptionMedication] = createSignal('');
+  const [prescriptionInstructions, setPrescriptionInstructions] = createSignal('');
+
   const [patientForm, setPatientForm] = createSignal({
     name: '',
+    citizenId: '',
     condition: 'STABLE' as PatientCondition,
     chiefComplaint: '',
     symptoms: '',
@@ -143,11 +152,12 @@ export function EMSDashboard() {
       setPatientForm({
         ...patientForm(),
         name: `${response.person.firstName} ${response.person.lastName}`,
+        citizenId: response.person.citizenid,
         allergies: response.person.allergies || '',
       });
 
       terminalActions.addLine(
-        `✓ ID read for patient: ${response.person.firstName} ${response.person.lastName} (${response.person.citizenid})`,
+        `ID read for patient: ${response.person.firstName} ${response.person.lastName} (${response.person.citizenid})`,
         'output'
       );
     } catch (error) {
@@ -186,7 +196,7 @@ export function EMSDashboard() {
       }
 
       terminalActions.addLine(
-        `✓ Police assistance requested (${response.callId}) - Priority: ${policeCallPriority()}`,
+        `Police assistance requested (${response.callId}) - Priority: ${policeCallPriority()}`,
         'output'
       );
       setShowPoliceCallModal(false);
@@ -295,7 +305,7 @@ export function EMSDashboard() {
       }
 
       setBloodRequests((prev) => prev.map((item) => (item.requestId === request.requestId ? response.request! : item)));
-      terminalActions.addLine(`✓ Blood request ${request.requestId} => ${status}`, 'output');
+      terminalActions.addLine(`Blood request ${request.requestId} => ${status}`, 'output');
       return true;
     } catch (error) {
       terminalActions.addLine(`Failed to update request: ${error}`, 'error');
@@ -367,9 +377,9 @@ export function EMSDashboard() {
 
   const getPriorityColor = (priority: number) => {
     switch (priority) {
-      case 1: return '#ff0000'; // critical
-      case 2: return '#ffaa00'; // serious
-      case 3: return '#00ff00'; // stable
+      case 1: return '#ff0000';
+      case 2: return '#ffaa00';
+      case 3: return '#00ff00';
       default: return '#808080';
     }
   };
@@ -390,6 +400,7 @@ export function EMSDashboard() {
 
     const patient = emsActions.triagePatient({
       name: form.name,
+      citizenId: form.citizenId || undefined,
       condition: form.condition,
       chiefComplaint: form.chiefComplaint || 'Not recorded',
       symptoms: form.symptoms ? form.symptoms.split(',').map((s: string) => s.trim()) : [],
@@ -402,10 +413,11 @@ export function EMSDashboard() {
       notificationActions.notifyCriticalPatient(patient.patientId, patient.name, patient.condition);
     }
 
-    terminalActions.addLine(`✓ Patient admitted: ${patient.patientId} (Priority ${patient.triagePriority})`, 'output');
-    
+    terminalActions.addLine(`Patient admitted: ${patient.patientId} (Priority ${patient.triagePriority})`, 'output');
+
     setPatientForm({
       name: '',
+      citizenId: '',
       condition: 'STABLE',
       chiefComplaint: '',
       symptoms: '',
@@ -422,28 +434,59 @@ export function EMSDashboard() {
   const startTreatment = (patient: Patient) => {
     emsActions.startTreatment(patient.patientId);
     setSelectedPatient(null);
-    terminalActions.addLine(`✓ Treatment started for: ${patient.name}`, 'output');
+    terminalActions.addLine(`Treatment started for: ${patient.name}`, 'output');
   };
 
-  const dischargePatient = (patient: Patient) => {
-    emsActions.dischargePatient(patient.patientId, 'HOME', 'Patient discharged in stable condition');
+  // Discharge flow with prescriptions
+  const openDischargeModal = (patient: Patient) => {
+    emsActions.clearDischargePrescriptions();
+    setDischargeNotes('');
+    setDischargeCitizenId(patient.citizenId || '');
+    setDischargeDisposition('HOME');
+    setPrescriptionMedication('');
+    setPrescriptionInstructions('');
+    setShowDischargeModal(true);
+  };
+
+  const addPrescription = () => {
+    const med = prescriptionMedication().trim();
+    const instr = prescriptionInstructions().trim();
+    if (!med) return;
+
+    emsActions.addDischargePrescription({
+      medication: med,
+      instructions: instr || 'As directed',
+    });
+    setPrescriptionMedication('');
+    setPrescriptionInstructions('');
+  };
+
+  const confirmDischarge = async () => {
+    const patient = selectedPatient();
+    if (!patient) return;
+
+    const citizenId = dischargeCitizenId().trim();
+    const notes = dischargeNotes().trim();
+    const prescriptions = [...emsState.dischargePrescriptions];
+
+    // Discharge the patient
+    emsActions.dischargePatient(patient.patientId, dischargeDisposition(), notes);
+
+    // Create medical record if citizenId is available
+    if (citizenId) {
+      const patientWithCitizenId = { ...patient, citizenId };
+      const created = await emsActions.createMedicalRecord(patientWithCitizenId, prescriptions, notes);
+      if (created) {
+        terminalActions.addLine(`Medical record created for citizen ${citizenId}`, 'output');
+      } else {
+        terminalActions.addLine('Failed to create medical record', 'error');
+      }
+    }
+
+    terminalActions.addLine(`Patient discharged: ${patient.name}`, 'output');
+    emsActions.clearDischargePrescriptions();
+    setShowDischargeModal(false);
     setSelectedPatient(null);
-    terminalActions.addLine(`✓ Patient discharged: ${patient.name}`, 'output');
-  };
-
-  const useInventoryItem = (itemId: string) => {
-    const result = emsActions.useInventory(itemId, 1, selectedPatient()?.patientId, 'Used in treatment');
-    if (!result.success) {
-      terminalActions.addLine(String(result.error), 'error');
-      return;
-    }
-    
-    const item = emsState.inventory[itemId];
-    terminalActions.addLine(`✓ Used 1 ${item.unit} of ${item.name}`, 'output');
-    
-    if (item.quantity <= item.minStock) {
-      notificationActions.notifyLowStock(itemId, item.name, item.quantity);
-    }
   };
 
   const handleHandoff = (patient: Patient) => {
@@ -454,20 +497,11 @@ export function EMSDashboard() {
     }
 
     emsActions.handoffToCase(patient.patientId, cadState.currentCase.caseId);
-    
-    terminalActions.addLine(`✓ Medical handoff added to case ${cadState.currentCase.caseId}`, 'output');
-    terminalActions.addLine(`  Patient: ${patient.name}`, 'output');
-    
-    terminalActions.setActiveModal(null);
-  };
 
-  const restockItem = (itemId: string) => {
-    const amount = prompt(`Enter quantity to add to ${emsState.inventory[itemId]?.name}:`);
-    const qty = parseInt(amount || '0');
-    if (qty <= 0) return;
-    
-    emsActions.restockInventory(itemId, qty);
-    terminalActions.addLine(`✓ Restocked ${qty} ${emsState.inventory[itemId]?.unit}`, 'output');
+    terminalActions.addLine(`Medical handoff added to case ${cadState.currentCase.caseId}`, 'output');
+    terminalActions.addLine(`  Patient: ${patient.name}`, 'output');
+
+    terminalActions.setActiveModal(null);
   };
 
   const patientsArray = createMemo(() => Object.values(emsState.patients));
@@ -486,8 +520,8 @@ export function EMSDashboard() {
   const filteredPatients = createMemo(() => {
     const query = patientSearchQuery().toLowerCase().trim();
     if (!query) return activePatients();
-    
-    return activePatients().filter(p => 
+
+    return activePatients().filter(p =>
       p.name.toLowerCase().includes(query) ||
       p.patientId.toLowerCase().includes(query) ||
       p.chiefComplaint.toLowerCase().includes(query)
@@ -499,8 +533,6 @@ export function EMSDashboard() {
       .filter(p => p.status === 'IN_TREATMENT')
       .sort((a, b) => a.triagePriority - b.triagePriority)
   );
-
-  const inventoryList = createMemo(() => Object.values(emsState.inventory));
 
   const triageCounts = createMemo(() => {
     const counts = { critical: 0, serious: 0, stable: 0 };
@@ -519,7 +551,6 @@ export function EMSDashboard() {
   const dashboardSummary = createMemo(() => ({
     admitted: patientsArray().filter((patient) => patient.status === 'ADMITTED').length,
     treatment: inTreatmentPatients().length,
-    lowStock: inventoryList().filter((item) => item.quantity <= item.minStock).length,
     pendingBlood: bloodRequests().filter((request) => request.status === 'PENDING' || request.status === 'ACKNOWLEDGED' || request.status === 'IN_PROGRESS').length,
   }));
 
@@ -559,10 +590,6 @@ export function EMSDashboard() {
             <div class="stat-number">{dashboardSummary().treatment}</div>
             <div class="stat-label">In Treatment</div>
           </div>
-          <div class="stat-box warrant">
-            <div class="stat-number">{dashboardSummary().lowStock}</div>
-            <div class="stat-label">Low Stock</div>
-          </div>
           <div class="stat-box record">
             <div class="stat-number">{dashboardSummary().pendingBlood}</div>
             <div class="stat-label">Blood Queue</div>
@@ -571,13 +598,12 @@ export function EMSDashboard() {
 
         <Tabs.Root
           value={activeTab()}
-          onValueChange={(value) => setActiveTab(value as 'patients' | 'treatment' | 'admit' | 'inventory' | 'blood')}
+          onValueChange={(value) => setActiveTab(value as 'patients' | 'treatment' | 'admit' | 'blood')}
         >
           <Tabs.List>
             <Tabs.Trigger value='patients' label='PATIENTS' badge={activePatients().length} />
             <Tabs.Trigger value='treatment' label='IN TREATMENT' badge={inTreatmentPatients().length} />
             <Tabs.Trigger value='admit' label='+ ADMIT' />
-            <Tabs.Trigger value='inventory' label='INVENTORY' />
             <Tabs.Trigger
               value='blood'
               label='BLOOD REQUESTS'
@@ -596,7 +622,7 @@ export function EMSDashboard() {
                 onInput={(e: any) => setPatientSearchQuery(e.currentTarget.value)}
                 placeholder="Search patients by name, ID, or complaint..."
               />
-              <Button.Root 
+              <Button.Root
                 class="btn"
                 onClick={() => setShowPoliceCallModal(true)}
                 style={{ 'margin-left': 'auto' }}
@@ -623,7 +649,7 @@ export function EMSDashboard() {
                 {patientSearchQuery() ? 'No active patients match that search' : 'No active EMS patients in the queue'}
               </div>
             </Show>
-            
+
             <div class="patients-list">
               <For each={filteredPatients()}>
                 {(patient) => (
@@ -647,14 +673,17 @@ export function EMSDashboard() {
             <Show when={inTreatmentPatients().length === 0}>
               <div class="empty-state">No patients are currently in treatment</div>
             </Show>
-            
+
             <For each={inTreatmentPatients()}>
               {(patient) => (
                 <EmsTreatmentCard
                   patient={patient}
                   getConditionColor={getConditionColor}
                   formatDate={formatDate}
-                  onDischarge={dischargePatient}
+                  onDischarge={(p) => {
+                    setSelectedPatient(p);
+                    openDischargeModal(p);
+                  }}
                 />
               )}
             </For>
@@ -663,7 +692,7 @@ export function EMSDashboard() {
           <Show when={activeTab() === 'admit'}>
             <div class="admit-form">
               <h3>[PATIENT ADMISSION FORM]</h3>
-              
+
               <div class="form-section">
                 <label>Patient Name *</label>
                 <div style={{ display: 'flex', gap: '8px' }}>
@@ -675,7 +704,7 @@ export function EMSDashboard() {
                     value={patientForm().name}
                     onInput={(e: any) => setPatientForm({ ...patientForm(), name: e.currentTarget.value })}
                   />
-                  <Button.Root 
+                  <Button.Root
                     class="btn"
                     onClick={() => void readPatientIdFromReader()}
                     title="Read ID from card reader"
@@ -683,6 +712,17 @@ export function EMSDashboard() {
                     [READ ID]
                   </Button.Root>
                 </div>
+              </div>
+
+              <div class="form-section">
+                <label>Citizen ID (for medical records)</label>
+                <Input.Root
+                  type="text"
+                  class="dos-input"
+                  placeholder="Citizen ID (auto-filled from ID reader)"
+                  value={patientForm().citizenId}
+                  onInput={(e: any) => setPatientForm({ ...patientForm(), citizenId: e.currentTarget.value })}
+                />
               </div>
 
               <div class="form-section">
@@ -791,53 +831,13 @@ export function EMSDashboard() {
                 <Button.Root class="btn btn-primary" onClick={handleAdmitPatient}>
                   [ADMIT PATIENT]
                 </Button.Root>
-                <Button.Root 
+                <Button.Root
                   class="btn"
                   onClick={() => setActiveTab('patients')}
                 >
                   [CANCEL]
                 </Button.Root>
               </div>
-            </div>
-          </Show>
-
-          <Show when={activeTab() === 'inventory'}>
-            <div class="section-header">
-              [MEDICAL SUPPLIES INVENTORY]
-            </div>
-            <Show when={inventoryList().length === 0}>
-              <div class="empty-state">No EMS inventory items are loaded</div>
-            </Show>
-            
-            <div class="inventory-list">
-              <For each={inventoryList()}>
-                {(item) => (
-                  <div class={`inventory-item ${item.quantity <= item.minStock ? 'low-stock' : ''}`}>
-                    <div class="inventory-header">
-                      <span class="item-name">{item.name}</span>
-                      <span class={`item-stock ${item.quantity <= item.minStock ? 'low' : ''}`}>
-                        {item.quantity} {item.unit} {item.quantity <= item.minStock ? '⚠️ LOW' : ''}
-                      </span>
-                    </div>
-                    <div class="inventory-category">{item.category} • Used today: {item.usedToday}</div>
-                    <div class="inventory-actions">
-                      <Button.Root 
-                        class="btn-small"
-                        onClick={() => useInventoryItem(item.itemId)}
-                        disabled={item.quantity <= 0}
-                      >
-                        [USE]
-                      </Button.Root>
-                      <Button.Root 
-                        class="btn-small btn-primary"
-                        onClick={() => restockItem(item.itemId)}
-                      >
-                        [RESTOCK]
-                      </Button.Root>
-                    </div>
-                  </div>
-                )}
-              </For>
             </div>
           </Show>
 
@@ -940,7 +940,7 @@ export function EMSDashboard() {
         </div>
 
         <Show when={bloodUpdateModalOpen() && pendingBloodUpdate()}>
-                    <Modal.Root onClose={cancelBloodUpdateModal} useContentWrapper={false}>
+          <Modal.Root onClose={cancelBloodUpdateModal} useContentWrapper={false}>
             <div class="modal-content" onClick={(e) => e.stopPropagation()}>
               <div class="modal-header">
                 <h3>=== BLOOD REQUEST UPDATE ===</h3>
@@ -975,7 +975,7 @@ export function EMSDashboard() {
         </Show>
 
         <Show when={showPoliceCallModal()}>
-                    <Modal.Root onClose={() => setShowPoliceCallModal(false)} useContentWrapper={false}>
+          <Modal.Root onClose={() => setShowPoliceCallModal(false)} useContentWrapper={false}>
             <div class="modal-content" onClick={(e) => e.stopPropagation()}>
               <div class="modal-header">
                 <h3>=== REQUEST POLICE ASSISTANCE ===</h3>
@@ -1029,7 +1029,110 @@ export function EMSDashboard() {
           </Modal.Root>
         </Show>
 
-        <Show when={selectedPatient() && activeTab() !== 'admit'}>
+        {/* Discharge Modal with Prescriptions */}
+        <Show when={showDischargeModal() && selectedPatient()}>
+          <Modal.Root onClose={() => setShowDischargeModal(false)} useContentWrapper={false}>
+            <div class="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div class="modal-header">
+                <h3>=== DISCHARGE: {selectedPatient()!.name} ===</h3>
+                <button class="modal-close" onClick={() => setShowDischargeModal(false)}>[X]</button>
+              </div>
+              <div class="modal-body">
+                <div class="form-group">
+                  <label>Citizen ID (required for medical record):</label>
+                  <Input.Root
+                    type="text"
+                    class="dos-input"
+                    value={dischargeCitizenId()}
+                    onInput={(e) => setDischargeCitizenId(e.currentTarget.value)}
+                    placeholder="Enter citizen ID..."
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label>Disposition:</label>
+                  <div class="condition-selector">
+                    {(['HOME', 'HOSPITAL', 'POLICE', 'MORGUE'] as const).map(d => (
+                      <button
+                        class={`condition-btn ${dischargeDisposition() === d ? 'selected' : ''}`}
+                        onClick={() => setDischargeDisposition(d)}
+                      >
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label>Discharge Notes:</label>
+                  <Textarea.Root
+                    class="dos-textarea"
+                    rows={3}
+                    value={dischargeNotes()}
+                    onInput={(e) => setDischargeNotes(e.currentTarget.value)}
+                    placeholder="Discharge notes..."
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label>[PRESCRIPTIONS]</label>
+                  <div style={{ display: 'flex', gap: '6px', 'margin-bottom': '8px' }}>
+                    <Input.Root
+                      type="text"
+                      class="dos-input"
+                      style={{ flex: 1 }}
+                      value={prescriptionMedication()}
+                      onInput={(e) => setPrescriptionMedication(e.currentTarget.value)}
+                      placeholder="Medication name"
+                    />
+                    <Input.Root
+                      type="text"
+                      class="dos-input"
+                      style={{ flex: 1 }}
+                      value={prescriptionInstructions()}
+                      onInput={(e) => setPrescriptionInstructions(e.currentTarget.value)}
+                      placeholder="Instructions"
+                    />
+                    <Button.Root class="btn" onClick={addPrescription}>[ADD]</Button.Root>
+                  </div>
+
+                  <Show when={emsState.dischargePrescriptions.length > 0}>
+                    <div style={{ 'margin-top': '6px' }}>
+                      <For each={emsState.dischargePrescriptions}>
+                        {(rx, index) => (
+                          <div style={{
+                            display: 'flex',
+                            'justify-content': 'space-between',
+                            'align-items': 'center',
+                            padding: '4px 8px',
+                            border: '1px solid #3a3a3a',
+                            'margin-bottom': '4px',
+                          }}>
+                            <span>{rx.medication} - {rx.instructions}</span>
+                            <button
+                              style={{ background: 'none', border: 'none', color: '#ff5555', cursor: 'pointer' }}
+                              onClick={() => emsActions.removeDischargePrescription(index())}
+                            >
+                              [X]
+                            </button>
+                          </div>
+                        )}
+                      </For>
+                    </div>
+                  </Show>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <Button.Root class="btn" onClick={() => setShowDischargeModal(false)}>[CANCEL]</Button.Root>
+                <Button.Root class="btn btn-success" onClick={() => void confirmDischarge()}>
+                  [CONFIRM DISCHARGE]
+                </Button.Root>
+              </div>
+            </div>
+          </Modal.Root>
+        </Show>
+
+        <Show when={selectedPatient() && activeTab() !== 'admit' && !showDischargeModal()}>
           <div class="patient-detail-overlay" onClick={() => setSelectedPatient(null)}>
             <div class="patient-detail-panel" onClick={(e: any) => e.stopPropagation()}>
               <div class="patient-detail-header">
@@ -1042,14 +1145,14 @@ export function EMSDashboard() {
                     </Show>
                   </div>
                 </div>
-                <span 
+                <span
                   class="condition-badge"
                   style={{ color: getConditionColor(selectedPatient()!.condition) }}
                 >
                   P{selectedPatient()!.triagePriority} - {selectedPatient()!.condition}
                 </span>
               </div>
-              
+
               <div class="patient-detail-content">
                 <div class="summary-stats" style={{ 'margin-bottom': '12px' }}>
                   <div class="stat-box case">
@@ -1138,6 +1241,38 @@ export function EMSDashboard() {
                   </For>
                 </div>
 
+                {/* Medical History from DB */}
+                <Show when={selectedPatient()!.citizenId}>
+                  <div class="detail-section">
+                    <h4>[PERSISTENT MEDICAL HISTORY]</h4>
+                    <Button.Root
+                      class="btn btn-small"
+                      onClick={() => emsActions.fetchMedicalHistory(selectedPatient()!.citizenId!)}
+                    >
+                      [LOAD HISTORY]
+                    </Button.Root>
+                    <Show when={emsState.medicalHistory.length > 0}>
+                      <For each={emsState.medicalHistory}>
+                        {(record) => (
+                          <div class="treatment-log-item" style={{ 'margin-top': '8px' }}>
+                            <div class="treatment-time">{new Date(record.visitDate).toLocaleDateString()}</div>
+                            <div class="treatment-action">{record.diagnosis}</div>
+                            <div class="treatment-meds">{record.treatmentSummary}</div>
+                            <Show when={record.prescriptions.length > 0}>
+                              <div class="treatment-notes">
+                                Rx: {record.prescriptions.map(p => p.medication).join(', ')}
+                              </div>
+                            </Show>
+                            <div class="treatment-notes" style={{ color: '#808080' }}>
+                              By: {record.treatingMedicName}
+                            </div>
+                          </div>
+                        )}
+                      </For>
+                    </Show>
+                  </div>
+                </Show>
+
                 <div class="detail-section">
                   <h4>[ADMISSION INFO]</h4>
                   <p>ID: {selectedPatient()!.patientId}</p>
@@ -1151,16 +1286,16 @@ export function EMSDashboard() {
               </div>
 
               <div class="patient-detail-actions">
-                <Button.Root 
+                <Button.Root
                   class="btn btn-primary"
                   onClick={() => handleHandoff(selectedPatient()!)}
                   title="Send medical report to active case"
                 >
                   [HANDOFF TO CASE]
                 </Button.Root>
-                
+
                 <Show when={selectedPatient()!.status === 'TRIAGE' || selectedPatient()!.status === 'ADMITTED'}>
-                  <Button.Root 
+                  <Button.Root
                     class="btn"
                     onClick={() => startTreatment(selectedPatient()!)}
                   >
@@ -1168,14 +1303,14 @@ export function EMSDashboard() {
                   </Button.Root>
                 </Show>
                 <Show when={selectedPatient()!.status === 'IN_TREATMENT'}>
-                  <Button.Root 
+                  <Button.Root
                     class="btn btn-success"
-                    onClick={() => dischargePatient(selectedPatient()!)}
+                    onClick={() => openDischargeModal(selectedPatient()!)}
                   >
                     [DISCHARGE PATIENT]
                   </Button.Root>
                 </Show>
-                <Button.Root 
+                <Button.Root
                   class="btn"
                   onClick={() => setSelectedPatient(null)}
                 >
@@ -1188,7 +1323,7 @@ export function EMSDashboard() {
 
         <div class="modal-footer">
           <span style={{ color: '#808080' }}>
-            EMS Dashboard v2.0 | {Object.keys(emsState.units).length} Units Available
+            EMS Dashboard v3.0 | {Object.keys(emsState.units).length} Units Available
           </span>
           <Button.Root class="btn" onClick={closeModal}>[CLOSE]</Button.Root>
         </div>
