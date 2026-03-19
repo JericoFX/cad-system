@@ -32,6 +32,7 @@ export type ModalId =
   | 'BOLO_MANAGER'
   | 'VEHICLE_CAD'
   | 'FORENSIC_COLLECTION'
+  | 'NEWS_FEED'
   | 'PHOTO_PREVIEW';
 
 export interface PhotoPreviewData {
@@ -136,6 +137,9 @@ const VehicleCAD = lazy(() =>
 const ForensicCollection = lazy(() =>
   import('./ForensicCollection').then((module) => ({ default: module.ForensicCollection }))
 );
+const NewsFeed = lazy(() =>
+  import('./NewsFeed').then((module) => ({ default: module.NewsFeed }))
+);
 
 const CallsignPromptSetup: Component = () => <CallsignPrompt mode='setup' />;
 
@@ -227,6 +231,10 @@ export const modalRegistry: Record<ModalId, ModalRegistryEntry> = {
   FORENSIC_COLLECTION: {
     component: ForensicCollection,
     enabled: () => featureState.forensics.visible,
+  },
+  NEWS_FEED: {
+    component: NewsFeed,
+    enabled: () => true,
   },
   PHOTO_PREVIEW: {
     component: PhotoCapturePreview,

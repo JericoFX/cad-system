@@ -292,6 +292,76 @@ local function upsertNewsArticle(source, payload)
     }
 end
 
+local function listPublishedArticles()
+    local output = {}
+    for _, article in pairs(CAD.State.News.Articles) do
+        if article.status == 'PUBLISHED' then
+            output[#output + 1] = CAD.DeepCopy(article)
+        end
+    end
+
+    table.sort(output, function(a, b)
+        return tostring(a.publishedAt or a.updatedAt or '') > tostring(b.publishedAt or b.updatedAt or '')
+    end)
+
+    return output
+end
+
+local function createBreakingDispatchAlert(article)
+    if not article or article.category ~= 'BREAKING' then
+        return
+    end
+
+    local callId = CAD.Server.GenerateId('CALL')
+    local nowIso = CAD.Server.ToIso()
+
+    local call = {
+        callId = callId,
+        type = 'NEWS_ALERT',
+        priority = 1,
+        title = CAD.Server.SanitizeString(article.headline, 255),
+        description = CAD.Server.SanitizeString(article.lead, 2000),
+        location = article.location or 'Los Santos',
+        status = 'ACTIVE',
+        assignedUnits = {},
+        createdAt = nowIso,
+    }
+
+    CAD.State.Dispatch = CAD.State.Dispatch or {}
+    CAD.State.Dispatch.Calls = CAD.State.Dispatch.Calls or {}
+    CAD.State.Dispatch.Calls[callId] = call
+
+    pcall(function()
+        MySQL.insert.await([[
+            INSERT INTO cad_dispatch_calls (call_id, call_type, priority, title, description, location, coordinates, status, assigned_units, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, NULL, ?, '{}', ?)
+        ]], {
+            callId,
+            call.type,
+            call.priority,
+            call.title,
+            call.description,
+            call.location,
+            call.status,
+            nowIso,
+        })
+    end)
+
+    CAD.Server.NotifyJobs(
+        { 'police', 'sheriff', 'ambulance', 'ems', 'dispatch' },
+        ('BREAKING NEWS: %s'):format(article.headline),
+        'error'
+    )
+
+    CAD.Server.BroadcastToJobs(
+        { 'police', 'sheriff', 'ambulance', 'ems', 'dispatch' },
+        'dispatchCallCreated',
+        { call = call }
+    )
+
+    CAD.Log('info', 'Breaking news dispatch alert created: %s -> %s', tostring(article.articleId), callId)
+end
+
 lib.callback.register('cad:news:getArticles', CAD.Auth.WithGuard('default', function(source)
     if not newsFeatureEnabled() then
         return {
@@ -300,24 +370,43 @@ lib.callback.register('cad:news:getArticles', CAD.Auth.WithGuard('default', func
         }
     end
 
-    local identity, authErr = getNewsIdentity(source, false)
+    local identity = CAD.Server.GetPlayerIdentity(source)
     if not identity then
         return {
             ok = false,
-            error = authErr or 'forbidden',
+            error = 'not_authorized',
         }
     end
 
     loadArticlesFromDatabase()
 
+    local job = tostring(identity.job or ''):lower()
+    local isNewsRole = job == 'reporter' or job == 'weazelnews' or identity.isAdmin
+
+    if isNewsRole then
+        return {
+            ok = true,
+            articles = listArticles(),
+        }
+    end
+
     return {
         ok = true,
-        articles = listArticles(),
+        articles = listPublishedArticles(),
     }
 end))
 
 lib.callback.register('cad:news:published', CAD.Auth.WithGuard('heavy', function(source, payload)
-    return upsertNewsArticle(source, payload)
+    local result = upsertNewsArticle(source, payload)
+
+    if result.ok and result.articleId then
+        local article = CAD.State.News.Articles[result.articleId]
+        if article and article.status == 'PUBLISHED' and article.category == 'BREAKING' then
+            createBreakingDispatchAlert(article)
+        end
+    end
+
+    return result
 end))
 
 lib.callback.register('cad:news:updated', CAD.Auth.WithGuard('heavy', function(source, payload)

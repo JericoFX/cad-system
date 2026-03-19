@@ -1,6 +1,7 @@
 import { createSignal, Show, For, createMemo } from 'solid-js';
 import { terminalActions, terminalState } from '~/stores/terminalStore';
 import { cadState, cadActions } from '~/stores/cadStore';
+import { emsState, emsActions, type MedicalRecord } from '~/stores/emsStore';
 import { Button, Modal, Tabs } from '~/components/ui';
 
 export function PersonSnapshot() {
@@ -385,10 +386,55 @@ export function PersonSnapshot() {
                     </div>
                   </Show>
                 </div>
-                
+
+                <div class="medical-section" style={{ 'margin-top': '16px' }}>
+                  <h4>Medical History</h4>
+                  <Button.Root
+                    class="btn btn-small"
+                    onClick={() => emsActions.fetchMedicalHistory(person()!.citizenid)}
+                    style={{ 'margin-bottom': '8px' }}
+                  >
+                    [LOAD MEDICAL HISTORY]
+                  </Button.Root>
+                  <Show when={emsState.medicalHistory.length > 0}>
+                    <For each={emsState.medicalHistory}>
+                      {(record) => (
+                        <div style={{
+                          padding: '8px',
+                          border: '1px solid #3a3a3a',
+                          'margin-bottom': '6px',
+                        }}>
+                          <div style={{ display: 'flex', 'justify-content': 'space-between', 'margin-bottom': '4px' }}>
+                            <strong>{new Date(record.visitDate).toLocaleDateString()}</strong>
+                            <span style={{ color: '#808080' }}>By: {record.treatingMedicName}</span>
+                          </div>
+                          <div><strong>Diagnosis:</strong> {record.diagnosis}</div>
+                          <div style={{ color: '#a0a0a0', 'font-size': '11px' }}>{record.treatmentSummary}</div>
+                          <Show when={record.prescriptions && record.prescriptions.length > 0}>
+                            <div style={{ 'margin-top': '4px' }}>
+                              <strong>Rx:</strong>{' '}
+                              {record.prescriptions.map((p: { medication: string; instructions: string }) =>
+                                `${p.medication} (${p.instructions})`
+                              ).join(', ')}
+                            </div>
+                          </Show>
+                          <Show when={record.notes}>
+                            <div style={{ color: '#808080', 'font-size': '11px', 'margin-top': '2px' }}>
+                              Notes: {record.notes}
+                            </div>
+                          </Show>
+                        </div>
+                      )}
+                    </For>
+                  </Show>
+                  <Show when={emsState.medicalHistory.length === 0}>
+                    <div class="empty-state">No medical records found. Click load to fetch from database.</div>
+                  </Show>
+                </div>
+
                 <div class="medical-notice">
-                  <strong>⚠️ MEDICAL DISCLAIMER:</strong>
-                  <p>This information is for emergency response purposes only. 
+                  <strong>MEDICAL DISCLAIMER:</strong>
+                  <p>This information is for emergency response purposes only.
                   Always verify critical medical information with the individual or medical ID card.</p>
                 </div>
               </div>

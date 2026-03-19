@@ -279,6 +279,25 @@ function CAD.Database.EnsureSchema()
         )
     ]])
 
+    execute([[
+        CREATE TABLE IF NOT EXISTS cad_medical_records (
+            record_id VARCHAR(64) NOT NULL PRIMARY KEY,
+            citizen_id VARCHAR(64) NOT NULL,
+            citizen_name VARCHAR(128) NOT NULL,
+            visit_date VARCHAR(32) NOT NULL,
+            diagnosis VARCHAR(500) NOT NULL,
+            treatment_summary TEXT NOT NULL,
+            prescriptions LONGTEXT NULL,
+            treating_medic VARCHAR(128) NOT NULL,
+            treating_medic_name VARCHAR(128) NOT NULL,
+            vitals_snapshot LONGTEXT NULL,
+            notes TEXT NULL,
+            created_at VARCHAR(32) NOT NULL,
+            INDEX idx_medical_citizen (citizen_id),
+            INDEX idx_medical_date (visit_date)
+        )
+    ]])
+
     executeOptional([[SET GLOBAL event_scheduler = ON]], 'event_scheduler')
 
     executeOptional([[
