@@ -1,0 +1,27 @@
+:root {
+  --terminal-bg: #000000;
+  --terminal-fg: #c0c0c0;
+  --terminal-fg-bright: #ffffff;
+  --terminal-fg-dim: #808080;
+  --terminal-error: #ff0000;
+  --terminal-error-bright: #ff5555;
+  --terminal-system: #ffff00;
+  --terminal-system-bright: #ffff55;
+  --terminal-border: #c0c0c0;
+  --terminal-border-dim: #808080;
+  --terminal-cursor: #c0c0c0;
+
+  --priority-high: #ff0000;
+  --priority-med: #ffff00;
+  --priority-low: #00ff00;
+
+  --font-terminal: 'Perfect DOS VGA 437 Win', 'Perfect DOS VGA 437', 'Courier New', monospace;
+  --font-size-base: 18px;
+  --font-size-small: 16px;
+  --font-size-large: 20px;
+  --line-height: 1.4;
+
+  --bg-overlay: rgba(0, 0, 0, 0.3);
+  --bg-subtle: rgba(192, 192, 192, 0.1);
+  --terminal-success: #00ff00;
+}

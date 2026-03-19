@@ -1,0 +1,59 @@
+.bolo-manager { max-width: 800px; width: 95%; max-height: 90vh; }
+
+.bolo-stats {
+  display: flex; gap: 16px; padding: 16px 30px;
+  background-color: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid var(--terminal-border);
+
+  .stat-item {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 12px 24px; border: 2px solid var(--terminal-border); min-width: 120px;
+    &.high { border-color: var(--terminal-error); background-color: rgba(255, 0, 0, 0.1); }
+  }
+
+  .stat-number { font-size: 28px; font-weight: bold; color: var(--terminal-fg-bright); }
+  .stat-label { font-size: 11px; text-transform: uppercase; color: var(--terminal-fg-dim); margin-top: 4px; }
+}
+
+.bolo-tabs {
+  display: flex; background-color: rgba(0, 0, 0, 0.2);
+  border-bottom: 2px solid var(--terminal-border);
+
+  .tab {
+    flex: 1; padding: 14px 16px; background: none; border: none;
+    border-bottom: 2px solid transparent; color: var(--terminal-fg-dim);
+    font-family: inherit; font-size: 13px; cursor: pointer; transition: all 0.2s;
+    &:hover { color: var(--terminal-fg); background-color: rgba(255, 255, 255, 0.05); }
+    &.active { color: var(--terminal-fg-bright); border-bottom-color: var(--terminal-error); background-color: rgba(255, 0, 0, 0.1); }
+  }
+}
+
+.bolo-actions { padding: 16px 30px; border-bottom: 1px solid var(--terminal-border); }
+
+.bolo-create-form {
+  background-color: rgba(255, 0, 0, 0.05); border: 2px solid var(--terminal-error);
+  padding: 24px 30px; margin: 16px 30px;
+  h3 { color: var(--terminal-error); margin: 0 0 16px 0; text-align: center; }
+}
+
+.radio-group { display: flex; gap: 24px; padding: 12px 0; }
+.radio-label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: bold; }
+.radio-label input[type='radio'] { width: 18px; height: 18px; accent-color: var(--terminal-error); }
+
+.bolos-list { padding: 16px 30px; max-height: 40vh; overflow-y: auto; }
+
+.bolo-card {
+  background-color: rgba(0, 0, 0, 0.2); border: 1px solid var(--terminal-border);
+  padding: 16px; margin-bottom: 12px; cursor: pointer; transition: all 0.2s;
+  &:hover, &.selected { border-color: var(--terminal-error); background-color: rgba(255, 0, 0, 0.05); }
+}
+
+.bolo-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; font-size: 12px; }
+.bolo-type { background-color: var(--terminal-border); color: var(--terminal-bg); padding: 4px 10px; font-weight: bold; text-transform: uppercase; }
+.bolo-priority { font-weight: bold; text-transform: uppercase; }
+.bolo-id { color: var(--terminal-fg-dim); font-family: monospace; margin-left: auto; }
+.bolo-main { margin-bottom: 12px; }
+.bolo-identifier { font-size: 20px; font-weight: bold; color: var(--terminal-fg-bright); font-family: monospace; margin-bottom: 8px; }
+.bolo-reason { color: var(--terminal-fg); line-height: 1.5; }
+.bolo-meta { display: flex; gap: 16px; font-size: 12px; color: var(--terminal-fg-dim); margin-top: 12px; }
+.bolo-actions-row { display: flex; gap: 12px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--terminal-border); }

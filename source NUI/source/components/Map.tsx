@@ -16,7 +16,6 @@ import {
   GTA_MAP_CENTER,
   gtaToLatLng,
 } from './map-crs';
-import './Map.css';
 
 export const Map: Component<MapProps> = (props) => {
   const [local, rest] = splitProps(props, [

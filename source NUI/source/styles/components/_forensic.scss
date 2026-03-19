@@ -1,0 +1,47 @@
+.forensic-collection { width: min(800px, 95vw); max-height: 90vh; }
+
+.evidence-type-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px; margin-top: 8px;
+}
+
+.forensic-person-search-row {
+  display: flex; gap: 8px; align-items: center;
+  .dos-input { flex: 1; }
+}
+
+.forensic-person-results {
+  margin-top: 8px; max-height: 180px; overflow-y: auto;
+  border: 1px solid var(--terminal-border-dim); background: rgba(0, 0, 0, 0.3);
+}
+
+.forensic-person-result {
+  width: 100%; display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 10px; background: transparent; border: 0;
+  border-bottom: 1px solid rgba(192, 192, 192, 0.15);
+  color: var(--terminal-fg); cursor: pointer; font-family: var(--font-terminal);
+  &:hover { background: rgba(192, 192, 192, 0.08); }
+  &.selected { background: rgba(255, 255, 0, 0.12); color: var(--terminal-system-bright); }
+  .name { font-weight: 600; }
+  .meta { color: var(--terminal-fg-dim); font-size: var(--font-size-small); }
+}
+
+.type-btn {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 12px 8px; background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--terminal-border-dim); color: var(--terminal-fg);
+  cursor: pointer; transition: all 0.2s;
+  &:hover { border-color: var(--terminal-border); background: rgba(192, 192, 192, 0.1); }
+  &.selected { border-color: var(--terminal-system); background: rgba(255, 255, 0, 0.1); }
+  .icon { font-size: 24px; margin-bottom: 4px; }
+  .label { font-size: var(--font-size-small); text-align: center; }
+}
+
+.collection-success {
+  margin-top: 16px; padding: 16px;
+  border: 1px solid var(--terminal-system); background: rgba(255, 255, 0, 0.05);
+  h3 { color: var(--terminal-system); margin-bottom: 8px; }
+}
+
+.evidence-id { font-family: var(--font-terminal); font-size: var(--font-size-large); color: var(--terminal-system-bright); margin-bottom: 8px; }
+.evidence-details { display: flex; flex-direction: column; gap: 4px; font-size: var(--font-size-small); color: var(--terminal-fg-dim); }

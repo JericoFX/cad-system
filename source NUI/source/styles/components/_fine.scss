@@ -1,0 +1,41 @@
+.fine-manager { max-width: 800px; width: 95%; max-height: 90vh; }
+.fine-form { padding: 20px; }
+
+.target-info {
+  background-color: rgba(0, 0, 0, 0.3); border: 1px solid var(--terminal-border);
+  padding: 12px; margin: 16px 0;
+}
+
+.info-box { font-size: 14px; }
+.info-line { margin: 4px 0; }
+.info-box strong { color: var(--terminal-fg-bright); margin-right: 8px; }
+
+.fines-list {
+  max-height: 300px; overflow-y: auto;
+  border: 1px solid var(--terminal-border);
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+.fine-item {
+  padding: 12px; border-bottom: 1px solid rgba(192, 192, 192, 0.1);
+  cursor: pointer; transition: background-color 0.2s;
+  display: grid; grid-template-columns: 80px 1fr auto; gap: 12px; align-items: center;
+  &:hover { background-color: rgba(192, 192, 192, 0.1); }
+  &.selected { background-color: rgba(255, 255, 0, 0.2); border-left: 3px solid var(--terminal-system); }
+}
+
+.fine-code { font-family: monospace; font-weight: bold; color: var(--terminal-fg-bright); font-size: 12px; }
+.fine-description { color: var(--terminal-fg); font-size: 13px; }
+
+.fine-amount {
+  text-align: right;
+  .amount { display: block; font-weight: bold; color: var(--terminal-fg-bright); }
+  .jail-time { display: block; font-size: 11px; color: var(--terminal-error); }
+}
+
+.fine-preview {
+  background-color: rgba(0, 0, 0, 0.3); border: 1px solid var(--terminal-border);
+  padding: 16px; margin: 16px 0;
+  .preview-box { font-size: 14px; line-height: 1.6; }
+  .preview-box div { margin: 4px 0; }
+}

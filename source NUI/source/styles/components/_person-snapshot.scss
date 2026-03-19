@@ -1,0 +1,100 @@
+.person-snapshot { max-width: 900px; width: 95%; max-height: 90vh; }
+
+.snapshot-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 24px 30px; background-color: rgba(0, 0, 0, 0.3);
+  border-bottom: 2px solid var(--terminal-border);
+}
+
+.header-main { display: flex; gap: 20px; flex: 1; }
+
+.person-photo {
+  width: 100px; height: 120px; border: 2px solid var(--terminal-border);
+  background-color: rgba(0, 0, 0, 0.5); display: flex;
+  align-items: center; justify-content: center; overflow: hidden;
+  img { width: 100%; height: 100%; object-fit: cover; }
+}
+
+.photo-placeholder { font-size: 48px; color: var(--terminal-fg-dim); }
+
+.person-info h2 { margin: 0 0 8px 0; color: var(--terminal-fg-bright); font-size: 24px; }
+.person-meta { display: flex; gap: 16px; margin-bottom: 12px; }
+.meta-item { color: var(--terminal-fg-dim); font-size: 13px; }
+
+.warning-flags { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+
+.flag {
+  padding: 4px 10px; font-size: 11px; font-weight: bold; text-transform: uppercase;
+  &.deceased { background-color: #000; color: #fff; border: 1px solid #666; }
+  &.warrant { background-color: var(--terminal-error); color: #fff; }
+  &.bolo { background-color: var(--terminal-system); color: var(--terminal-bg); }
+}
+
+.status-flags { display: flex; gap: 6px; flex-wrap: wrap; }
+.status-flag { padding: 2px 8px; font-size: 10px; border: 1px solid currentColor; text-transform: uppercase; }
+.header-actions { display: flex; flex-direction: column; gap: 8px; }
+
+.snapshot-tabs {
+  display: flex; background-color: rgba(0, 0, 0, 0.2);
+  border-bottom: 2px solid var(--terminal-border);
+
+  .tab {
+    flex: 1; padding: 12px 16px; background: none; border: none;
+    border-bottom: 2px solid transparent; color: var(--terminal-fg-dim);
+    font-family: inherit; font-size: 12px; cursor: pointer; transition: all 0.2s;
+    &:hover { color: var(--terminal-fg); background-color: rgba(255, 255, 255, 0.05); }
+    &.active { color: var(--terminal-fg-bright); border-bottom-color: var(--terminal-system); background-color: rgba(255, 255, 0, 0.05); }
+  }
+}
+
+.snapshot-content { padding: 24px 30px; min-height: 300px; max-height: 50vh; overflow-y: auto; }
+
+.overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+
+.summary-stats {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+}
+
+.stat-box {
+  text-align: center; padding: 12px; border: 1px solid var(--terminal-border);
+  &.warrant { border-color: var(--terminal-error); background-color: rgba(255, 0, 0, 0.05); }
+  &.record { border-color: var(--terminal-system); background-color: rgba(255, 255, 0, 0.05); }
+  &.vehicle { border-color: #00ffff; background-color: rgba(0, 255, 255, 0.05); }
+  &.case { border-color: #00ff00; background-color: rgba(0, 255, 0, 0.05); }
+}
+
+.stat-number { font-size: 24px; font-weight: bold; color: var(--terminal-fg-bright); }
+.stat-label { font-size: 11px; color: var(--terminal-fg-dim); text-transform: uppercase; margin-top: 4px; }
+
+.records-list, .vehicles-list, .cases-list { display: flex; flex-direction: column; gap: 12px; }
+
+.record-card, .warrant-card, .vehicle-card, .case-card {
+  background-color: rgba(0, 0, 0, 0.2); border: 1px solid var(--terminal-border); padding: 16px;
+  &:hover { border-color: var(--terminal-system); background-color: rgba(255, 255, 0, 0.05); }
+}
+
+.record-header, .case-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+.record-id, .case-id { font-family: monospace; color: var(--terminal-system-bright); }
+.record-date, .case-type { font-size: 12px; color: var(--terminal-fg-dim); }
+.record-charges { color: var(--terminal-fg); font-size: 13px; }
+.record-officer { font-size: 12px; color: var(--terminal-fg-dim); margin-top: 4px; }
+
+.warrant-card { border-left: 4px solid var(--terminal-error); }
+.warrant-type { color: var(--terminal-error); font-weight: bold; font-size: 12px; }
+.warrant-reason { color: var(--terminal-fg); margin: 8px 0; }
+.warrant-meta { font-size: 12px; color: var(--terminal-fg-dim); }
+
+.vehicle-card.stolen { border-left: 4px solid #ff0000; }
+.vehicle-plate { font-family: monospace; font-size: 16px; font-weight: bold; color: var(--terminal-system-bright); }
+.vehicle-details { color: var(--terminal-fg); font-size: 13px; margin: 8px 0; }
+.vehicle-status { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.stolen-tag { background-color: #ff0000; color: #fff; padding: 2px 8px; font-size: 10px; font-weight: bold; }
+.status-tag {
+  padding: 2px 8px; font-size: 10px; border: 1px solid var(--terminal-border);
+  &.valid { border-color: #00ff00; color: #00ff00; }
+  &.expired { border-color: #ff8800; color: #ff8800; }
+  &.none { border-color: #ff0000; color: #ff0000; }
+}
+
+.case-priority { padding: 2px 8px; font-size: 10px; font-weight: bold; }

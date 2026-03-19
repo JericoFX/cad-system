@@ -68,3 +68,9 @@ export type { TextComponent, UITextProps } from './Text';
 
 export { UIProvider, useUIContext } from './UIContext';
 export type { UiContextValue, UiLabelOptions, UIProviderProps } from './UIContext';
+
+export { NotesList } from './NotesList';
+export type { NoteItem, NotesListProps } from './NotesList';
+
+export { StatusBadge, getPriorityColor, getStatusColor } from './StatusBadge';
+export type { StatusBadgeProps } from './StatusBadge';

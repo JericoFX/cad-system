@@ -3,6 +3,7 @@ import { For, Show, createMemo } from 'solid-js';
 import { notificationState, notificationActions, type Notification, type NotificationType } from '~/stores/notificationStore';
 import { terminalActions } from '~/stores/terminalStore';
 import { registry } from '~/commands/registry';
+import { getPriorityColor as getColor } from '~/components/ui';
 
 interface NotificationCenterProps {
   mode?: 'floating' | 'dock';
@@ -35,14 +36,7 @@ export function NotificationCenter(props: NotificationCenterProps = {}) {
     return icons[type] || '•';
   };
 
-  const getPriorityColor = (priority: Notification['priority']): string => {
-    const colors = {
-      high: '#ff0000',
-      medium: '#ffff00',
-      low: '#808080',
-    };
-    return colors[priority];
-  };
+  const getPriorityColor = (priority: Notification['priority']): string => getColor(priority);
 
   const handleAction = (notification: Notification) => {
     notificationActions.markAsRead(notification.id);

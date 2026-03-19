@@ -4,29 +4,12 @@ import { cadState, cadActions, type Vehicle } from '~/stores/cadStore';
 import { fetchNui } from '~/utils/fetchNui';
 import { Button, Input, Modal, Tabs, Textarea } from '~/components/ui';
 import { PhotoGallery } from '~/components/ui/PhotoGallery';
+import { useEntityNotes } from '~/hooks/useEntityNotes';
+import { formatDate as formatDateUtil } from '~/utils/storeHelpers/dateHelpers';
 
 interface LookupVehiclesResponse {
   ok?: boolean;
   vehicles?: Vehicle[];
-  error?: string;
-}
-
-interface EntityNoteResponse {
-  ok?: boolean;
-  notes?: Array<{
-    id: string;
-    content: string;
-    author: string;
-    authorName?: string;
-    timestamp: string;
-  }>;
-  note?: {
-    id: string;
-    content: string;
-    author: string;
-    authorName?: string;
-    timestamp: string;
-  };
   error?: string;
 }
 
@@ -62,9 +45,7 @@ export function VehicleSearch() {
     cadActions.clearSearchResults();
   };
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString();
-  };
+  const formatDate = (dateStr: string) => formatDateUtil(dateStr);
 
   const vehicleNotes = createMemo(() => {
     const vehicle = selectedVehicle();

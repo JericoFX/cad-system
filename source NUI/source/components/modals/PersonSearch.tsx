@@ -5,6 +5,8 @@ import { featureState } from '~/stores/featureStore';
 import { fetchNui } from '~/utils/fetchNui';
 import { Button, Input, Modal, Tabs, Textarea } from '~/components/ui';
 import { PhotoGallery } from '~/components/ui/PhotoGallery';
+import { formatDate as formatDateUtil } from '~/utils/storeHelpers/dateHelpers';
+import type { EntityNote } from '~/hooks/useEntityNotes';
 
 interface LookupPersonsResponse {
   ok?: boolean;
@@ -14,22 +16,8 @@ interface LookupPersonsResponse {
 
 interface EntityNoteResponse {
   ok?: boolean;
-  notes?: Array<{
-    id: string;
-    content: string;
-    author: string;
-    authorName?: string;
-    timestamp: string;
-    important?: boolean;
-  }>;
-  note?: {
-    id: string;
-    content: string;
-    author: string;
-    authorName?: string;
-    timestamp: string;
-    important?: boolean;
-  };
+  notes?: EntityNote[];
+  note?: EntityNote;
   error?: string;
 }
 
