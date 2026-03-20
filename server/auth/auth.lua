@@ -6,6 +6,9 @@ CAD.Auth = CAD.Auth or {}
 local officerCache = {}
 local rateLimits = {}
 
+local CACHE_TTL_SECONDS = 15
+local RATE_BUCKET_TTL_SECONDS = 120
+
 local function getRateLimitConfig(bucket)
     local security = CAD.Config and CAD.Config.Security or {}
     local perMinute = security.RateLimitPerMinute or {}
@@ -125,4 +128,39 @@ AddEventHandler('playerDropped', function()
     local source = source
     officerCache[source] = nil
     rateLimits[source] = nil
+end)
+
+CreateThread(function()
+    while true do
+        Wait(60000)
+        local now = os.time()
+        local activePlayers = {}
+        for _, playerId in ipairs(GetPlayers()) do
+            activePlayers[tonumber(playerId)] = true
+        end
+
+        for src, cached in pairs(officerCache) do
+            if not activePlayers[src] or (now - (cached.updatedAt or 0)) > CACHE_TTL_SECONDS then
+                officerCache[src] = nil
+            end
+        end
+
+        for src, buckets in pairs(rateLimits) do
+            if not activePlayers[src] then
+                rateLimits[src] = nil
+            else
+                local hasActive = false
+                for key, state in pairs(buckets) do
+                    if now >= (state.resetAt or 0) + RATE_BUCKET_TTL_SECONDS then
+                        buckets[key] = nil
+                    else
+                        hasActive = true
+                    end
+                end
+                if not hasActive then
+                    rateLimits[src] = nil
+                end
+            end
+        end
+    end
 end)

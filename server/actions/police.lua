@@ -2,7 +2,9 @@
 
 CAD.Police = CAD.Police or {}
 
-local jailTransfers = CAD.State.Police and CAD.State.Police.JailTransfers or {}
+CAD.State.Police = CAD.State.Police or {}
+CAD.State.Police.JailTransfers = CAD.State.Police.JailTransfers or {}
+local jailTransfers = CAD.State.Police.JailTransfers
 
 local function toArraySorted(transfers, caseId)
     local out = {}
@@ -99,10 +101,73 @@ local function createJailTransfer(officer, payload)
         createdAt = CAD.Server.ToIso(),
     }
 
-    if transfer.caseId and CAD.State.Cases[transfer.caseId] then
-        local noted, noteErr = addCaseNote(CAD.State.Cases[transfer.caseId], officer, transfer)
-        if not noted then
-            return nil, noteErr or 'cannot_add_case_note'
+    local caseObj = transfer.caseId and CAD.State.Cases[transfer.caseId] or nil
+
+    if caseObj then
+        local noteId = CAD.Server.GenerateId('NOTE')
+        local content = ('Jail transfer logged\nCitizen: %s (%s)\nTime: %s months\nReason: %s\nFacility: %s\nOfficer: %s'):format(
+            transfer.personName,
+            transfer.citizenId,
+            transfer.jailMonths,
+            transfer.reason,
+            transfer.facility,
+            officer.name or officer.identifier
+        )
+
+        local txnOk, txnErr = pcall(function()
+            MySQL.transaction.await({
+                {
+                    query = [[
+                        INSERT INTO cad_jail_transfers (transfer_id, citizen_id, person_name, case_id, jail_months, reason, facility, notes, created_by, created_by_name, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ]],
+                    values = {
+                        transferId, citizenId, personName, transfer.caseId,
+                        jailMonths, transfer.reason, transfer.facility, notes,
+                        officer.identifier, officer.name, transfer.createdAt,
+                    },
+                },
+                {
+                    query = [[
+                        INSERT INTO cad_case_notes (note_id, case_id, author, content, timestamp, note_type)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    ]],
+                    values = {
+                        noteId, caseObj.caseId, officer.identifier, content, transfer.createdAt, 'GENERAL',
+                    },
+                },
+            })
+        end)
+
+        if not txnOk then
+            CAD.Log('error', 'Jail transfer transaction failed for %s: %s', transferId, tostring(txnErr))
+            return nil, 'db_transaction_failed'
+        end
+
+        caseObj.notes = caseObj.notes or {}
+        caseObj.notes[#caseObj.notes + 1] = {
+            id = noteId,
+            caseId = caseObj.caseId,
+            author = officer.identifier,
+            content = content,
+            timestamp = transfer.createdAt,
+            type = 'general',
+        }
+    else
+        local ok, err = pcall(function()
+            MySQL.insert.await([[
+                INSERT INTO cad_jail_transfers (transfer_id, citizen_id, person_name, case_id, jail_months, reason, facility, notes, created_by, created_by_name, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ]], {
+                transferId, citizenId, personName, transfer.caseId,
+                jailMonths, transfer.reason, transfer.facility, notes,
+                officer.identifier, officer.name, transfer.createdAt,
+            })
+        end)
+
+        if not ok then
+            CAD.Log('error', 'Failed saving jail transfer %s: %s', transferId, tostring(err))
+            return nil, 'db_write_failed'
         end
     end
 

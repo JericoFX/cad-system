@@ -133,15 +133,24 @@ end
 
 CAD.Server.OfflineQueue = {}
 
+local OFFLINE_QUEUE_MAX_PER_PLAYER = 50
+local OFFLINE_QUEUE_TTL_SECONDS = 1800
+
 function CAD.Server.QueueOfflineEvent(playerId, eventName, data)
     if not CAD.Server.OfflineQueue[playerId] then
         CAD.Server.OfflineQueue[playerId] = {}
     end
-    table.insert(CAD.Server.OfflineQueue[playerId], {
+
+    local queue = CAD.Server.OfflineQueue[playerId]
+    if #queue >= OFFLINE_QUEUE_MAX_PER_PLAYER then
+        table.remove(queue, 1)
+    end
+
+    queue[#queue + 1] = {
         eventName = eventName,
         data = data,
         timestamp = os.time()
-    })
+    }
 end
 
 function CAD.Server.SendOfflineQueue(playerId, source)
@@ -154,3 +163,20 @@ function CAD.Server.SendOfflineQueue(playerId, source)
         })
     end
 end
+
+CreateThread(function()
+    while true do
+        Wait(300000)
+        local now = os.time()
+        for playerId, queue in pairs(CAD.Server.OfflineQueue) do
+            for i = #queue, 1, -1 do
+                if (now - (queue[i].timestamp or 0)) > OFFLINE_QUEUE_TTL_SECONDS then
+                    table.remove(queue, i)
+                end
+            end
+            if #queue == 0 then
+                CAD.Server.OfflineQueue[playerId] = nil
+            end
+        end
+    end
+end)
