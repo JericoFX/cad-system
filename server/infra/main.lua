@@ -34,7 +34,7 @@ local function safeQuery(sql, params, context)
 end
 
 local function bootstrapFromDatabase()
-    local caseRows = safeQuery('SELECT * FROM cad_cases', {}, 'cad_cases')
+    local caseRows = safeQuery('SELECT case_id, case_type, title, description, status, priority, created_by, assigned_to, linked_call_id, person_id, person_name, created_at, updated_at FROM cad_cases', {}, 'cad_cases')
     for i = 1, #caseRows do
         local row = caseRows[i]
         CAD.State.Cases[row.case_id] = {
@@ -57,7 +57,7 @@ local function bootstrapFromDatabase()
         }
     end
 
-    local noteRows = safeQuery('SELECT * FROM cad_case_notes', {}, 'cad_case_notes')
+    local noteRows = safeQuery('SELECT note_id, case_id, author, content, timestamp, note_type FROM cad_case_notes', {}, 'cad_case_notes')
     for i = 1, #noteRows do
         local row = noteRows[i]
         local caseObj = CAD.State.Cases[row.case_id]
@@ -73,7 +73,7 @@ local function bootstrapFromDatabase()
         end
     end
 
-    local evidenceRows = safeQuery('SELECT * FROM cad_evidence', {}, 'cad_evidence')
+    local evidenceRows = safeQuery('SELECT evidence_id, case_id, evidence_type, payload, attached_by, attached_at, custody_chain FROM cad_evidence', {}, 'cad_evidence')
     for i = 1, #evidenceRows do
         local row = evidenceRows[i]
         local caseObj = CAD.State.Cases[row.case_id]
@@ -172,6 +172,24 @@ local function bootstrapFromDatabase()
         end
     end
 
+    local jailRows = safeQuery('SELECT transfer_id, citizen_id, person_name, case_id, jail_months, reason, facility, notes, created_by, created_by_name, created_at FROM cad_jail_transfers ORDER BY created_at DESC LIMIT 500', {}, 'cad_jail_transfers')
+    for i = 1, #jailRows do
+        local row = jailRows[i]
+        CAD.State.Police.JailTransfers[row.transfer_id] = {
+            transferId = row.transfer_id,
+            citizenId = row.citizen_id,
+            personName = row.person_name,
+            caseId = row.case_id,
+            jailMonths = tonumber(row.jail_months) or 0,
+            reason = row.reason or '',
+            facility = row.facility or 'Bolingbroke Penitentiary',
+            notes = row.notes or '',
+            createdBy = row.created_by,
+            createdByName = row.created_by_name,
+            createdAt = row.created_at,
+        }
+    end
+
     CAD.State.SecurityCameras = CAD.State.SecurityCameras or {
         Cameras = {},
         LastNumber = 0,
@@ -219,19 +237,93 @@ local function bootstrapFromDatabase()
 
     CAD.Log(
         'success',
-        'Bootstrap loaded: %s cases, %s calls, %s fines, %s blood requests, %s cameras, %s virtual slots',
+        'Bootstrap loaded: %s cases, %s calls, %s fines, %s jail transfers, %s blood requests, %s cameras, %s virtual slots',
         #caseRows,
         #callRows,
         #fineRows,
+        #jailRows,
         #bloodRows,
         #cameraRows,
         virtualSlots
     )
 end
 
+local function validateConfig()
+    local errors = {}
+
+    if type(CAD.Config) ~= 'table' then
+        errors[#errors + 1] = 'CAD.Config is not a table'
+        return errors
+    end
+
+    if type(CAD.Config.Security) ~= 'table' then
+        errors[#errors + 1] = 'CAD.Config.Security is not a table'
+    else
+        if type(CAD.Config.Security.AllowedJobs) ~= 'table' then
+            errors[#errors + 1] = 'CAD.Config.Security.AllowedJobs must be a table'
+        end
+        local rlpm = CAD.Config.Security.RateLimitPerMinute
+        if type(rlpm) == 'table' then
+            if rlpm.default and not tonumber(rlpm.default) then
+                errors[#errors + 1] = 'RateLimitPerMinute.default must be a number'
+            end
+            if rlpm.heavy and not tonumber(rlpm.heavy) then
+                errors[#errors + 1] = 'RateLimitPerMinute.heavy must be a number'
+            end
+        end
+    end
+
+    if type(CAD.Config.Cases) ~= 'table' then
+        errors[#errors + 1] = 'CAD.Config.Cases is not a table'
+    else
+        if type(CAD.Config.Cases.Types) ~= 'table' or #CAD.Config.Cases.Types == 0 then
+            errors[#errors + 1] = 'CAD.Config.Cases.Types must be a non-empty table'
+        end
+        local ps = CAD.Config.Cases.PublicState
+        if type(ps) == 'table' then
+            if ps.MaxCases and (not tonumber(ps.MaxCases) or tonumber(ps.MaxCases) < 1) then
+                errors[#errors + 1] = 'Cases.PublicState.MaxCases must be a positive number'
+            end
+        end
+    end
+
+    if type(CAD.Config.Dispatch) == 'table' then
+        local d = CAD.Config.Dispatch
+        if d.PositionBroadcastMs and (not tonumber(d.PositionBroadcastMs) or tonumber(d.PositionBroadcastMs) < 1000) then
+            errors[#errors + 1] = 'Dispatch.PositionBroadcastMs must be a number >= 1000'
+        end
+        if d.RefreshIntervalMs and (not tonumber(d.RefreshIntervalMs) or tonumber(d.RefreshIntervalMs) < 1000) then
+            errors[#errors + 1] = 'Dispatch.RefreshIntervalMs must be a number >= 1000'
+        end
+    end
+
+    if type(CAD.Config.Evidence) == 'table' then
+        local e = CAD.Config.Evidence
+        if e.MaxStagingPerOfficer and (not tonumber(e.MaxStagingPerOfficer) or tonumber(e.MaxStagingPerOfficer) < 1) then
+            errors[#errors + 1] = 'Evidence.MaxStagingPerOfficer must be a positive number'
+        end
+    end
+
+    if type(CAD.Config.UI) ~= 'table' then
+        errors[#errors + 1] = 'CAD.Config.UI is not a table'
+    end
+
+    return errors
+end
+
 CreateThread(function()
     CAD.Log('info', 'Starting CAD backend v1.0.0')
     math.randomseed(GetGameTimer())
+
+    local configErrors = validateConfig()
+    if #configErrors > 0 then
+        for i = 1, #configErrors do
+            CAD.Log('error', 'Config validation: %s', configErrors[i])
+        end
+        CAD.Log('error', 'CAD startup aborted due to %d config errors. Fix config.lua and restart.', #configErrors)
+        return
+    end
+
     CAD.Database.EnsureSchema()
     bootstrapFromDatabase()
 end)
@@ -282,6 +374,15 @@ AddEventHandler('playerDropped', function()
     CAD.State.Evidence.Staging[source] = nil
     if CAD.Photos and CAD.Photos.State and CAD.Photos.State.Staging then
         CAD.Photos.State.Staging[source] = nil
+    end
+
+    if CAD.State.Dispatch and CAD.State.Dispatch.Units then
+        for unitId, unit in pairs(CAD.State.Dispatch.Units) do
+            if unit.source == source then
+                unit.status = 'OFFLINE'
+                unit.currentCall = nil
+            end
+        end
     end
 end)
 
