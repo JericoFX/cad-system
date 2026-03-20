@@ -55,6 +55,29 @@ local function normalizeContainerConfig(terminal)
     }
 end
 
+local TERMINAL_MAX_DISTANCE = 10.0
+
+local function isPlayerNearTerminal(source, terminal)
+    if not terminal.coords then
+        return true
+    end
+
+    local ped = GetPlayerPed(source)
+    if not ped or ped == 0 then
+        return false
+    end
+
+    local playerCoords = GetEntityCoords(ped)
+    local terminalCoords = terminal.coords
+    local dx = playerCoords.x - terminalCoords.x
+    local dy = playerCoords.y - terminalCoords.y
+    local dz = playerCoords.z - terminalCoords.z
+    local dist = math.sqrt(dx * dx + dy * dy + dz * dz)
+
+    local maxDist = tonumber(terminal.radius) or TERMINAL_MAX_DISTANCE
+    return dist <= maxDist
+end
+
 local function resolveContainerContext(payload, officer)
     local terminalId = CAD.Server.SanitizeString(payload and payload.terminalId, 64)
     if terminalId == '' then
@@ -84,6 +107,13 @@ local function resolveContainerContext(payload, officer)
         return nil, nil, nil, {
             ok = false,
             error = 'forbidden',
+        }
+    end
+
+    if not isPlayerNearTerminal(officer.source, terminal) then
+        return nil, nil, nil, {
+            ok = false,
+            error = 'too_far_from_terminal',
         }
     end
 
@@ -150,35 +180,43 @@ local function appendCaseEvidence(caseId, evidence)
     end
 
     caseObj.evidence = caseObj.evidence or {}
-    caseObj.evidence[#caseObj.evidence + 1] = evidence
-    local insertedIndex = #caseObj.evidence
     local previousUpdatedAt = caseObj.updatedAt
-    caseObj.updatedAt = CAD.Server.ToIso()
+    local newUpdatedAt = CAD.Server.ToIso()
 
     local ok, err = pcall(function()
-        MySQL.insert.await([[
-            INSERT INTO cad_evidence (evidence_id, case_id, evidence_type, payload, attached_by, attached_at, custody_chain)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE
-                payload = VALUES(payload),
-                custody_chain = VALUES(custody_chain)
-        ]], {
-            evidence.evidenceId,
-            evidence.caseId,
-            evidence.evidenceType,
-            json.encode(evidence.data or {}),
-            evidence.attachedBy,
-            evidence.attachedAt,
-            json.encode(evidence.custodyChain or {}),
+        MySQL.transaction.await({
+            {
+                query = [[
+                    INSERT INTO cad_evidence (evidence_id, case_id, evidence_type, payload, attached_by, attached_at, custody_chain)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE
+                        payload = VALUES(payload),
+                        custody_chain = VALUES(custody_chain)
+                ]],
+                values = {
+                    evidence.evidenceId,
+                    evidence.caseId,
+                    evidence.evidenceType,
+                    json.encode(evidence.data or {}),
+                    evidence.attachedBy,
+                    evidence.attachedAt,
+                    json.encode(evidence.custodyChain or {}),
+                },
+            },
+            {
+                query = [[UPDATE cad_cases SET updated_at = ? WHERE case_id = ?]],
+                values = { newUpdatedAt, caseId },
+            },
         })
     end)
 
     if not ok then
-        table.remove(caseObj.evidence, insertedIndex)
-        caseObj.updatedAt = previousUpdatedAt
-        CAD.Log('error', 'Failed saving evidence %s: %s', tostring(evidence and evidence.evidenceId), tostring(err))
+        CAD.Log('error', 'Failed saving evidence %s to case %s: %s', tostring(evidence.evidenceId), tostring(caseId), tostring(err))
         return false, 'db_write_failed'
     end
+
+    caseObj.evidence[#caseObj.evidence + 1] = evidence
+    caseObj.updatedAt = newUpdatedAt
 
     if CAD.Cases and type(CAD.Cases.PublishPublicState) == 'function' then
         CAD.Cases.PublishPublicState(false)
