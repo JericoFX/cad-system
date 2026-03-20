@@ -311,8 +311,16 @@ local function validateConfig()
     return errors
 end
 
+local function readVersion()
+    local raw = LoadResourceFile(GetCurrentResourceName(), 'version.txt')
+    if not raw then return 'unknown' end
+    return CAD.StringTrim(raw)
+end
+
+CAD.Version = readVersion()
+
 CreateThread(function()
-    CAD.Log('info', 'Starting CAD backend v1.0.0')
+    CAD.Log('info', 'Starting CAD backend v%s', CAD.Version)
     math.randomseed(GetGameTimer())
 
     local configErrors = validateConfig()
@@ -326,6 +334,10 @@ CreateThread(function()
 
     CAD.Database.EnsureSchema()
     bootstrapFromDatabase()
+end)
+
+lib.callback.register('cad:getVersion', function(source)
+    return { version = CAD.Version or 'unknown' }
 end)
 
 lib.callback.register('cad:getConfig', CAD.Auth.WithGuard('default', function()

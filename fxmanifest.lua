@@ -1,5 +1,4 @@
 
-
 fx_version 'cerulean'
 game 'gta5'
 
@@ -8,7 +7,7 @@ use_experimental_fxv2_oal 'yes'
 
 description 'C.A.D. Terminal System - Computer Aided Dispatch'
 author 'JericoFX'
-version '1.0.0'
+version '1.0.0' -- keep in sync with version.txt
 
 shared_scripts {
     '@ox_lib/init.lua',
@@ -23,7 +22,7 @@ client_scripts {
     'client/core/qb.lua',
     'client/core/init.lua',
 
-    'client/shared functions.lua',
+    'client/shared/functions.lua',
 
     'client/app/main.lua',
     'client/app/nui.lua',
@@ -78,6 +77,7 @@ server_scripts {
 }
 
 files {
+    'version.txt',
     'locales/*.json',
     'nui/build/index.html',
     'nui/build/*.js',

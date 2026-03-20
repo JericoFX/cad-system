@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read version
+        id: version
+        run: |
+          VERSION=$(cat version.txt | tr -d '[:space:]')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          if [ "$VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::version.txt ($VERSION) does not match tag (v$TAG_VERSION)"
+            exit 1
+          fi
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Build NUI
+        working-directory: ./source NUI
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+
+      - name: Create release zip
+        run: |
+          RELEASE_NAME="cad-system-v${{ steps.version.outputs.version }}"
+          mkdir -p "$RELEASE_NAME"
+
+          # Copy resource files (exclude AI, source, dev, docs, git)
+          rsync -a \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='.claude' \
+            --exclude='.anthropic' \
+            --exclude='CLAUDE.md' \
+            --exclude='GEMINI.md' \
+            --exclude='AGENTS.md' \
+            --exclude='.cursorrules' \
+            --exclude='.cursorignore' \
+            --exclude='source NUI' \
+            --exclude='docs' \
+            --exclude='node_modules' \
+            --exclude='.vscode' \
+            --exclude='.idea' \
+            --exclude='TODO.md' \
+            --exclude='.env*' \
+            --exclude='*.log' \
+            --exclude='.DS_Store' \
+            --exclude='Thumbs.db' \
+            --exclude='.gitignore' \
+            --exclude='.cache' \
+            --exclude='*.tsbuildinfo' \
+            ./ "$RELEASE_NAME/"
+
+          zip -r "${RELEASE_NAME}.zip" "$RELEASE_NAME"
+          echo "RELEASE_ZIP=${RELEASE_NAME}.zip" >> "$GITHUB_ENV"
+          echo "RELEASE_NAME=${RELEASE_NAME}" >> "$GITHUB_ENV"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "CAD System v${{ steps.version.outputs.version }}"
+          body_path: CHANGELOG.md
+          files: ${{ env.RELEASE_ZIP }}
+          draft: false
+          prerelease: false
