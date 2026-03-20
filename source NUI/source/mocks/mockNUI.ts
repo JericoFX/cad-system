@@ -901,30 +901,7 @@ const mockHandlers: Record<string, (data: unknown) => unknown> = {
   
   'cad:getDispatchSettings': () => {
     return {
-      profileName: 'standard',
-      refreshIntervalMs: 8000,
-      clockTickMs: 15000,
       callTypeOptions: ['GENERAL', '10-31', '10-50', '10-71', 'MEDICAL'],
-      sla: {
-        enabled: true,
-        pending: {
-          warningMinutes: { p1: 2, p2: 4, p3: 6, default: 4 },
-          breachMinutes: { p1: 7, p2: 8, p3: 9, default: 8 },
-        },
-        active: {
-          warningMinutes: { p1: 9, p2: 10, p3: 11, default: 10 },
-          breachMinutes: { p1: 19, p2: 20, p3: 21, default: 20 },
-        },
-      },
-      autoAssignment: {
-        enabled: true,
-        distanceMetersPerPenaltyPoint: 70,
-        unknownDistancePenalty: 15,
-        servicePenalties: {
-          needsEmsButNotEms: 40,
-          nonMedicalEms: 25,
-        },
-      },
     };
   },
 

@@ -61,6 +61,13 @@ export function registerDispatchCommands() {
           terminal.print('Opening tactical dispatch map...', 'system');
         }
       },
+      cctv: {
+        description: 'Open security camera panel',
+        handler: async ({ terminal }) => {
+          terminal.openModal('SECURITY_CAMERA_PANEL');
+          terminal.print('Opening security camera panel...', 'system');
+        }
+      },
       view: {
         description: 'Open dispatch panel (alias for gui)',
         handler: async ({ terminal }) => {

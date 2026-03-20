@@ -191,48 +191,11 @@ CAD.Config = {
         UnitStaleSeconds = 300,
 
         PublicState = {
-            CellSizeMeters = 200,
             ClosedRetentionMinutes = 10,
             MaxCalls = 250,
         },
 
         AllowEMSControl = true,
-
-        Easy = {
-            Preset = 'standard',
-            Presets = {
-                relaxed = {
-                    refreshIntervalMs = 10000,
-                    clockTickMs = 20000,
-                    pendingWarningMinutes = 6,
-                    pendingBreachMinutes = 12,
-                    activeWarningMinutes = 14,
-                    activeBreachMinutes = 25,
-                    autoAssignEnabled = true,
-                },
-                standard = {
-                    refreshIntervalMs = 8000,
-                    clockTickMs = 15000,
-                    pendingWarningMinutes = 4,
-                    pendingBreachMinutes = 8,
-                    activeWarningMinutes = 10,
-                    activeBreachMinutes = 20,
-                    autoAssignEnabled = true,
-                },
-                strict = {
-                    refreshIntervalMs = 6000,
-                    clockTickMs = 10000,
-                    pendingWarningMinutes = 2,
-                    pendingBreachMinutes = 5,
-                    activeWarningMinutes = 8,
-                    activeBreachMinutes = 15,
-                    autoAssignEnabled = true,
-                },
-            },
-        },
-
-        RefreshIntervalMs = 8000,
-        ClockTickMs = 15000,
 
         CallTypeOptions = {
             'GENERAL',
@@ -240,48 +203,6 @@ CAD.Config = {
             '10-50',
             '10-71',
             'MEDICAL',
-        },
-        SLA = {
-
-            Enabled = true,
-            Pending = {
-                WarningMinutes = {
-                    p1 = 2,
-                    p2 = 4,
-                    p3 = 6,
-                    default = 6,
-                },
-                BreachMinutes = {
-                    p1 = 4,
-                    p2 = 8,
-                    p3 = 12,
-                    default = 12,
-                },
-            },
-            Active = {
-                WarningMinutes = {
-                    p1 = 8,
-                    p2 = 10,
-                    p3 = 12,
-                    default = 12,
-                },
-                BreachMinutes = {
-                    p1 = 15,
-                    p2 = 20,
-                    p3 = 25,
-                    default = 25,
-                },
-            },
-        },
-        AutoAssignment = {
-
-            Enabled = true,
-            DistanceMetersPerPenaltyPoint = 70,
-            UnknownDistancePenalty = 15,
-            ServicePenalties = {
-                NeedsEmsButNotEms = 40,
-                NonMedicalEms = 25,
-            },
         },
     },
 

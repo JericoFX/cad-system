@@ -108,124 +108,13 @@ end)
 
 wrapNui('cad:getDispatchSettings', function()
     local dispatch = CAD.Config.Dispatch or {}
-    local sla = dispatch.SLA or {}
-    local pending = sla.Pending or {}
-    local active = sla.Active or {}
-    local autoAssign = dispatch.AutoAssignment or {}
-    local servicePenalties = autoAssign.ServicePenalties or {}
-
-    local function clampNumber(value, fallback, minimum, maximum)
-        local num = tonumber(value) or fallback
-        if num < minimum then
-            return minimum
-        end
-        if num > maximum then
-            return maximum
-        end
-        return math.floor(num)
-    end
-
-    local function buildThresholds(baseWarning, baseBreach)
-        local warning = clampNumber(baseWarning, 4, 1, 999)
-        local breach = clampNumber(baseBreach, warning + 1, warning + 1, 999)
-        return {
-            warningMinutes = {
-                p1 = math.max(1, warning - 1),
-                p2 = warning,
-                p3 = warning + 1,
-                default = warning,
-            },
-            breachMinutes = {
-                p1 = math.max(2, breach - 1),
-                p2 = breach,
-                p3 = breach + 1,
-                default = breach,
-            },
-        }
-    end
-
-    local easy = dispatch.Easy or {}
-    local easyPresets = easy.Presets or {}
-    local defaultPresetName = tostring(easy.Preset or 'standard'):lower()
-    local resolvedPresetName = defaultPresetName
-    local preset = easyPresets[resolvedPresetName] or easyPresets.standard or {}
-
-    local easyRefreshIntervalMs = clampNumber(preset.refreshIntervalMs, 8000, 1000, 60000)
-    local easyClockTickMs = clampNumber(preset.clockTickMs, 15000, 1000, 60000)
-
-    local pendingThresholds = buildThresholds(
-        preset.pendingWarningMinutes,
-        preset.pendingBreachMinutes
-    )
-    local activeThresholds = buildThresholds(
-        preset.activeWarningMinutes,
-        preset.activeBreachMinutes
-    )
-
-    local advancedPendingWarning = pending.WarningMinutes
-    local advancedPendingBreach = pending.BreachMinutes
-    local advancedActiveWarning = active.WarningMinutes
-    local advancedActiveBreach = active.BreachMinutes
-
-    local function resolvedThresholdMap(advanced, fallback)
-        if type(advanced) ~= 'table' then
-            return fallback
-        end
-
-        return {
-            p1 = clampNumber(advanced.p1, fallback.p1, 1, 999),
-            p2 = clampNumber(advanced.p2, fallback.p2, 1, 999),
-            p3 = clampNumber(advanced.p3, fallback.p3, 1, 999),
-            default = clampNumber(advanced.default, fallback.default, 1, 999),
-        }
-    end
-
-    local resolvedPendingWarning = resolvedThresholdMap(advancedPendingWarning, pendingThresholds.warningMinutes)
-    local resolvedPendingBreach = resolvedThresholdMap(advancedPendingBreach, pendingThresholds.breachMinutes)
-    local resolvedActiveWarning = resolvedThresholdMap(advancedActiveWarning, activeThresholds.warningMinutes)
-    local resolvedActiveBreach = resolvedThresholdMap(advancedActiveBreach, activeThresholds.breachMinutes)
-
-    local resolvedRefreshIntervalMs = clampNumber(dispatch.RefreshIntervalMs, easyRefreshIntervalMs, 1000, 60000)
-    local resolvedClockTickMs = clampNumber(dispatch.ClockTickMs, easyClockTickMs, 1000, 60000)
-
-    local resolvedAutoAssignEnabled = autoAssign.Enabled
-    if resolvedAutoAssignEnabled == nil then
-        resolvedAutoAssignEnabled = preset.autoAssignEnabled
-    end
-    if resolvedAutoAssignEnabled == nil then
-        resolvedAutoAssignEnabled = true
-    end
-
-    local resolvedCallTypeOptions = dispatch.CallTypeOptions
-    if type(resolvedCallTypeOptions) ~= 'table' or #resolvedCallTypeOptions == 0 then
-        resolvedCallTypeOptions = { 'GENERAL', '10-31', '10-50', '10-71', 'MEDICAL' }
+    local callTypeOptions = dispatch.CallTypeOptions
+    if type(callTypeOptions) ~= 'table' or #callTypeOptions == 0 then
+        callTypeOptions = { 'GENERAL' }
     end
 
     return {
-        profileName = resolvedPresetName,
-        refreshIntervalMs = resolvedRefreshIntervalMs,
-        clockTickMs = resolvedClockTickMs,
-        callTypeOptions = resolvedCallTypeOptions,
-        sla = {
-            enabled = sla.Enabled ~= false,
-            pending = {
-                warningMinutes = resolvedPendingWarning,
-                breachMinutes = resolvedPendingBreach,
-            },
-            active = {
-                warningMinutes = resolvedActiveWarning,
-                breachMinutes = resolvedActiveBreach,
-            },
-        },
-        autoAssignment = {
-            enabled = resolvedAutoAssignEnabled == true,
-            distanceMetersPerPenaltyPoint = clampNumber(autoAssign.DistanceMetersPerPenaltyPoint, 70, 1, 10000),
-            unknownDistancePenalty = clampNumber(autoAssign.UnknownDistancePenalty, 15, 0, 1000),
-            servicePenalties = {
-                needsEmsButNotEms = clampNumber(servicePenalties.NeedsEmsButNotEms, 40, 0, 1000),
-                nonMedicalEms = clampNumber(servicePenalties.NonMedicalEms, 25, 0, 1000),
-            },
-        },
+        callTypeOptions = callTypeOptions,
     }
 end)
 

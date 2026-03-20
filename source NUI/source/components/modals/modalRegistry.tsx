@@ -7,6 +7,7 @@ import { PhotoCapturePreview } from './PhotoCapturePreview';
 export type ModalId =
   | 'CALLSIGN_PROMPT'
   | 'DISPATCH_PANEL'
+  | 'SECURITY_CAMERA_PANEL'
   | 'CASE_CREATOR'
   | 'CASE_MANAGER'
   | 'MAP'
@@ -140,6 +141,9 @@ const ForensicCollection = lazy(() =>
 const NewsFeed = lazy(() =>
   import('./NewsFeed').then((module) => ({ default: module.NewsFeed }))
 );
+const SecurityCameraPanel = lazy(() =>
+  import('./SecurityCameraPanel').then((module) => ({ default: module.SecurityCameraPanel }))
+);
 
 const CallsignPromptSetup: Component = () => <CallsignPrompt mode='setup' />;
 
@@ -149,6 +153,10 @@ export const modalRegistry: Record<ModalId, ModalRegistryEntry> = {
   },
   DISPATCH_PANEL: {
     component: DispatchTable,
+    enabled: () => featureState.dispatch.visible,
+  },
+  SECURITY_CAMERA_PANEL: {
+    component: SecurityCameraPanel,
     enabled: () => featureState.dispatch.visible,
   },
   CASE_CREATOR: {

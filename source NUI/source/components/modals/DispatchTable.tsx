@@ -1,26 +1,19 @@
-import { createEffect, createMemo, createSignal, createSelector, For, onCleanup, onMount, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, createSelector, For, onCleanup, Show } from 'solid-js';
 import { terminalActions } from '~/stores/terminalStore';
 import {
   cadActions,
   cadState,
   type DispatchCall,
-  type SecurityCamera,
 } from '~/stores/cadStore';
 import { radioActions } from '~/stores/radioStore';
 import { fetchNui } from '~/utils/fetchNui';
-import { useNui } from '~/hooks/useNui';
 import { newsActions } from '~/stores/newsStore';
 import { Button, Modal } from '~/components/ui';
 import {
   DEFAULT_DISPATCH_SETTINGS,
-  cameraArrayToRecord,
   isDispatchCall,
   isGuardError,
   normalizeDispatchSettings,
-  type CameraListResponse,
-  type CameraRemoveResponse,
-  type CameraStatusResponse,
-  type CameraWatchResponse,
   type DispatchGuardError,
   type DispatchSettings,
 } from './dispatchTable.utils';
@@ -29,18 +22,13 @@ import {
   filterAvailableDispatchUnits,
   filterDispatchCalls,
   formatCallAge,
-  getCallSlaLabel,
-  getCallSlaLevel,
   getDispatchChannelForUnit,
-  getRecommendedUnit,
   mapAssignedUnits,
   priorityLabel,
   selectDispatchCall,
-  sortCameraGrid,
   sortDispatchCalls,
 } from './dispatchTable.selectors';
 import { DispatchCallCard } from './DispatchCallCard';
-import { DispatchCCTVGrid } from './DispatchCCTVGrid';
 import { DispatchUnitActionRow } from './DispatchUnitActionRow';
 
 export function DispatchTable() {
@@ -53,8 +41,6 @@ export function DispatchTable() {
   const [priorityFilter, setPriorityFilter] = createSignal<'ALL' | '1' | '2' | '3'>('ALL');
   const [unitTypeFilter, setUnitTypeFilter] = createSignal<'ALL' | 'PATROL' | 'EMS' | 'SUPERVISOR'>('ALL');
   const [creatingCall, setCreatingCall] = createSignal(false);
-  const [cameraLoading, setCameraLoading] = createSignal(false);
-  const [watchingCameraId, setWatchingCameraId] = createSignal<string | null>(null);
   const [callForm, setCallForm] = createSignal({
     title: '',
     type: 'GENERAL',
@@ -65,18 +51,6 @@ export function DispatchTable() {
 
   const callTypeOptions = createMemo(() => dispatchSettings().callTypeOptions);
 
-  useNui('camera:viewStarted', (data) => {
-    if (!data || !data.camera || !data.camera.cameraId) {
-      return;
-    }
-
-    setWatchingCameraId(data.camera.cameraId);
-  });
-
-  useNui('camera:viewStopped', () => {
-    setWatchingCameraId(null);
-  });
-
   const allCalls = createMemo(() =>
     sortDispatchCalls(
       Object.values(cadState.dispatchCalls).filter(
@@ -86,17 +60,6 @@ export function DispatchTable() {
   );
 
   const allUnits = createMemo(() => Object.values(cadState.dispatchUnits));
-
-  const cameraGrid = createMemo(() => sortCameraGrid(Object.values(cadState.securityCameras)));
-
-  const activeWatchedCamera = createMemo(() => {
-    const cameraId = watchingCameraId();
-    if (!cameraId) {
-      return null;
-    }
-
-    return cadState.securityCameras[cameraId] || null;
-  });
 
   const metrics = createMemo(() => calculateDispatchMetrics(allCalls(), allUnits()));
 
@@ -117,6 +80,16 @@ export function DispatchTable() {
 
   const selectedCallAssignedUnits = createMemo(() => mapAssignedUnits(selectedCall(), cadState.dispatchUnits));
 
+  const caseByLinkedCallId = createMemo(() => {
+    const map: Record<string, true> = {};
+    const cases = Object.values(cadState.cases);
+    for (let i = 0; i < cases.length; i += 1) {
+      const linkedCallId = cases[i].linkedCallId;
+      if (linkedCallId) map[linkedCallId] = true;
+    }
+    return map;
+  });
+
   const selectedCallSummary = createMemo(() => {
     const call = selectedCall();
     if (!call) {
@@ -128,25 +101,6 @@ export function DispatchTable() {
       availableMatches: availableUnits().length,
       hasLinkedCase: caseByLinkedCallId()[call.callId] === true,
     };
-  });
-
-  const getCallSlaLevelFor = (call: DispatchCall) =>
-    getCallSlaLevel(call, dispatchSettings(), nowMs());
-
-  const getCallSlaLabelFor = (call: DispatchCall) => getCallSlaLabel(getCallSlaLevelFor(call));
-
-  const recommendedUnit = createMemo(() =>
-    getRecommendedUnit(selectedCall(), dispatchSettings(), allUnits())
-  );
-
-  const caseByLinkedCallId = createMemo(() => {
-    const map: Record<string, true> = {};
-    const cases = Object.values(cadState.cases);
-    for (let i = 0; i < cases.length; i += 1) {
-      const linkedCallId = cases[i].linkedCallId;
-      if (linkedCallId) map[linkedCallId] = true;
-    }
-    return map;
   });
 
   const formatAge = (iso: string) => formatCallAge(iso, nowMs());
@@ -178,143 +132,7 @@ export function DispatchTable() {
     terminalActions.addLine(`Radio notice sent: ${msg}`, 'system');
   };
 
-  const formatCameraNumber = (cameraNumber: number) => String(cameraNumber || 0).padStart(4, '0');
-
-  const getMockCameraBackground = (camera: SecurityCamera | null) => {
-    if (camera) {
-      return `/cctv-mock.svg?cam=${camera.cameraNumber}`;
-    }
-
-    return '/cctv-mock.svg';
-  };
-
-  const refreshCameraGrid = async (silent = false) => {
-    setCameraLoading(true);
-
-    try {
-      const response = await fetchNui<CameraListResponse>('cad:cameras:list', {});
-      if (!response || response.ok !== true) {
-        terminalActions.addLine(
-          `Failed to refresh CCTV grid: ${response?.error || 'unknown_error'}`,
-          'error'
-        );
-        return;
-      }
-
-      const cameraList = Array.isArray(response.cameras) ? response.cameras : [];
-      cadActions.setSecurityCameras(cameraArrayToRecord(cameraList));
-
-      if (!silent) {
-        terminalActions.addLine(`CCTV grid refreshed (${cameraList.length})`, 'system');
-      }
-    } catch (error) {
-      terminalActions.addLine(`Failed to refresh CCTV grid: ${String(error)}`, 'error');
-    } finally {
-      setCameraLoading(false);
-    }
-  };
-
-  const watchCamera = async (cameraId: string) => {
-    try {
-      const response = await fetchNui<CameraWatchResponse>('cad:cameras:watch', { cameraId });
-      if (!response || response.ok !== true || !response.camera) {
-        terminalActions.addLine(
-          `Cannot open camera feed: ${response?.error || 'unknown_error'}`,
-          'error'
-        );
-        return;
-      }
-
-      setWatchingCameraId(response.camera.cameraId);
-      terminalActions.addLine(
-        `Viewing camera #${formatCameraNumber(response.camera.cameraNumber)} (${response.camera.label})`,
-        'system'
-      );
-    } catch (error) {
-      terminalActions.addLine(`Cannot open camera feed: ${String(error)}`, 'error');
-    }
-  };
-
-  const stopWatchingCamera = async (silent = false) => {
-    if (!watchingCameraId()) {
-      return;
-    }
-
-    try {
-      await fetchNui<{ ok: boolean; error?: string }>('cad:cameras:stopWatch', {});
-      if (!silent) {
-        terminalActions.addLine('Camera feed closed', 'system');
-      }
-    } catch (error) {
-      terminalActions.addLine(`Cannot close camera feed: ${String(error)}`, 'error');
-    } finally {
-      setWatchingCameraId(null);
-    }
-  };
-
-  const setCameraStatus = async (cameraId: string, status: 'ACTIVE' | 'DISABLED') => {
-    try {
-      const response = await fetchNui<CameraStatusResponse>('cad:cameras:setStatus', {
-        cameraId,
-        status,
-      });
-
-      if (!response || response.ok !== true || !response.camera) {
-        terminalActions.addLine(
-          `Cannot update camera status: ${response?.error || 'unknown_error'}`,
-          'error'
-        );
-        return;
-      }
-
-      cadActions.upsertSecurityCamera(response.camera);
-      terminalActions.addLine(
-        `Camera #${formatCameraNumber(response.camera.cameraNumber)} set to ${response.camera.status}`,
-        'system'
-      );
-
-      if (status === 'DISABLED' && watchingCameraId() === response.camera.cameraId) {
-        await stopWatchingCamera(true);
-      }
-    } catch (error) {
-      terminalActions.addLine(`Cannot update camera status: ${String(error)}`, 'error');
-    }
-  };
-
-  const removeCamera = async (camera: SecurityCamera) => {
-    const confirmed = window.confirm(
-      `Remove camera #${formatCameraNumber(camera.cameraNumber)} (${camera.label})?`
-    );
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      const response = await fetchNui<CameraRemoveResponse>('cad:cameras:remove', {
-        cameraId: camera.cameraId,
-      });
-
-      if (!response || response.ok !== true || !response.cameraId) {
-        terminalActions.addLine(`Cannot remove camera: ${response?.error || 'unknown_error'}`, 'error');
-        return;
-      }
-
-      cadActions.removeSecurityCamera(response.cameraId);
-      terminalActions.addLine(
-        `Camera #${formatCameraNumber(camera.cameraNumber)} removed from grid`,
-        'system'
-      );
-
-      if (watchingCameraId() === response.cameraId) {
-        await stopWatchingCamera(true);
-      }
-    } catch (error) {
-      terminalActions.addLine(`Cannot remove camera: ${String(error)}`, 'error');
-    }
-  };
-
   const closePanel = () => {
-    void stopWatchingCamera(true);
     terminalActions.setActiveModal(null);
   };
 
@@ -422,23 +240,6 @@ export function DispatchTable() {
     }
   };
 
-  const autoAssignBestUnit = async () => {
-   const call = selectedCall();
-    const suggestion = recommendedUnit();
-
-    if (!call || call.status === 'CLOSED') {
-      terminalActions.addLine('Cannot auto-assign: call is closed or missing', 'error');
-      return;
-    }
-
-    if (!suggestion) {
-      terminalActions.addLine('No available unit for auto-assignment', 'error');
-      return;
-    }
-
-    await assignUnitToCall(suggestion.unit.unitId, call.callId);
-  };
-
   const createCaseFromCall = (callId: string) => {
     const call = cadState.dispatchCalls[callId];
     if (!call) {
@@ -529,32 +330,11 @@ export function DispatchTable() {
     }
   });
 
+  // Clock for timestamps
   createEffect(() => {
-    const cameraId = watchingCameraId();
-    if (!cameraId) {
-      return;
-    }
-
-    const camera = cadState.securityCameras[cameraId];
-    if (!camera || camera.status !== 'ACTIVE') {
-      void stopWatchingCamera(true);
-    }
-  });
-
-  onMount(() => {
-    void refreshCameraGrid(true);
-  });
-
-  onCleanup(() => {
-    void stopWatchingCamera(true);
-  });
-
-  createEffect(() => {
-    const settings = dispatchSettings();
-    // Solo reloj local para timestamps.
     const clockInterval = window.setInterval(() => {
       setNowMs(Date.now());
-    }, settings.clockTickMs);
+    }, 15000);
 
     onCleanup(() => {
       window.clearInterval(clockInterval);
@@ -567,33 +347,11 @@ export function DispatchTable() {
         <div class="modal-header dispatch-v2-header">
           <h2>=== DISPATCH OPERATIONS CENTER ===</h2>
           <div class="dispatch-v2-header-actions">
+            <Button.Root class="btn" onClick={() => terminalActions.setActiveModal('SECURITY_CAMERA_PANEL')}>[CCTV]</Button.Root>
             <Button.Root class="btn" onClick={() => terminalActions.setActiveModal('MAP', { returnModal: 'DISPATCH_PANEL' })}>[MAP]</Button.Root>
             <button class="modal-close" onClick={closePanel}>[X]</button>
           </div>
         </div>
-
-        <Show when={watchingCameraId()}>
-          <div class="dispatch-cctv-crt-overlay">
-            <div
-              class="dispatch-cctv-mock-feed"
-              style={{
-                'background-image': `url(${getMockCameraBackground(activeWatchedCamera())})`,
-              }}
-            />
-            <div class="dispatch-cctv-crt-scanlines" />
-            <div class="dispatch-cctv-crt-label">CCTV LIVE FEED</div>
-            <Show when={activeWatchedCamera()}>
-              {(cameraAccessor) => {
-                const camera = cameraAccessor();
-                return (
-                  <div class="dispatch-cctv-crt-meta">
-                     CAM #{formatCameraNumber(camera.cameraNumber)} | {camera.street || 'Street unavailable'}
-                  </div>
-                );
-              }}
-            </Show>
-          </div>
-        </Show>
 
         <div class="dispatch-v2-kpis">
           <div class="dispatch-v2-kpi pending">
@@ -650,7 +408,7 @@ export function DispatchTable() {
           <section class="dispatch-v2-column dispatch-v2-queue">
             <div class="dispatch-v2-section-title">CALL QUEUE ({visibleCalls().length})</div>
             <Show when={visibleCalls().length > 0}>
-              <div class="case-modal-hint">Click a call to load unit assignment, case actions, and CCTV.</div>
+              <div class="case-modal-hint">Click a call to load unit assignment and case actions.</div>
             </Show>
             <div class="dispatch-v2-call-list">
               <For each={visibleCalls()}>
@@ -659,8 +417,6 @@ export function DispatchTable() {
                     call={call}
                     selected={isCallSelected(call.callId)}
                     onSelect={setSelectedCallId}
-                    getSlaLevel={getCallSlaLevelFor}
-                    getSlaLabel={getCallSlaLabelFor}
                     formatAge={formatAge}
                     priorityLabel={priorityLabel}
                   />
@@ -676,21 +432,7 @@ export function DispatchTable() {
             <Show
               when={selectedCall()}
               fallback={
-                <>
-                  <div class="empty-state">Select a dispatch call to open the incident workspace</div>
-                  <div class="dispatch-v2-section-title">CCTV GRID ({cameraGrid().length})</div>
-                  <DispatchCCTVGrid
-                    cameras={cameraGrid()}
-                    cameraLoading={cameraLoading()}
-                    watchingCameraId={watchingCameraId()}
-                    formatCameraNumber={formatCameraNumber}
-                    onRefresh={() => void refreshCameraGrid()}
-                    onStopView={() => void stopWatchingCamera()}
-                    onWatch={(cameraId) => void watchCamera(cameraId)}
-                    onToggleStatus={(cameraId, status) => void setCameraStatus(cameraId, status)}
-                    onRemove={(camera) => void removeCamera(camera)}
-                  />
-                </>
+                <div class="empty-state">Select a dispatch call to open the incident workspace</div>
               }
             >
               {(callAccessor) => {
@@ -698,7 +440,7 @@ export function DispatchTable() {
                 return (
                   <>
                     <div class="dispatch-v2-section-title">INCIDENT WORKSPACE</div>
-                    <div class={`dispatch-v2-incident-card sla-${getCallSlaLevelFor(call)}`}>
+                    <div class="dispatch-v2-incident-card">
                       <div class="dispatch-v2-incident-top">
                         <div>
                           <strong>{call.callId}</strong> - {call.title}
@@ -711,11 +453,6 @@ export function DispatchTable() {
                         <span>Type: {call.type}</span>
                         <span>Status: {call.status}</span>
                         <span>Opened: {formatAge(call.createdAt)} ago</span>
-                      </div>
-                      <div class="dispatch-v2-incident-row">
-                        <span class={`dispatch-v2-sla-badge sla-${getCallSlaLevelFor(call)}`}>
-                          {getCallSlaLabelFor(call)}
-                        </span>
                       </div>
                       <div class="dispatch-v2-incident-row">
                         <span>Location: {call.location || 'Location unavailable'}</span>
@@ -789,24 +526,6 @@ export function DispatchTable() {
                     </div>
 
                     <div class="dispatch-v2-section-title">AVAILABLE UNITS ({availableUnits().length})</div>
-                    <Show when={recommendedUnit()}>
-                      {(suggestionAccessor) => {
-                        const suggestion = suggestionAccessor();
-                        return (
-                          <div class="dispatch-v2-recommendation">
-                            <div>
-                              Suggested: <strong>{suggestion.unit.unitId}</strong> ({suggestion.unit.type}) - {suggestion.reason}
-                              <Show when={suggestion.distance > 0}>
-                                <span> [{Math.floor(suggestion.distance)}m]</span>
-                              </Show>
-                            </div>
-                            <Button.Root class="btn btn-primary" onClick={() => void autoAssignBestUnit()} disabled={call.status === 'CLOSED'}>
-                              [AUTO ASSIGN BEST]
-                            </Button.Root>
-                          </div>
-                        );
-                      }}
-                    </Show>
                     <div class="dispatch-v2-available-list">
                       <For each={availableUnits()}>
                         {(unit) => (
@@ -824,19 +543,6 @@ export function DispatchTable() {
                         <div class="empty-state">No available units match the current type filter</div>
                       </Show>
                     </div>
-
-                    <div class="dispatch-v2-section-title">CCTV GRID ({cameraGrid().length})</div>
-                    <DispatchCCTVGrid
-                      cameras={cameraGrid()}
-                      cameraLoading={cameraLoading()}
-                      watchingCameraId={watchingCameraId()}
-                      formatCameraNumber={formatCameraNumber}
-                      onRefresh={() => void refreshCameraGrid()}
-                      onStopView={() => void stopWatchingCamera()}
-                      onWatch={(cameraId) => void watchCamera(cameraId)}
-                      onToggleStatus={(cameraId, status) => void setCameraStatus(cameraId, status)}
-                      onRemove={(camera) => void removeCamera(camera)}
-                    />
                   </>
                 );
               }}
@@ -945,7 +651,7 @@ export function DispatchTable() {
 
         <div class="modal-footer">
           <span style={{ color: '#808080', 'font-size': '14px' }}>
-            Profile {dispatchSettings().profileName.toUpperCase()} | Live sync every {Math.round(dispatchSettings().refreshIntervalMs / 1000)}s | Calls {allCalls().length} | Units {allUnits().length}
+            Calls {allCalls().length} | Units {allUnits().length}
           </span>
           <Button.Root class="btn" onClick={closePanel}>[CLOSE]</Button.Root>
         </div>
