@@ -32,15 +32,17 @@ local units = CAD.State.Dispatch.Units
 local calls = CAD.State.Dispatch.Calls
 local sourceToUnit = {}
 local saveCallDb
-local dispatchPublicRev = 0
-local dispatchPublicFingerprint = ''
-local dispatchGridEnabled = lib and lib.grid and type(lib.grid.addEntry) == 'function' and type(lib.grid.removeEntry) == 'function' and type(lib.grid.getNearbyEntries) == 'function'
-local dispatchGridEntries = {}
 
 local dispatchPublicCfg = CAD.Config.Dispatch and CAD.Config.Dispatch.PublicState or {}
-local DISPATCH_PUBLIC_CELL_SIZE = math.max(50, tonumber(dispatchPublicCfg.CellSizeMeters) or 200)
 local DISPATCH_PUBLIC_CLOSED_TTL_MINUTES = math.max(1, tonumber(dispatchPublicCfg.ClosedRetentionMinutes) or 10)
 local DISPATCH_PUBLIC_MAX_CALLS = math.max(10, tonumber(dispatchPublicCfg.MaxCalls) or 250)
+
+local dirty = false
+local rev = 0
+
+local function markDirty()
+    dirty = true
+end
 
 local function isDispatchEnabled()
     return CAD.Config.Dispatch.Enabled ~= false and CAD.IsFeatureEnabled('Dispatch')
@@ -82,38 +84,6 @@ local function isoToEpoch(value)
     return localEpoch + utcOffset
 end
 
----@param coords { x: number, y: number, z: number }|nil
----@return table|nil
-local function quantizeCoords(coords)
-    if type(coords) ~= 'table' then
-        return nil
-    end
-
-    local x = tonumber(coords.x)
-    local y = tonumber(coords.y)
-    local z = tonumber(coords.z)
-    if not x or not y or not z then
-        return nil
-    end
-
-    local cellX = math.floor(x / DISPATCH_PUBLIC_CELL_SIZE)
-    local cellY = math.floor(y / DISPATCH_PUBLIC_CELL_SIZE)
-    local centerX = (cellX + 0.5) * DISPATCH_PUBLIC_CELL_SIZE
-    local centerY = (cellY + 0.5) * DISPATCH_PUBLIC_CELL_SIZE
-    local cellHash = ('%s:%s'):format(cellX, cellY)
-
-    return {
-        cellX = cellX,
-        cellY = cellY,
-        cellHash = cellHash,
-        center = {
-            x = centerX,
-            y = centerY,
-            z = z,
-        },
-    }
-end
-
 ---@param unit DispatchUnitRecord
 ---@return boolean
 local function isUnitStale(unit)
@@ -126,120 +96,27 @@ local function isUnitStale(unit)
     return (os.time() - updatedEpoch) > staleSeconds
 end
 
----@param coords { x: number, y: number, z: number }|nil
----@return string|nil
-local function getCoordCellHash(coords)
-    if type(coords) ~= 'table' then
-        return nil
+local function normalizeUnitStatus(status)
+    local val = tostring(status or 'AVAILABLE'):upper()
+    if val == 'OFF_DUTY' or val == 'BUSY' or val == 'AVAILABLE' then
+        return val
     end
-
-    local x = tonumber(coords.x)
-    local y = tonumber(coords.y)
-    local z = tonumber(coords.z)
-    if not x or not y or not z then
-        return nil
-    end
-
-    if dispatchGridEnabled and type(lib.grid.getCellPosition) == 'function' then
-        -- Verified: Context7 /websites/coxdocs_dev ox_lib Grid Shared lib.grid.getCellPosition(point)
-        local cellX, cellY = lib.grid.getCellPosition(vector3(x, y, z))
-        if type(cellX) == 'number' and type(cellY) == 'number' then
-            return ('%s:%s'):format(cellX, cellY)
-        end
-    end
-
-    local cellX = math.floor(x / DISPATCH_PUBLIC_CELL_SIZE)
-    local cellY = math.floor(y / DISPATCH_PUBLIC_CELL_SIZE)
-    return ('%s:%s'):format(cellX, cellY)
-end
-
----@param unitId string
-local function removeDispatchGridEntry(unitId)
-    if not dispatchGridEnabled then
-        return
-    end
-
-    local entry = dispatchGridEntries[unitId]
-    if not entry then
-        return
-    end
-
-    -- Verified: Context7 /websites/coxdocs_dev ox_lib Grid Shared lib.grid.removeEntry(entry)
-    lib.grid.removeEntry(entry)
-    dispatchGridEntries[unitId] = nil
+    return 'AVAILABLE'
 end
 
 ---@param unitId string
 ---@param unit DispatchUnitRecord|nil
-local function upsertDispatchGridEntry(unitId, unit)
-    if not dispatchGridEnabled or type(unit) ~= 'table' then
+local function syncEmsUnit(unitId, unit)
+    local ems = CAD.State.EMS.Units[unitId]
+    if not ems then return end
+    if not unit then
+        CAD.State.EMS.Units[unitId] = nil
         return
     end
-
-    local location = unit.location
-    if type(location) ~= 'table' then
-        removeDispatchGridEntry(unitId)
-        return
-    end
-
-    local x = tonumber(location.x)
-    local y = tonumber(location.y)
-    local z = tonumber(location.z)
-    if not x or not y or not z then
-        removeDispatchGridEntry(unitId)
-        return
-    end
-
-    local oldEntry = dispatchGridEntries[unitId]
-    if oldEntry then
-        -- Verified: Context7 /websites/coxdocs_dev ox_lib Grid Shared lib.grid.removeEntry(entry)
-        lib.grid.removeEntry(oldEntry)
-    end
-
-    local entry = {
-        coords = vector3(x, y, z),
-        radius = DISPATCH_PUBLIC_CELL_SIZE,
-        unitId = unitId,
-    }
-
-    -- Verified: Context7 /websites/coxdocs_dev ox_lib Grid Shared lib.grid.addEntry(entry)
-    lib.grid.addEntry(entry)
-    dispatchGridEntries[unitId] = entry
-end
-
-local function rebuildDispatchGridEntries()
-    if not dispatchGridEnabled then
-        return
-    end
-
-    for unitId, entry in pairs(dispatchGridEntries) do
-        lib.grid.removeEntry(entry)
-        dispatchGridEntries[unitId] = nil
-    end
-
-    for unitId, unit in pairs(units) do
-        upsertDispatchGridEntry(unitId, unit)
-    end
-end
-
----@param unit DispatchUnitRecord
----@return table
-local function buildPublicUnit(unit)
-    local quantized = quantizeCoords(unit.location)
-    local zoneName = quantized and ('GRID %s'):format(quantized.cellHash) or 'UNKNOWN'
-
-    return {
-        unitId = unit.unitId,
-        badge = unit.badge,
-        name = unit.name,
-        status = unit.status,
-        type = unit.type,
-        currentCall = unit.currentCall,
-        location = quantized and quantized.center or nil,
-        zoneName = zoneName,
-        cellHash = quantized and quantized.cellHash or nil,
-        updatedAt = unit.updatedAt,
-    }
+    ems.status = unit.status
+    ems.location = unit.location
+    ems.currentCall = unit.currentCall
+    ems.updatedAt = unit.updatedAt
 end
 
 ---@param call DispatchCallRecord
@@ -258,47 +135,12 @@ local function shouldPublishCall(call)
     return (os.time() - closedEpoch) <= ttlSeconds
 end
 
----@param call DispatchCallRecord
----@return table
-local function buildPublicCall(call)
-    local quantized = quantizeCoords(call.coordinates)
-    local zoneName = CAD.Server.SanitizeString(call.location, 96)
-    if zoneName == '' then
-        zoneName = quantized and ('GRID %s'):format(quantized.cellHash) or 'UNKNOWN'
-    end
+local function publishIfDirty()
+    if not dirty then return end
+    dirty = false
+    rev = rev + 1
 
-    local publicTitle = ('%s INCIDENT'):format(tostring(call.type or 'GENERAL'):upper())
-    local locationLabel = zoneName
-    if quantized and quantized.cellHash then
-        locationLabel = ('%s [%s]'):format(zoneName, quantized.cellHash)
-    end
-
-    return {
-        callId = call.callId,
-        type = call.type,
-        priority = call.priority,
-        title = publicTitle,
-        description = '',
-        location = locationLabel,
-        coordinates = quantized and quantized.center or nil,
-        status = call.status,
-        assignedUnits = call.assignedUnits or {},
-        createdAt = call.createdAt,
-        closedAt = call.closedAt,
-        zoneName = zoneName,
-        cellHash = quantized and quantized.cellHash or nil,
-    }
-end
-
----@return table
-local function buildDispatchPublicStateCore()
-    local publicUnits = {}
-    for unitId, unit in pairs(units) do
-        if type(unit) == 'table' and not isUnitStale(unit) then
-            publicUnits[unitId] = buildPublicUnit(unit)
-        end
-    end
-
+    local publicCalls = {}
     local callRows = {}
     for callId, call in pairs(calls) do
         if type(call) == 'table' and shouldPublishCall(call) then
@@ -322,88 +164,24 @@ local function buildDispatchPublicStateCore()
         end)
     end
 
-    local publicCalls = {}
     local limit = math.min(#callRows, DISPATCH_PUBLIC_MAX_CALLS)
     for i = 1, limit do
         local callId = callRows[i].callId
-        publicCalls[callId] = buildPublicCall(calls[callId])
+        publicCalls[callId] = calls[callId]
     end
 
-    return {
-        calls = publicCalls,
-        units = publicUnits,
-    }
-end
-
----@param core table
----@return string
-local function buildDispatchPublicFingerprint(core)
-    local lines = {}
-    lines[#lines + 1] = 'calls'
-
-    local callIds = {}
-    for callId in pairs(core.calls) do
-        callIds[#callIds + 1] = callId
-    end
-    table.sort(callIds)
-
-    for i = 1, #callIds do
-        local callId = callIds[i]
-        local call = core.calls[callId]
-        local unitIds = {}
-        for unitId in pairs(call.assignedUnits or {}) do
-            unitIds[#unitIds + 1] = unitId
+    local publicUnits = {}
+    for unitId, unit in pairs(units) do
+        if type(unit) == 'table' and not isUnitStale(unit) then
+            publicUnits[unitId] = unit
         end
-        table.sort(unitIds)
-
-        lines[#lines + 1] = table.concat({
-            call.callId,
-            tostring(call.status),
-            tostring(call.priority),
-            tostring(call.cellHash or ''),
-            tostring(call.closedAt or ''),
-            table.concat(unitIds, ','),
-        }, '|')
     end
-
-    lines[#lines + 1] = 'units'
-    local unitIds = {}
-    for unitId in pairs(core.units) do
-        unitIds[#unitIds + 1] = unitId
-    end
-    table.sort(unitIds)
-
-    for i = 1, #unitIds do
-        local unitId = unitIds[i]
-        local unit = core.units[unitId]
-        lines[#lines + 1] = table.concat({
-            unit.unitId,
-            tostring(unit.status),
-            tostring(unit.currentCall or ''),
-            tostring(unit.cellHash or ''),
-        }, '|')
-    end
-
-    return table.concat(lines, '\n')
-end
-
----@param force boolean|nil
-local function publishDispatchPublicState(force)
-    local core = buildDispatchPublicStateCore()
-    local fingerprint = buildDispatchPublicFingerprint(core)
-
-    if not force and fingerprint == dispatchPublicFingerprint then
-        return
-    end
-
-    dispatchPublicFingerprint = fingerprint
-    dispatchPublicRev = dispatchPublicRev + 1
 
     GlobalState:set('cad_dispatch_public', {
-        rev = dispatchPublicRev,
+        rev = rev,
         generatedAt = CAD.Server.ToIso(),
-        calls = core.calls,
-        units = core.units,
+        calls = publicCalls,
+        units = publicUnits,
     }, true)
 end
 
@@ -452,15 +230,12 @@ local function removeSourceUnit(source, persistCalls)
 
     local unit = units[unitId]
     if not unit then
-        removeDispatchGridEntry(unitId)
         return
     end
 
     releaseUnitFromCalls(unitId, persistCalls)
-    removeDispatchGridEntry(unitId)
-
     units[unitId] = nil
-    CAD.State.EMS.Units[unitId] = nil
+    syncEmsUnit(unitId, nil)
 end
 
 local function canUseDispatchControl(officer)
@@ -503,7 +278,7 @@ local function withDispatchGuard(bucket, handler)
         return handler(source, payload, officer)
     end)
 end
--- Yes i love pcalls
+
 saveCallDb = function(call)
     local ok, err = pcall(function()
         MySQL.insert.await([[
@@ -542,17 +317,11 @@ saveCallDb = function(call)
     return true
 end
 
-local function normalizeUnitStatus(status)
-    local val = tostring(status or 'AVAILABLE'):upper()
-    if val == 'OFF_DUTY' or val == 'BUSY' or val == 'AVAILABLE' then
-        return val
-    end
-    return 'AVAILABLE'
-end
-
 local function unitIsResponding(unit)
     return unit.status == 'BUSY'
 end
+
+-- Callbacks
 
 lib.callback.register('cad:registerDispatchUnit', withDispatchGuard('default', function(source, payload, officer)
     local existingUnitId = sourceToUnit[source]
@@ -578,9 +347,7 @@ lib.callback.register('cad:registerDispatchUnit', withDispatchGuard('default', f
     end
 
     touchUnit(unit)
-
     units[unitId] = unit
-    upsertDispatchGridEntry(unitId, unit)
 
     if officer.job == 'ambulance' or officer.job == 'ems' then
         CAD.State.EMS.Units[unitId] = {
@@ -594,7 +361,7 @@ lib.callback.register('cad:registerDispatchUnit', withDispatchGuard('default', f
         }
     end
 
-    publishDispatchPublicState(false)
+    markDirty()
 
     return unit
 end))
@@ -638,7 +405,6 @@ lib.callback.register('cad:updateUnitStatus', withDispatchGuard('default', funct
 
     local unit = units[unitId]
     local previousStatus = unit.status
-    local previousCellHash = getCoordCellHash(unit.location)
 
     if payload.status then
         unit.status = normalizeUnitStatus(payload.status)
@@ -650,21 +416,13 @@ lib.callback.register('cad:updateUnitStatus', withDispatchGuard('default', funct
             y = tonumber(payload.location.y) or 0.0,
             z = tonumber(payload.location.z) or 0.0,
         }
-        upsertDispatchGridEntry(unitId, unit)
     end
 
     touchUnit(unit)
+    syncEmsUnit(unitId, unit)
 
-    if CAD.State.EMS.Units[unitId] then
-        CAD.State.EMS.Units[unitId].status = unit.status
-        CAD.State.EMS.Units[unitId].location = unit.location
-        CAD.State.EMS.Units[unitId].updatedAt = unit.updatedAt
-    end
-
-    local statusChanged = previousStatus ~= unit.status
-    local cellChanged = previousCellHash ~= getCoordCellHash(unit.location)
-    if statusChanged or cellChanged then
-        publishDispatchPublicState(false)
+    if previousStatus ~= unit.status then
+        markDirty()
     end
 
     return unit
@@ -700,8 +458,7 @@ lib.callback.register('cad:createDispatchCall', withDispatchGuard('heavy', funct
     end
 
     calls[callId] = call
-
-    publishDispatchPublicState(false)
+    markDirty()
 
     return call
 end))
@@ -731,12 +488,6 @@ lib.callback.register('cad:assignUnitToCall', withDispatchGuard('heavy', functio
     local previousCallStatus = call.status
     local previousUnitStatus = unit.status
     local previousCurrentCall = unit.currentCall
-    local previousEmsStatus = nil
-    local previousEmsCurrentCall = nil
-    if CAD.State.EMS.Units[payload.unitId] then
-        previousEmsStatus = CAD.State.EMS.Units[payload.unitId].status
-        previousEmsCurrentCall = CAD.State.EMS.Units[payload.unitId].currentCall
-    end
 
     call.assignedUnits[payload.unitId] = {
         assignedAt = CAD.Server.ToIso(),
@@ -758,15 +509,11 @@ lib.callback.register('cad:assignUnitToCall', withDispatchGuard('heavy', functio
         call.status = previousCallStatus
         unit.status = previousUnitStatus
         unit.currentCall = previousCurrentCall
-        if CAD.State.EMS.Units[payload.unitId] then
-            CAD.State.EMS.Units[payload.unitId].status = previousEmsStatus or previousUnitStatus
-            CAD.State.EMS.Units[payload.unitId].currentCall = previousEmsCurrentCall or previousCurrentCall
-            CAD.State.EMS.Units[payload.unitId].updatedAt = unit.updatedAt
-        end
+        syncEmsUnit(payload.unitId, unit)
         return { ok = false, error = saveErr or 'db_write_failed' }
     end
 
-    publishDispatchPublicState(false)
+    markDirty()
 
     return call
 end))
@@ -782,12 +529,6 @@ lib.callback.register('cad:unassignUnitFromCall', withDispatchGuard('heavy', fun
     local previousCallStatus = call.status
     local previousUnitStatus = unit.status
     local previousCurrentCall = unit.currentCall
-    local previousEmsStatus = nil
-    local previousEmsCurrentCall = nil
-    if CAD.State.EMS.Units[payload.unitId] then
-        previousEmsStatus = CAD.State.EMS.Units[payload.unitId].status
-        previousEmsCurrentCall = CAD.State.EMS.Units[payload.unitId].currentCall
-    end
 
     call.assignedUnits[payload.unitId] = nil
     unit.currentCall = nil
@@ -805,11 +546,7 @@ lib.callback.register('cad:unassignUnitFromCall', withDispatchGuard('heavy', fun
         call.status = 'PENDING'
     end
 
-    if CAD.State.EMS.Units[payload.unitId] then
-        CAD.State.EMS.Units[payload.unitId].status = 'AVAILABLE'
-        CAD.State.EMS.Units[payload.unitId].currentCall = nil
-        CAD.State.EMS.Units[payload.unitId].updatedAt = unit.updatedAt
-    end
+    syncEmsUnit(payload.unitId, unit)
 
     local saved, saveErr = saveCallDb(call)
     if not saved then
@@ -817,15 +554,11 @@ lib.callback.register('cad:unassignUnitFromCall', withDispatchGuard('heavy', fun
         call.status = previousCallStatus
         unit.status = previousUnitStatus
         unit.currentCall = previousCurrentCall
-        if CAD.State.EMS.Units[payload.unitId] then
-            CAD.State.EMS.Units[payload.unitId].status = previousEmsStatus or previousUnitStatus
-            CAD.State.EMS.Units[payload.unitId].currentCall = previousEmsCurrentCall or previousCurrentCall
-            CAD.State.EMS.Units[payload.unitId].updatedAt = unit.updatedAt
-        end
+        syncEmsUnit(payload.unitId, unit)
         return { ok = false, error = saveErr or 'db_write_failed' }
     end
 
-    publishDispatchPublicState(false)
+    markDirty()
 
     return call
 end))
@@ -849,15 +582,15 @@ local function closeCallInternal(call, payload)
             unit.currentCall = nil
             unit.status = 'AVAILABLE'
             touchUnit(unit)
-        end
-        if CAD.State.EMS.Units[unitId] then
-            local existing = previousUnits[unitId] or {}
-            existing.emsStatus = CAD.State.EMS.Units[unitId].status
-            existing.emsCurrentCall = CAD.State.EMS.Units[unitId].currentCall
-            previousUnits[unitId] = existing
+            syncEmsUnit(unitId, unit)
+        elseif CAD.State.EMS.Units[unitId] then
+            previousUnits[unitId] = {
+                emsStatus = CAD.State.EMS.Units[unitId].status,
+                emsCurrentCall = CAD.State.EMS.Units[unitId].currentCall,
+            }
             CAD.State.EMS.Units[unitId].status = 'AVAILABLE'
             CAD.State.EMS.Units[unitId].currentCall = nil
-            CAD.State.EMS.Units[unitId].updatedAt = unit and unit.updatedAt or CAD.Server.ToIso()
+            CAD.State.EMS.Units[unitId].updatedAt = CAD.Server.ToIso()
         end
     end
 
@@ -871,10 +604,11 @@ local function closeCallInternal(call, payload)
                 unit.status = snapshot.status
                 unit.currentCall = snapshot.currentCall
                 touchUnit(unit)
+                syncEmsUnit(unitId, unit)
             end
-            if CAD.State.EMS.Units[unitId] then
-                CAD.State.EMS.Units[unitId].status = snapshot.emsStatus or snapshot.status
-                CAD.State.EMS.Units[unitId].currentCall = snapshot.emsCurrentCall or snapshot.currentCall
+            if CAD.State.EMS.Units[unitId] and snapshot.emsStatus then
+                CAD.State.EMS.Units[unitId].status = snapshot.emsStatus
+                CAD.State.EMS.Units[unitId].currentCall = snapshot.emsCurrentCall
                 CAD.State.EMS.Units[unitId].updatedAt = unit and unit.updatedAt or CAD.Server.ToIso()
             end
         end
@@ -895,12 +629,12 @@ lib.callback.register('cad:closeDispatchCall', withDispatchGuard('heavy', functi
         return { ok = false, error = closeErr or 'db_write_failed' }
     end
 
-    publishDispatchPublicState(false)
+    markDirty()
 
     return closed
 end))
 
-lib.callback.register('cad:closeCall', withDispatchGuard('heavy', function(source, payload)
+lib.callback.register('cad:closeCall', withDispatchGuard('heavy', function(_, payload)
     local call = calls[payload.callId]
     if not call then
         return { ok = false, error = 'call_not_found' }
@@ -911,7 +645,7 @@ lib.callback.register('cad:closeCall', withDispatchGuard('heavy', function(sourc
         return { ok = false, error = closeErr or 'db_write_failed' }
     end
 
-    publishDispatchPublicState(false)
+    markDirty()
 
     return closed
 end))
@@ -928,15 +662,12 @@ lib.callback.register('cad:setOfficerStatus', withDispatchGuard('default', funct
     if unit.status ~= normalized then
         unit.status = normalized
         touchUnit(unit)
-        publishDispatchPublicState(false)
+        markDirty()
     else
         touchUnit(unit)
     end
 
-    if CAD.State.EMS.Units[unitId] then
-        CAD.State.EMS.Units[unitId].status = unit.status
-        CAD.State.EMS.Units[unitId].updatedAt = unit.updatedAt
-    end
+    syncEmsUnit(unitId, unit)
 
     return {
         statusCode = unit.status,
@@ -972,41 +703,16 @@ lib.callback.register('cad:getNearestUnit', withDispatchGuard('default', functio
 
     local nearest = nil
     local nearestDistance = nil
-    local targetCoords = vector3(tx, ty, tz)
 
-    if dispatchGridEnabled then
-        -- Verified: Context7 /websites/coxdocs_dev ox_lib Grid Shared lib.grid.getNearbyEntries(point, filter)
-        local nearbyEntries = lib.grid.getNearbyEntries(targetCoords, function(entry)
-            return type(entry) == 'table' and type(entry.unitId) == 'string' and units[entry.unitId] ~= nil
-        end)
-
-        for i = 1, #nearbyEntries do
-            local entry = nearbyEntries[i]
-            local unit = units[entry.unitId]
-            if unit and unit.location then
-                local dx = unit.location.x - tx
-                local dy = unit.location.y - ty
-                local dz = unit.location.z - tz
-                local distance = math.sqrt((dx * dx) + (dy * dy) + (dz * dz))
-                if not nearestDistance or distance < nearestDistance then
-                    nearestDistance = distance
-                    nearest = unit
-                end
-            end
-        end
-    end
-
-    if not nearest then
-        for _, unit in pairs(units) do
-            if unit.location then
-                local dx = unit.location.x - tx
-                local dy = unit.location.y - ty
-                local dz = unit.location.z - tz
-                local distance = math.sqrt((dx * dx) + (dy * dy) + (dz * dz))
-                if not nearestDistance or distance < nearestDistance then
-                    nearestDistance = distance
-                    nearest = unit
-                end
+    for _, unit in pairs(units) do
+        if unit.location then
+            local dx = unit.location.x - tx
+            local dy = unit.location.y - ty
+            local dz = unit.location.z - tz
+            local distance = math.sqrt((dx * dx) + (dy * dy) + (dz * dz))
+            if not nearestDistance or distance < nearestDistance then
+                nearestDistance = distance
+                nearest = unit
             end
         end
     end
@@ -1017,6 +723,8 @@ lib.callback.register('cad:getNearestUnit', withDispatchGuard('default', functio
 
     return nearest
 end))
+
+-- Rate-limited net events
 
 local positionUpdateLimits = {}
 local statusChangeLimits = {}
@@ -1038,7 +746,6 @@ local function cleanupDispatchRateLimits(now)
 end
 
 if lib and lib.cron and type(lib.cron.new) == 'function' then
-    -- Verified: Context7 /websites/coxdocs_dev ox_lib Cron Server lib.cron.new(expression, job, options)
     lib.cron.new('* * * * *', function()
         cleanupDispatchRateLimits(os.time())
     end)
@@ -1075,7 +782,6 @@ RegisterNetEvent('cad:server:updatePosition', function(coords)
     end
 
     local unit = units[unitId]
-    local previousCellHash = getCoordCellHash(unit.location)
 
     local x = tonumber(coords.x)
     local y = tonumber(coords.y)
@@ -1090,17 +796,8 @@ RegisterNetEvent('cad:server:updatePosition', function(coords)
 
     unit.location = { x = x, y = y, z = z }
     touchUnit(unit)
-
-    if CAD.State.EMS.Units[unitId] then
-        CAD.State.EMS.Units[unitId].location = unit.location
-        CAD.State.EMS.Units[unitId].updatedAt = unit.updatedAt
-    end
-
-    local currentCellHash = getCoordCellHash(unit.location)
-    if previousCellHash ~= currentCellHash then
-        upsertDispatchGridEntry(unitId, unit)
-        publishDispatchPublicState(false)
-    end
+    syncEmsUnit(unitId, unit)
+    markDirty()
 end)
 
 RegisterNetEvent('cad:server:statusChanged', function(statusCode)
@@ -1137,27 +834,25 @@ RegisterNetEvent('cad:server:statusChanged', function(statusCode)
 
     units[unitId].status = normalized
     touchUnit(units[unitId])
-
-    if CAD.State.EMS.Units[unitId] then
-        CAD.State.EMS.Units[unitId].status = normalized
-        CAD.State.EMS.Units[unitId].updatedAt = units[unitId].updatedAt
-    end
-
-    publishDispatchPublicState(false)
+    syncEmsUnit(unitId, units[unitId])
+    markDirty()
 end)
 
 AddEventHandler('playerDropped', function()
     local source = source
     removeSourceUnit(source, true)
-    publishDispatchPublicState(false)
+    markDirty()
 end)
+
+-- Background thread: publish + stale cleanup
 
 CreateThread(function()
     Wait(500)
-    rebuildDispatchGridEntries()
-    publishDispatchPublicState(true)
+    markDirty()
+    publishIfDirty()
     Wait(5000)
-    publishDispatchPublicState(true)
+    markDirty()
+    publishIfDirty()
 
     while true do
         Wait(30000)
@@ -1179,9 +874,9 @@ CreateThread(function()
         end
 
         if didMutate then
-            publishDispatchPublicState(true)
-        else
-            publishDispatchPublicState(false)
+            markDirty()
         end
+
+        publishIfDirty()
     end
 end)
