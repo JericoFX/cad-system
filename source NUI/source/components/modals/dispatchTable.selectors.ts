@@ -1,5 +1,4 @@
 import type { DispatchCall, DispatchUnit, SecurityCamera } from '~/stores/cadStore';
-import { getThresholdForPriority, type DispatchSettings, type SlaLevel } from './dispatchTable.utils';
 
 export const sortDispatchCalls = (calls: DispatchCall[]) =>
   [...calls].sort((a, b) => {
@@ -101,131 +100,6 @@ export const mapAssignedUnits = (
     .filter((unit): unit is DispatchUnit => Boolean(unit));
 };
 
-const getCallAgeMinutes = (iso: string, nowMs: number) => {
-  const createdAt = new Date(iso).getTime();
-  if (Number.isNaN(createdAt)) {
-    return 0;
-  }
-
-  return Math.max(0, Math.floor((nowMs - createdAt) / 60000));
-};
-
-export const getCallSlaLevel = (
-  call: DispatchCall,
-  settings: DispatchSettings,
-  nowMs: number
-): SlaLevel => {
-  if (!settings.sla.enabled || call.status === 'CLOSED') {
-    return 'ok';
-  }
-
-  const ageMinutes = getCallAgeMinutes(call.createdAt, nowMs);
-  if (call.status === 'PENDING') {
-    const warningAt = getThresholdForPriority(settings.sla.pending.warningMinutes, call.priority);
-    const breachAt = getThresholdForPriority(settings.sla.pending.breachMinutes, call.priority);
-    if (ageMinutes >= breachAt) return 'breach';
-    if (ageMinutes >= warningAt) return 'warning';
-    return 'ok';
-  }
-
-  if (call.status === 'ACTIVE') {
-    const warningAt = getThresholdForPriority(settings.sla.active.warningMinutes, call.priority);
-    const breachAt = getThresholdForPriority(settings.sla.active.breachMinutes, call.priority);
-    if (ageMinutes >= breachAt) return 'breach';
-    if (ageMinutes >= warningAt) return 'warning';
-    return 'ok';
-  }
-
-  return 'ok';
-};
-
-export const getCallSlaLabel = (level: SlaLevel) => {
-  if (level === 'breach') return 'SLA BREACH';
-  if (level === 'warning') return 'SLA WARNING';
-  return 'SLA OK';
-};
-
-export const isEmsUnit = (unit: DispatchUnit) => {
-  const unitType = String(unit.type || '').toUpperCase();
-  return unitType.includes('EMS') || unitType.includes('AMBULANCE') || unitType.includes('MEDIC');
-};
-
-const isMedicalCall = (call: DispatchCall) => {
-  const haystack = `${call.type} ${call.title} ${call.description || ''}`.toUpperCase();
-  return (
-    haystack.includes('EMS') ||
-    haystack.includes('MEDICAL') ||
-    haystack.includes('INJUR') ||
-    haystack.includes('AMBUL') ||
-    haystack.includes('UNCONSCIOUS')
-  );
-};
-
-export const getRecommendedUnit = (
-  call: DispatchCall | null,
-  settings: DispatchSettings,
-  units: DispatchUnit[]
-) => {
-  if (!call || call.status === 'CLOSED' || !settings.autoAssignment.enabled) {
-    return null;
-  }
-
-  const candidates = units.filter((unit) => unit.status === 'AVAILABLE');
-  if (!candidates.length) {
-    return null;
-  }
-
-  const wantsEms = isMedicalCall(call);
-  const callCoords = call.coordinates;
-
-  const scored = candidates
-    .map((unit) => {
-      const ems = isEmsUnit(unit);
-      const servicePenalty = wantsEms
-        ? ems
-          ? 0
-          : settings.autoAssignment.servicePenalties.needsEmsButNotEms
-        : ems
-          ? settings.autoAssignment.servicePenalties.nonMedicalEms
-          : 0;
-
-      let distance = 0;
-      let distancePenalty = settings.autoAssignment.unknownDistancePenalty;
-      if (callCoords && unit.location) {
-        const dx = unit.location.x - callCoords.x;
-        const dy = unit.location.y - callCoords.y;
-        const dz = unit.location.z - callCoords.z;
-        distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        distancePenalty = Math.floor(distance / settings.autoAssignment.distanceMetersPerPenaltyPoint);
-      }
-
-      return {
-        unit,
-        distance,
-        score: servicePenalty + distancePenalty,
-      };
-    })
-    .sort((a, b) => {
-      if (a.score !== b.score) {
-        return a.score - b.score;
-      }
-
-      return a.unit.unitId.localeCompare(b.unit.unitId);
-    });
-
-  const best = scored[0];
-  const reason =
-    callCoords && best.unit.location
-      ? `Closest ${wantsEms ? 'EMS' : 'field'} unit`
-      : `Best ${wantsEms ? 'EMS-role' : 'patrol-role'} match`;
-
-  return {
-    unit: best.unit,
-    distance: best.distance,
-    reason,
-  };
-};
-
 export const formatCallAge = (iso: string, nowMs: number) => {
   const createdAt = new Date(iso).getTime();
   if (Number.isNaN(createdAt)) {
@@ -246,4 +120,8 @@ export const priorityLabel = (priority: number) => {
   return 'LOW';
 };
 
-export const getDispatchChannelForUnit = (unit: DispatchUnit) => (isEmsUnit(unit) ? 'CH-3' : 'CH-2');
+export const getDispatchChannelForUnit = (unit: DispatchUnit) => {
+  const unitType = String(unit.type || '').toUpperCase();
+  const isEms = unitType.includes('EMS') || unitType.includes('AMBULANCE') || unitType.includes('MEDIC');
+  return isEms ? 'CH-3' : 'CH-2';
+};

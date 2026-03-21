@@ -11,9 +11,9 @@
   "case_type_accident": "Accident",
   "case_type_drugs": "Drugs",
   "case_type_traffic": "Traffic",
-  "case_type_domestic": "Domestic",
-  "case_type_fraud": "Fraud",
+  "case_type_disturbance": "Disturbance",
   "case_type_suspicious": "Suspicious",
+  "case_type_medical": "Medical",
   
   "priority_critical": "Critical",
   "priority_high": "High",
