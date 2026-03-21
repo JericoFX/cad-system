@@ -29,5 +29,8 @@ docs/.vitepress/cache/
 docs/.vitepress/dist/
 .vite/
 
+# Source maps
+nui/build/*.map
+
 # Release artifacts
 cad-system-v*.zip

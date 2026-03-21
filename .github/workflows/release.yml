@@ -52,6 +52,7 @@ jobs:
             --exclude='.cursorrules' \
             --exclude='.cursorignore' \
             --exclude='source NUI' \
+            --exclude='*.map' \
             --exclude='docs' \
             --exclude='node_modules' \
             --exclude='.vscode' \
