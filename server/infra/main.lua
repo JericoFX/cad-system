@@ -5,8 +5,7 @@ local Auth = require 'modules.server.auth'
 local Fn = require 'modules.server.functions'
 local Officers = require 'modules.server.officers'
 local DB = require 'modules.server.database'
-
-local function getAction(name) return _G.CadActions and _G.CadActions[name] end
+local Registry = require 'modules.shared.registry'
 
 
 local function safeJsonDecode(raw, fallback, context)
@@ -233,13 +232,15 @@ local function bootstrapFromDatabase()
         end
     end
 
-    if getAction("Topology") and getAction("Topology").LoadFromDatabase then
-        getAction("Topology").LoadFromDatabase()
+    local TopologyAction = Registry.Get("Topology")
+    if TopologyAction and TopologyAction.LoadFromDatabase then
+        TopologyAction.LoadFromDatabase()
     end
 
     local virtualSlots = 0
-    if getAction("VirtualContainer") and getAction("VirtualContainer").LoadFromDatabase then
-        virtualSlots = tonumber(getAction("VirtualContainer").LoadFromDatabase()) or 0
+    local VirtualContainerAction = Registry.Get("VirtualContainer")
+    if VirtualContainerAction and VirtualContainerAction.LoadFromDatabase then
+        virtualSlots = tonumber(VirtualContainerAction.LoadFromDatabase()) or 0
     end
 
     Utils.Log(
@@ -391,7 +392,7 @@ AddEventHandler('playerDropped', function()
     local source = source
     State.OfficerStatus[source] = nil
     State.Evidence.Staging[source] = nil
-    local PhotosAction = getAction("Photos")
+    local PhotosAction = Registry.Get("Photos")
     if PhotosAction and PhotosAction.State and PhotosAction.State.Staging then
         PhotosAction.State.Staging[source] = nil
     end

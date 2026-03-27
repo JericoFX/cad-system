@@ -5,8 +5,6 @@ local Auth = require 'modules.server.auth'
 local Fn = require 'modules.server.functions'
 local EvidenceTypes = require 'shared.evidence_types'
 
-local function getAction(name) return _G.CadActions and _G.CadActions[name] end
-
 local pendingAnalysis = {}
 State.Forensics = State.Forensics or {}
 State.Forensics.WorldTraces = State.Forensics.WorldTraces or {}

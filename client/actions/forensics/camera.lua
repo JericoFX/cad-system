@@ -1,5 +1,7 @@
+local Registry = require 'modules.shared.registry'
+
 local function usePoliceCamera()
-    local Photos = _G.CadActions and _G.CadActions.Photos or nil
+    local Photos = Registry.Get('Photos')
     if Photos and Photos.CapturePolicePhoto then
         Photos.CapturePolicePhoto()
         return

@@ -1,7 +1,6 @@
 local Config = require 'modules.shared.config'
 local Utils = require 'modules.shared.utils'
-
-local function getAction(name) return _G.CadActions and _G.CadActions[name] end
+local Registry = require 'modules.shared.registry'
 
 local Vehicle = {}
 
@@ -388,7 +387,7 @@ end
 function Vehicle.PlayAlert(payload)
     local alertType = Utils.Trim(payload and payload.type or 'wanted'):lower()
 
-    local SoundsAction = getAction('Sounds')
+    local SoundsAction = Registry.Get('Sounds')
     if SoundsAction then
         if alertType == 'wanted' and SoundsAction.EmergencyAlert then
             SoundsAction.EmergencyAlert()
@@ -626,5 +625,4 @@ AddEventHandler('onResourceStop', function(resourceName)
     end
 end)
 
-_G.CadActions = _G.CadActions or {}
-_G.CadActions.Vehicle = Vehicle
+Registry.Register('Vehicle', Vehicle)

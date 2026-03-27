@@ -3,8 +3,7 @@ local State = require 'modules.shared.state'
 local Utils = require 'modules.shared.utils'
 local Auth = require 'modules.server.auth'
 local Fn = require 'modules.server.functions'
-
-local function getAction(name) return _G.CadActions and _G.CadActions[name] end
+local Registry = require 'modules.shared.registry'
 
 local Photos = {}
 Photos.Providers = {}
@@ -1028,8 +1027,9 @@ lib.callback.register('cad:photos:attachToCase', withPhotoGuard('heavy', functio
     }
     evidence.custodyChain[1].evidenceId = evidence.evidenceId
 
-    if getAction("Evidence") and type(getAction("Evidence").AppendCaseEvidence) == 'function' then
-        local ok, appendErr = getAction("Evidence").AppendCaseEvidence(caseId, evidence)
+    local EvidenceAction = Registry.Get("Evidence")
+    if EvidenceAction and type(EvidenceAction.AppendCaseEvidence) == 'function' then
+        local ok, appendErr = EvidenceAction.AppendCaseEvidence(caseId, evidence)
         if not ok then
             return { ok = false, error = appendErr or 'cannot_attach_evidence' }
         end
@@ -1038,8 +1038,9 @@ lib.callback.register('cad:photos:attachToCase', withPhotoGuard('heavy', functio
         caseObj.evidence[#caseObj.evidence + 1] = evidence
         caseObj.updatedAt = Utils.ToIso()
 
-        if getAction("Cases") and type(getAction("Cases").PublishPublicState) == 'function' then
-            getAction("Cases").PublishPublicState(false)
+        local CasesAction = Registry.Get("Cases")
+        if CasesAction and type(CasesAction.PublishPublicState) == 'function' then
+            CasesAction.PublishPublicState(false)
         end
     end
 
@@ -1152,5 +1153,4 @@ end))
 
 Utils.Log('info', 'Photo system initialized')
 
-_G.CadActions = _G.CadActions or {}
-_G.CadActions.Photos = Photos
+Registry.Register('Photos', Photos)

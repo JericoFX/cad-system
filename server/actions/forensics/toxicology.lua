@@ -1,6 +1,7 @@
 local Config = require 'modules.shared.config'
 local Utils = require 'modules.shared.utils'
 local Fn = require 'modules.server.functions'
+local Registry = require 'modules.shared.registry'
 
 local Forensic = {}
 Forensic.Toxicology = {}
@@ -599,6 +600,6 @@ AddEventHandler('onResourceStart', function(resourceName)
     end
 end)
 
-_G.CadActions = _G.CadActions or {}
-_G.CadActions.Forensic = _G.CadActions.Forensic or {}
-_G.CadActions.Forensic.Toxicology = Forensic.Toxicology
+local ForensicRegistry = Registry.Get('Forensic') or {}
+ForensicRegistry.Toxicology = Forensic.Toxicology
+Registry.Register('Forensic', ForensicRegistry)

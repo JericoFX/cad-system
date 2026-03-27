@@ -4,8 +4,7 @@ local Utils = require 'modules.shared.utils'
 local Auth = require 'modules.server.auth'
 local Fn = require 'modules.server.functions'
 local DB = require 'modules.server.database'
-
-local function getAction(name) return _G.CadActions and _G.CadActions[name] end
+local Registry = require 'modules.shared.registry'
 
 
 local function dispatchEnabled()
@@ -158,7 +157,7 @@ exports('CreateCase', function(source, data)
 
     State.Cases[caseId] = caseObj
 
-    local CasesAct = getAction("Cases"); if CasesAct and CasesAct.PublishPublicState then
+    local CasesAct = Registry.Get("Cases"); if CasesAct and CasesAct.PublishPublicState then
         CasesAct.PublishPublicState(false)
     end
 
@@ -194,7 +193,7 @@ exports('UpdateCase', function(source, caseId, data)
         Utils.Log('error', 'exports: UpdateCase DB failed for %s', tostring(caseId))
     end
 
-    local CasesAct = getAction("Cases"); if CasesAct and CasesAct.PublishPublicState then
+    local CasesAct = Registry.Get("Cases"); if CasesAct and CasesAct.PublishPublicState then
         CasesAct.PublishPublicState(false)
     end
 
@@ -216,7 +215,7 @@ exports('CloseCase', function(source, caseId)
         Utils.Log('error', 'exports: CloseCase DB failed for %s', tostring(caseId))
     end
 
-    local CasesAct = getAction("Cases"); if CasesAct and CasesAct.PublishPublicState then
+    local CasesAct = Registry.Get("Cases"); if CasesAct and CasesAct.PublishPublicState then
         CasesAct.PublishPublicState(false)
     end
 

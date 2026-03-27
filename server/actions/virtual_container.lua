@@ -3,6 +3,7 @@
 local Config = require 'modules.shared.config'
 local State = require 'modules.shared.state'
 local Utils = require 'modules.shared.utils'
+local Registry = require 'modules.shared.registry'
 
 local VirtualContainer = {}
 
@@ -392,5 +393,4 @@ function VirtualContainer.LoadFromDatabase()
     return total
 end
 
-_G.CadActions = _G.CadActions or {}
-_G.CadActions.VirtualContainer = VirtualContainer
+Registry.Register('VirtualContainer', VirtualContainer)

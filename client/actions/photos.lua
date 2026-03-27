@@ -1,3 +1,5 @@
+local Registry = require 'modules.shared.registry'
+
 local Photos = {}
 
 local PHOTO_CONFIG = {
@@ -393,5 +395,4 @@ exports('viewPhotoItem', function(data, _)
     return nil
 end)
 
-_G.CadActions = _G.CadActions or {}
-_G.CadActions.Photos = Photos
+Registry.Register('Photos', Photos)

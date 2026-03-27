@@ -3,8 +3,7 @@ local State = require 'modules.shared.state'
 local Utils = require 'modules.shared.utils'
 local Auth = require 'modules.server.auth'
 local Fn = require 'modules.server.functions'
-
-local function getAction(name) return _G.CadActions and _G.CadActions[name] end
+local Registry = require 'modules.shared.registry'
 
 
 local alerts = State.EMS.Alerts
@@ -40,7 +39,7 @@ local function isBloodSampleVirtualEnabled()
         return false
     end
 
-    return getAction("VirtualContainer") ~= nil
+    return Registry.Get("VirtualContainer") ~= nil
 end
 
 local function getBloodSampleContainerConfig()
@@ -64,7 +63,8 @@ local function ensureBloodSampleContainer()
     end
 
     local cfg = getBloodSampleContainerConfig()
-    local container, ensureErr = getAction("VirtualContainer") and getAction("VirtualContainer").Ensure(cfg.containerKey, {
+    local VCAction = Registry.Get("VirtualContainer")
+    local container, ensureErr = VCAction and VCAction.Ensure(cfg.containerKey, {
         containerType = 'blood_lab',
         endpointId = 'ems_blood_lab',
         slotCount = cfg.slotCount,
@@ -141,7 +141,8 @@ local function getBloodToxicologySnapshot(request)
         source = 'QBCORE_METADATA',
     }
 
-    local toxicology = getAction("Forensic") and getAction("Forensic").Toxicology or nil
+    local ForensicAction = Registry.Get("Forensic")
+    local toxicology = ForensicAction and ForensicAction.Toxicology or nil
     if type(toxicology) ~= 'table' or type(toxicology.GetSnapshotForCitizen) ~= 'function' then
         snapshot.source = 'UNAVAILABLE'
         return snapshot
@@ -403,7 +404,7 @@ local function createBloodSampleItem(request, officer)
             return false, 'blood_sample_container_full'
         end
 
-        local setOk, setErr = getAction("VirtualContainer").SetSlot(container.containerKey, freeSlot, {
+        local setOk, setErr = Registry.Get("VirtualContainer").SetSlot(container.containerKey, freeSlot, {
             itemName = itemName,
             label = 'Blood Sample',
             count = 1,
@@ -462,16 +463,17 @@ local function removeBloodSampleItem(request)
         return true
     end
 
-    if getAction("VirtualContainer") and getAction("VirtualContainer").Get(request.sampleStashId) then
+    local VCAction = Registry.Get("VirtualContainer")
+    if VCAction and VCAction.Get(request.sampleStashId) then
         if request.sampleSlot then
-            local clearOk, clearErr = getAction("VirtualContainer").ClearSlot(request.sampleStashId, tonumber(request.sampleSlot))
+            local clearOk, clearErr = VCAction.ClearSlot(request.sampleStashId, tonumber(request.sampleSlot))
             if not clearOk then
                 return false, clearErr or 'cannot_remove_sample_item'
             end
         else
-            local slotIndex, _ = getAction("VirtualContainer").GetFirstOccupied(request.sampleStashId)
+            local slotIndex, _ = VCAction.GetFirstOccupied(request.sampleStashId)
             if slotIndex then
-                local clearOk, clearErr = getAction("VirtualContainer").ClearSlot(request.sampleStashId, slotIndex)
+                local clearOk, clearErr = VCAction.ClearSlot(request.sampleStashId, slotIndex)
                 if not clearOk then
                     return false, clearErr or 'cannot_remove_sample_item'
                 end
@@ -642,8 +644,9 @@ local function appendBloodEvidenceToCase(request, officer, notes)
         evidence.custodyChain[i].evidenceId = evidence.evidenceId
     end
 
-    if getAction("Evidence") and getAction("Evidence").AppendCaseEvidence then
-        local ok = getAction("Evidence").AppendCaseEvidence(request.caseId, evidence)
+    local EvidenceAction = Registry.Get("Evidence")
+    if EvidenceAction and EvidenceAction.AppendCaseEvidence then
+        local ok = EvidenceAction.AppendCaseEvidence(request.caseId, evidence)
         if not ok then
             return nil, 'cannot_attach_evidence'
         end

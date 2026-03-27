@@ -3,6 +3,7 @@ local State = require 'modules.shared.state'
 local Utils = require 'modules.shared.utils'
 local Auth = require 'modules.server.auth'
 local Fn = require 'modules.server.functions'
+local Registry = require 'modules.shared.registry'
 
 local Dispatch = {}
 
@@ -884,5 +885,4 @@ CreateThread(function()
     end
 end)
 
-_G.CadActions = _G.CadActions or {}
-_G.CadActions.Dispatch = Dispatch
+Registry.Register('Dispatch', Dispatch)

@@ -1,5 +1,6 @@
 local Config = require 'modules.shared.config'
 local ClientFn = require 'modules.client.functions'
+local Registry = require 'modules.shared.registry'
 
 local SecurityCamera = {}
 
@@ -551,5 +552,4 @@ AddEventHandler('onResourceStop', function(resourceName)
     stopWatchInternal()
 end)
 
-_G.CadActions = _G.CadActions or {}
-_G.CadActions.SecurityCamera = SecurityCamera
+Registry.Register('SecurityCamera', SecurityCamera)

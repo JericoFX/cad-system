@@ -3,8 +3,7 @@ local State = require 'modules.shared.state'
 local Utils = require 'modules.shared.utils'
 local Auth = require 'modules.server.auth'
 local Fn = require 'modules.server.functions'
-
-local function getAction(name) return _G.CadActions and _G.CadActions[name] end
+local Registry = require 'modules.shared.registry'
 
 local idReaders = State.Forensics.IdReaders
 
@@ -631,7 +630,7 @@ end
 
 local function readerFeatureEnabled()
     local cfg = Config.Forensics and Config.Forensics.IdReader or {}
-    return cfg.Enabled == true and cfg.UseVirtualContainer == true and getAction("VirtualContainer") ~= nil
+    return cfg.Enabled == true and cfg.UseVirtualContainer == true and Registry.Get("VirtualContainer") ~= nil
 end
 
 local function resolveReaderContext(source, payload, officer)
@@ -683,7 +682,7 @@ end
 
 local function ensureVirtualReaderContainer(terminalId, readerConfig)
     local containerKey = getVirtualContainerKey(terminalId)
-    local container, ensureErr = getAction("VirtualContainer").Ensure(containerKey, {
+    local container, ensureErr = Registry.Get("VirtualContainer").Ensure(containerKey, {
         containerType = 'id_reader',
         endpointId = terminalId,
         slotCount = readerConfig.slots,
@@ -714,7 +713,7 @@ end
 local function getVirtualReaderSlot(containerKey, readerConfig, requestedSlot)
     local targetSlot = tonumber(requestedSlot)
     if targetSlot and targetSlot > 0 then
-        local slotData = getAction("VirtualContainer").GetSlot(containerKey, targetSlot)
+        local slotData = Registry.Get("VirtualContainer").GetSlot(containerKey, targetSlot)
         if slotData and slotData.itemName then
             return targetSlot, slotData
         end
@@ -722,13 +721,13 @@ local function getVirtualReaderSlot(containerKey, readerConfig, requestedSlot)
 
     local preferredSlot = tonumber(readerConfig.readSlot)
     if preferredSlot and preferredSlot > 0 then
-        local slotData = getAction("VirtualContainer").GetSlot(containerKey, preferredSlot)
+        local slotData = Registry.Get("VirtualContainer").GetSlot(containerKey, preferredSlot)
         if slotData and slotData.itemName then
             return preferredSlot, slotData
         end
     end
 
-    local firstSlot, firstData = getAction("VirtualContainer").GetFirstOccupied(containerKey)
+    local firstSlot, firstData = Registry.Get("VirtualContainer").GetFirstOccupied(containerKey)
     if firstData and firstData.itemName then
         return firstSlot, firstData
     end
@@ -874,7 +873,7 @@ lib.callback.register('cad:idreader:insert', Auth.WithGuard('default', function(
         }
     end
 
-    if getAction("VirtualContainer").GetSlot(container.containerKey, targetSlot) then
+    if Registry.Get("VirtualContainer").GetSlot(container.containerKey, targetSlot) then
         return {
             ok = false,
             error = 'slot_occupied',
@@ -941,7 +940,7 @@ lib.callback.register('cad:idreader:insert', Auth.WithGuard('default', function(
         }
     end
 
-    local setOk, setErr = getAction("VirtualContainer").SetSlot(container.containerKey, targetSlot, {
+    local setOk, setErr = Registry.Get("VirtualContainer").SetSlot(container.containerKey, targetSlot, {
         itemName = selected.name,
         label = selected.label or selected.name,
         count = 1,
@@ -1028,7 +1027,7 @@ lib.callback.register('cad:idreader:eject', Auth.WithGuard('default', function(s
         }
     end
 
-    local clearOk, clearErr = getAction("VirtualContainer").ClearSlot(container.containerKey, targetSlot)
+    local clearOk, clearErr = Registry.Get("VirtualContainer").ClearSlot(container.containerKey, targetSlot)
     if not clearOk then
         exports.ox_inventory:RemoveItem(source, itemName, math.max(1, tonumber(slotData.count) or 1), metadata, nil, true, false)
         return {
@@ -1076,7 +1075,7 @@ lib.callback.register('cad:idreader:getContainer', Auth.WithGuard('default', fun
         containerKey = container.containerKey,
         slotCount = container.slotCount,
         readSlot = container.readSlot,
-        slots = getAction("VirtualContainer").List(container.containerKey),
+        slots = Registry.Get("VirtualContainer").List(container.containerKey),
     }
 end))
 

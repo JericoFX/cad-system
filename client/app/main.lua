@@ -2,8 +2,7 @@
 
 local Config = require 'modules.shared.config'
 local Core = require 'modules.client.core'
-
-local function getAction(name) return _G.CadActions and _G.CadActions[name] end
+local Registry = require 'modules.shared.registry'
 
 local Client = {}
 
@@ -949,7 +948,7 @@ function Client.SetUIState(open)
         pushDispatchPublicStateToUi(GlobalState and GlobalState.cad_dispatch_public or nil, true)
         pushCasesPublicStateToUi(GlobalState and GlobalState.cad_cases_public or nil, true)
     else
-        local SecurityCameraAction = getAction('SecurityCamera')
+        local SecurityCameraAction = Registry.Get('SecurityCamera')
         if SecurityCameraAction and SecurityCameraAction.StopWatch then
             SecurityCameraAction.StopWatch()
         end
@@ -1008,7 +1007,7 @@ function Client.GetComputerContext()
 end
 
 function Client.ToggleUI()
-    local VehicleAction = getAction('Vehicle')
+    local VehicleAction = Registry.Get('Vehicle')
     if VehicleAction and VehicleAction.IsPoliceVehicleContext and VehicleAction.OpenTablet then
         local inVehicleTabletContext = VehicleAction.IsPoliceVehicleContext() == true
         if inVehicleTabletContext then
@@ -1213,5 +1212,4 @@ AddEventHandler('cad:client:syncOffline', function(data)
     SendNUIMessage({ action = 'cad:syncOffline', data = data })
 end)
 
-_G.CadActions = _G.CadActions or {}
-_G.CadActions.Client = Client
+Registry.Register('Client', Client)

@@ -3,6 +3,7 @@ local State = require 'modules.shared.state'
 local Utils = require 'modules.shared.utils'
 local Auth = require 'modules.server.auth'
 local Fn = require 'modules.server.functions'
+local Registry = require 'modules.shared.registry'
 
 local Evidence = {}
 
@@ -10,7 +11,7 @@ local staging = State.Evidence.Staging
 
 local function evidenceVirtualEnabled()
     local cfg = Config.Evidence or {}
-    return cfg.UseVirtualContainer ~= false and _G.CadActions and _G.CadActions.VirtualContainer ~= nil
+    return cfg.UseVirtualContainer ~= false and Registry.Get('VirtualContainer') ~= nil
 end
 
 local function getTerminalById(terminalId)
@@ -129,7 +130,8 @@ end
 
 local function ensureVirtualEvidenceContainer(terminalId, containerConfig)
     local containerKey = getContainerKey(terminalId)
-    local container, ensureErr = _G.CadActions and _G.CadActions.VirtualContainer.Ensure(containerKey, {
+    local VCAction = Registry.Get('VirtualContainer')
+    local container, ensureErr = VCAction and VCAction.Ensure(containerKey, {
         containerType = 'evidence',
         endpointId = terminalId,
         slotCount = containerConfig.slots,
@@ -163,7 +165,8 @@ local function getContainerSlot(container, requestedSlot)
         end
     end
 
-    local slotIndex, entry = _G.CadActions and _G.CadActions.VirtualContainer.GetFirstOccupied(container.containerKey)
+    local VCAction = Registry.Get('VirtualContainer')
+    local slotIndex, entry = VCAction and VCAction.GetFirstOccupied(container.containerKey)
     if slotIndex and entry then
         return slotIndex, entry
     end
@@ -221,7 +224,7 @@ local function appendCaseEvidence(caseId, evidence)
     caseObj.evidence[#caseObj.evidence + 1] = evidence
     caseObj.updatedAt = newUpdatedAt
 
-    local CasesAction = getAction("Cases"); if CasesAction and type(CasesAction.PublishPublicState) == 'function' then
+    local CasesAction = Registry.Get("Cases"); if CasesAction and type(CasesAction.PublishPublicState) == 'function' then
         CasesAction.PublishPublicState(false)
     end
 
@@ -304,7 +307,7 @@ lib.callback.register('cad:evidence:container:list', Auth.WithGuard('default', f
         terminalId = terminalId,
         containerKey = container.containerKey,
         slotCount = container.slotCount,
-        slots = _G.CadActions and _G.CadActions.VirtualContainer.List(container.containerKey),
+        slots = Registry.Get('VirtualContainer') and Registry.Get('VirtualContainer').List(container.containerKey),
     }
 end))
 
@@ -390,7 +393,7 @@ lib.callback.register('cad:evidence:container:store', Auth.WithGuard('heavy', fu
         storedBy = officer.identifier,
     }
 
-    local setOk, setErr = _G.CadActions and _G.CadActions.VirtualContainer.SetSlot(container.containerKey, targetSlot, {
+    local setOk, setErr = Registry.Get('VirtualContainer') and Registry.Get('VirtualContainer').SetSlot(container.containerKey, targetSlot, {
         itemName = 'cad_evidence_record',
         label = ('%s Evidence'):format(tostring(selected.evidenceType or 'UNKNOWN')),
         count = 1,
@@ -466,7 +469,7 @@ lib.callback.register('cad:evidence:container:pull', Auth.WithGuard('heavy', fun
 
     bucket[#bucket + 1] = staged
 
-    local clearOk, clearErr = _G.CadActions and _G.CadActions.VirtualContainer.ClearSlot(container.containerKey, targetSlot)
+    local clearOk, clearErr = Registry.Get('VirtualContainer') and Registry.Get('VirtualContainer').ClearSlot(container.containerKey, targetSlot)
     if not clearOk then
         table.remove(bucket, #bucket)
         return {
@@ -581,5 +584,4 @@ lib.callback.register('cad:debug:createEvidenceItem', Auth.WithGuard('default', 
     end
 end))
 
-_G.CadActions = _G.CadActions or {}
-_G.CadActions.Evidence = Evidence
+Registry.Register('Evidence', Evidence)

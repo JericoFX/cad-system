@@ -1,7 +1,6 @@
 local Config = require 'modules.shared.config'
 local Utils = require 'modules.shared.utils'
-
-local function getAction(name) return _G.CadActions and _G.CadActions[name] end
+local Registry = require 'modules.shared.registry'
 
 local function wrapNui(name, handler)
     RegisterNUICallback(name, function(data, cb)
@@ -109,7 +108,7 @@ wrapNui('cad:getDispatchSettings', function()
 end)
 
 wrapNui('cad:getComputerContext', function()
-    local ClientAction = getAction('Client')
+    local ClientAction = Registry.Get('Client')
     if ClientAction and ClientAction.GetComputerContext then
         return ClientAction.GetComputerContext()
     end
@@ -121,7 +120,7 @@ wrapNui('cad:getComputerContext', function()
 end)
 
 wrapNui('cad:vehicle:getContext', function()
-    local VehicleAction = getAction('Vehicle')
+    local VehicleAction = Registry.Get('Vehicle')
     if VehicleAction and VehicleAction.GetContext then
         return VehicleAction.GetContext()
     end
@@ -133,7 +132,7 @@ wrapNui('cad:vehicle:getContext', function()
 end)
 
 wrapNui('cad:vehicle:getReaderContext', function()
-    local VehicleAction = getAction('Vehicle')
+    local VehicleAction = Registry.Get('Vehicle')
     if VehicleAction and VehicleAction.GetReaderContext then
         return VehicleAction.GetReaderContext()
     end
@@ -145,7 +144,7 @@ wrapNui('cad:vehicle:getReaderContext', function()
 end)
 
 wrapNui('cad:vehicle:setOpen', function(payload)
-    local VehicleAction = getAction('Vehicle')
+    local VehicleAction = Registry.Get('Vehicle')
     if VehicleAction and VehicleAction.SetTabletOpen then
         return VehicleAction.SetTabletOpen(payload and payload.open == true)
     end
@@ -157,7 +156,7 @@ wrapNui('cad:vehicle:setOpen', function(payload)
 end)
 
 wrapNui('cad:vehicle:scanFront', function(payload)
-    local VehicleAction = getAction('Vehicle')
+    local VehicleAction = Registry.Get('Vehicle')
     if VehicleAction and VehicleAction.ScanFront then
         return VehicleAction.ScanFront(payload or {})
     end
@@ -169,7 +168,7 @@ wrapNui('cad:vehicle:scanFront', function(payload)
 end)
 
 wrapNui('cad:vehicle:playAlert', function(payload)
-    local VehicleAction = getAction('Vehicle')
+    local VehicleAction = Registry.Get('Vehicle')
     if VehicleAction and VehicleAction.PlayAlert then
         return VehicleAction.PlayAlert(payload or {})
     end
@@ -248,7 +247,7 @@ wrapNui('cad:cameras:get', bridge('cad:cameras:get'))
 wrapNui('cad:cameras:setStatus', bridge('cad:cameras:setStatus'))
 wrapNui('cad:cameras:remove', bridge('cad:cameras:remove'))
 wrapNui('cad:cameras:watch', function(payload)
-    local SecurityCameraAction = getAction('SecurityCamera')
+    local SecurityCameraAction = Registry.Get('SecurityCamera')
     if SecurityCameraAction and SecurityCameraAction.StartWatch then
         return SecurityCameraAction.StartWatch(payload or {})
     end
@@ -259,7 +258,7 @@ wrapNui('cad:cameras:watch', function(payload)
     }
 end)
 wrapNui('cad:cameras:stopWatch', function()
-    local SecurityCameraAction = getAction('SecurityCamera')
+    local SecurityCameraAction = Registry.Get('SecurityCamera')
     if SecurityCameraAction and SecurityCameraAction.StopWatch then
         return SecurityCameraAction.StopWatch()
     end

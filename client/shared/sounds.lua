@@ -1,3 +1,5 @@
+local Registry = require 'modules.shared.registry'
+
 local Sounds = {}
 
 local SOUND_IDS = {
@@ -86,7 +88,6 @@ exports('PlayEmergencyAlert', Sounds.EmergencyAlert)
 exports('PlaySuccess', Sounds.Success)
 exports('PlayError', Sounds.Error)
 
-_G.CadActions = _G.CadActions or {}
-_G.CadActions.Sounds = Sounds
+Registry.Register('Sounds', Sounds)
 
 print('[CAD Sounds] Sound system initialized')
