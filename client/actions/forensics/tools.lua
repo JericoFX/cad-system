@@ -1,7 +1,3 @@
-CAD = CAD or {}
-CAD.Forensic = CAD.Forensic or {}
-CAD.Forensic.Tools = CAD.Forensic.Tools or {}
-
 local function hasItem(itemName)
     if GetResourceState('ox_inventory') ~= 'started' then
         return false
@@ -15,7 +11,7 @@ local function getPed()
 end
 
 local function showProgress(duration, label, anim)
-    return CAD.Progress.Run({
+    return lib.progressBar({
         duration = duration,
         label = label,
         useWhileDead = false,

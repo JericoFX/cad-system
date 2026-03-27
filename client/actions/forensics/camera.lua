@@ -1,10 +1,7 @@
-CAD = CAD or {}
-CAD.Forensic = CAD.Forensic or {}
-CAD.Forensic.Camera = CAD.Forensic.Camera or {}
-
 local function usePoliceCamera()
-    if CAD.Photos and CAD.Photos.CapturePolicePhoto then
-        CAD.Photos.CapturePolicePhoto()
+    local Photos = _G.CadActions and _G.CadActions.Photos or nil
+    if Photos and Photos.CapturePolicePhoto then
+        Photos.CapturePolicePhoto()
         return
     end
 

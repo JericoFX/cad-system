@@ -1,6 +1,5 @@
-CAD = CAD or {}
-CAD.Forensic = CAD.Forensic or {}
-CAD.Forensic.Blood = CAD.Forensic.Blood or {}
+local State = require 'modules.shared.state'
+local EvidenceTypes = require 'shared.evidence_types'
 
 local lastEmitAt = 0
 
@@ -27,7 +26,7 @@ end
 
 local function isCrimeContext(victimPed)
     local victimSource = getPlayerServerIdFromPed(victimPed)
-    local calls = CAD.State.Dispatch.Calls or {}
+    local calls = State.Dispatch.Calls or {}
 
     for _, call in pairs(calls) do
         if type(call) == 'table' and call.status == 'ACTIVE' then
@@ -56,7 +55,7 @@ local function emitBloodEvidence(victimPed)
 
     local coords = GetEntityCoords(victimPed)
     local z = getGroundZ(coords.x, coords.y, coords.z)
-    local bloodType = CAD.EvidenceTypes.GetRandomBloodType()
+    local bloodType = EvidenceTypes.GetRandomBloodType()
     local ownerId = getPlayerServerIdFromPed(victimPed)
 
     TriggerServerEvent('cad:forensic:sync', 'blood', ownerId, vector3(coords.x, coords.y, z), bloodType)
@@ -76,7 +75,7 @@ AddEventHandler('gameEventTriggered', function(name, args)
         return
     end
 
-    local config = CAD.EvidenceTypes.GetType('blood')
+    local config = EvidenceTypes.GetType('blood')
     if not config then
         return
     end

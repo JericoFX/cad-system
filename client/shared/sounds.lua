@@ -1,7 +1,4 @@
-
-
-CAD = CAD or {}
-CAD.Sounds = {}
+local Sounds = {}
 
 local SOUND_IDS = {
 
@@ -18,7 +15,7 @@ local SOUND_IDS = {
     BACK = { soundName = "BACK", soundSet = "HUD_FRONTEND_DEFAULT_SOUNDSET" },
 }
 
-function CAD.Sounds.Play(soundConfig)
+function Sounds.Play(soundConfig)
     if not soundConfig then return end
 
     PlaySoundFrontend(-1, soundConfig.soundName, soundConfig.soundSet, true)
@@ -37,56 +34,59 @@ RegisterNUICallback('playSound', function(data, cb)
         return
     end
 
-    CAD.Sounds.Play(soundConfig)
+    Sounds.Play(soundConfig)
     cb({ ok = true })
 end)
 
-function CAD.Sounds.PTTStart()
-    CAD.Sounds.Play(SOUND_IDS.PTT_START)
+function Sounds.PTTStart()
+    Sounds.Play(SOUND_IDS.PTT_START)
 end
 
-function CAD.Sounds.PTTEnd()
-    CAD.Sounds.Play(SOUND_IDS.PTT_END)
+function Sounds.PTTEnd()
+    Sounds.Play(SOUND_IDS.PTT_END)
 end
 
-function CAD.Sounds.DispatchIncoming()
+function Sounds.DispatchIncoming()
 
-    CAD.Sounds.Play(SOUND_IDS.DISPATCH_INCOMING)
+    Sounds.Play(SOUND_IDS.DISPATCH_INCOMING)
     Citizen.SetTimeout(200, function()
-        CAD.Sounds.Play(SOUND_IDS.DISPATCH_INCOMING)
+        Sounds.Play(SOUND_IDS.DISPATCH_INCOMING)
     end)
 end
 
-function CAD.Sounds.EmergencyAlert()
+function Sounds.EmergencyAlert()
 
     for i = 1, 5 do
         Citizen.SetTimeout(i * 200, function()
-            CAD.Sounds.Play(SOUND_IDS.DISPATCH_EMERGENCY)
+            Sounds.Play(SOUND_IDS.DISPATCH_EMERGENCY)
         end)
     end
 end
 
-function CAD.Sounds.Success()
-    CAD.Sounds.Play(SOUND_IDS.SUCCESS)
+function Sounds.Success()
+    Sounds.Play(SOUND_IDS.SUCCESS)
 end
 
-function CAD.Sounds.Error()
-    CAD.Sounds.Play(SOUND_IDS.ERROR)
+function Sounds.Error()
+    Sounds.Play(SOUND_IDS.ERROR)
 end
 
-function CAD.Sounds.Click()
-    CAD.Sounds.Play(SOUND_IDS.CLICK)
+function Sounds.Click()
+    Sounds.Play(SOUND_IDS.CLICK)
 end
 
-function CAD.Sounds.Back()
-    CAD.Sounds.Play(SOUND_IDS.BACK)
+function Sounds.Back()
+    Sounds.Play(SOUND_IDS.BACK)
 end
 
-exports('PlayPTTStart', CAD.Sounds.PTTStart)
-exports('PlayPTTEnd', CAD.Sounds.PTTEnd)
-exports('PlayDispatchIncoming', CAD.Sounds.DispatchIncoming)
-exports('PlayEmergencyAlert', CAD.Sounds.EmergencyAlert)
-exports('PlaySuccess', CAD.Sounds.Success)
-exports('PlayError', CAD.Sounds.Error)
+exports('PlayPTTStart', Sounds.PTTStart)
+exports('PlayPTTEnd', Sounds.PTTEnd)
+exports('PlayDispatchIncoming', Sounds.DispatchIncoming)
+exports('PlayEmergencyAlert', Sounds.EmergencyAlert)
+exports('PlaySuccess', Sounds.Success)
+exports('PlayError', Sounds.Error)
+
+_G.CadActions = _G.CadActions or {}
+_G.CadActions.Sounds = Sounds
 
 print('[CAD Sounds] Sound system initialized')

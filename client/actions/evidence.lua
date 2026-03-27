@@ -1,9 +1,8 @@
 -- This module was taken from other resource that i dont remember the name, SORRY
 
-CAD = CAD or {}
-CAD.Client = CAD.Client or {}
+local Config = require 'modules.shared.config'
 
-function CAD.Client.CollectEvidence(evidenceType, description)
+local function CollectEvidence(evidenceType, description)
     local payload = {
         evidenceType = evidenceType,
         data = {
@@ -26,7 +25,7 @@ function CAD.Client.CollectEvidence(evidenceType, description)
     return result
 end
 
-if CAD.Config.Debug == true then
+if Config.Debug == true then
     RegisterCommand('collectevidence', function()
         local input = lib.inputDialog('Collect Evidence (Debug)', {
             { type = 'input', label = 'Evidence Type', placeholder = 'PHOTO / DOCUMENT / DNA', required = true },
@@ -37,7 +36,7 @@ if CAD.Config.Debug == true then
             return
         end
 
-        CAD.Client.CollectEvidence(input[1], input[2])
+        CollectEvidence(input[1], input[2])
     end, false)
 
     RegisterCommand('cadevidencedebug', function()

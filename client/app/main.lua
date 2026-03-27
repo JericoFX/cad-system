@@ -1,7 +1,11 @@
 -- Some day i will finish the anotations
 
-CAD = CAD or {}
-CAD.Client = CAD.Client or {}
+local Config = require 'modules.shared.config'
+local Core = require 'modules.client.core'
+
+local function getAction(name) return _G.CadActions and _G.CadActions[name] end
+
+local Client = {}
 
 local uiOpen = false
 local canUseCad = false
@@ -45,12 +49,12 @@ local function asVector3(value)
 end
 
 local function isVirtualReaderEnabled()
-    local readerCfg = CAD.Config.Forensics and CAD.Config.Forensics.IdReader or {}
+    local readerCfg = Config.Forensics and Config.Forensics.IdReader or {}
     return readerCfg.Enabled == true and readerCfg.UseVirtualContainer == true
 end
 
 local function isVirtualEvidenceEnabled()
-    local evidenceCfg = CAD.Config.Evidence or {}
+    local evidenceCfg = Config.Evidence or {}
     return evidenceCfg.UseVirtualContainer ~= false
 end
 
@@ -86,7 +90,7 @@ local function getNearestTerminal()
     end
 
     local coords = GetEntityCoords(ped)
-    local points = CAD.Config.UI.AccessPoints or {}
+    local points = Config.UI.AccessPoints or {}
     local nearest, nearestDistance = nil, nil
 
     for i = 1, #points do
@@ -130,7 +134,7 @@ end
 
 local function getReaderDistance(point)
     local reader = type(point.idReader) == 'table' and point.idReader or {}
-    local globalCfg = CAD.Config.Forensics and CAD.Config.Forensics.IdReader or {}
+    local globalCfg = Config.Forensics and Config.Forensics.IdReader or {}
     return tonumber(reader.interactionDistance) or tonumber(globalCfg.InteractionDistance) or 1.6
 end
 
@@ -164,7 +168,7 @@ local function getLockerDistance(point)
 end
 
 local function playCardSwipeAnimation()
-    local readerCfg = CAD.Config.Forensics and CAD.Config.Forensics.IdReader or {}
+    local readerCfg = Config.Forensics and Config.Forensics.IdReader or {}
     local cardModelName = tostring(readerCfg.CardModel or 'prop_cs_swipe_card')
     local ped = cache.ped or PlayerPedId()
     if not ped or ped == 0 then
@@ -607,7 +611,7 @@ local function refreshAccess()
 end
 
 local function setupAccessZones()
-    local points = CAD.Config.UI.AccessPoints or {}
+    local points = Config.UI.AccessPoints or {}
 
     if useTargetAccess then
         for i = 1, #points do
@@ -617,7 +621,7 @@ local function setupAccessZones()
                 name = zoneName,
                 coords = point.coords,
                 radius = point.radius or 1.25,
-                debug = CAD.Config.Debug == true,
+                debug = Config.Debug == true,
                 options = {
                     {
                         name = ('%s_option'):format(zoneName),
@@ -628,7 +632,7 @@ local function setupAccessZones()
                         end,
                         onSelect = function()
                             setActiveTerminal(point, i)
-                            CAD.Client.SetUIState(true)
+                            Client.SetUIState(true)
                         end,
                     },
                 },
@@ -650,7 +654,7 @@ local function setupAccessZones()
                 if IsControlJustPressed(0, 38) then
                     if canUseCad then
                         setActiveTerminal(point, i)
-                        CAD.Client.SetUIState(true)
+                        Client.SetUIState(true)
                     else
                         lib.notify({ title = 'CAD', description = 'No tienes acceso al CAD', type = 'error' })
                     end
@@ -668,7 +672,7 @@ local function setupReaderZones()
         return
     end
 
-    local points = CAD.Config.UI.AccessPoints or {}
+    local points = Config.UI.AccessPoints or {}
     for i = 1, #points do
         local point = points[i]
         local reader = type(point.idReader) == 'table' and point.idReader or nil
@@ -685,7 +689,7 @@ local function setupReaderZones()
                         name = zoneName,
                         coords = coords,
                         radius = radius,
-                        debug = CAD.Config.Debug == true,
+                        debug = Config.Debug == true,
                         options = {
                             {
                                 name = ('%s_insert'):format(zoneName),
@@ -759,7 +763,7 @@ local function setupLockerZones()
         return
     end
 
-    local points = CAD.Config.UI.AccessPoints or {}
+    local points = Config.UI.AccessPoints or {}
     for i = 1, #points do
         local point = points[i]
         local container = type(point.evidenceContainer) == 'table' and point.evidenceContainer or nil
@@ -776,7 +780,7 @@ local function setupLockerZones()
                         name = zoneName,
                         coords = coords,
                         radius = radius,
-                        debug = CAD.Config.Debug == true,
+                        debug = Config.Debug == true,
                         options = {
                             {
                                 name = ('%s_store'):format(zoneName),
@@ -846,7 +850,7 @@ local function setupLockerZones()
 end
 
 local function setupFrameworkBridge()
-    CAD.Core.Client.RegisterAccessEvents(refreshAccess)
+    Core.RegisterAccessEvents(refreshAccess)
 end
 
 ---@param payload DispatchPublicStatePayload|nil
@@ -906,7 +910,7 @@ local function pushCasesPublicStateToUi(payload, force)
     })
 end
 
-function CAD.Client.SetUIState(open)
+function Client.SetUIState(open)
     if open == true then
         local nearest = getNearestTerminal()
         if nearest then
@@ -945,8 +949,9 @@ function CAD.Client.SetUIState(open)
         pushDispatchPublicStateToUi(GlobalState and GlobalState.cad_dispatch_public or nil, true)
         pushCasesPublicStateToUi(GlobalState and GlobalState.cad_cases_public or nil, true)
     else
-        if CAD.SecurityCamera and CAD.SecurityCamera.StopWatch then
-            CAD.SecurityCamera.StopWatch()
+        local SecurityCameraAction = getAction('SecurityCamera')
+        if SecurityCameraAction and SecurityCameraAction.StopWatch then
+            SecurityCameraAction.StopWatch()
         end
 
         SendNUIMessage({
@@ -976,7 +981,7 @@ if type(AddStateBagChangeHandler) == 'function' then
     end)
 end
 
-function CAD.Client.GetComputerContext()
+function Client.GetComputerContext()
     if not activeTerminalContext then
         local nearest = getNearestTerminal()
         if nearest then
@@ -1002,41 +1007,42 @@ function CAD.Client.GetComputerContext()
     }
 end
 
-function CAD.Client.ToggleUI()
-    if CAD.Vehicle and CAD.Vehicle.IsPoliceVehicleContext and CAD.Vehicle.OpenTablet then
-        local inVehicleTabletContext = CAD.Vehicle.IsPoliceVehicleContext() == true
+function Client.ToggleUI()
+    local VehicleAction = getAction('Vehicle')
+    if VehicleAction and VehicleAction.IsPoliceVehicleContext and VehicleAction.OpenTablet then
+        local inVehicleTabletContext = VehicleAction.IsPoliceVehicleContext() == true
         if inVehicleTabletContext then
-            local isTabletOpen = CAD.Vehicle.IsTabletOpen and CAD.Vehicle.IsTabletOpen() == true
+            local isTabletOpen = VehicleAction.IsTabletOpen and VehicleAction.IsTabletOpen() == true
             if isTabletOpen then
-                if CAD.Vehicle.CloseTablet then
-                    CAD.Vehicle.CloseTablet(true)
+                if VehicleAction.CloseTablet then
+                    VehicleAction.CloseTablet(true)
                 else
-                    CAD.Client.SetUIState(false)
+                    Client.SetUIState(false)
                 end
             else
-                CAD.Vehicle.OpenTablet(false)
+                VehicleAction.OpenTablet(false)
             end
             return
         end
     end
 
-    CAD.Client.SetUIState(not uiOpen)
+    Client.SetUIState(not uiOpen)
 end
 
-RegisterCommand(CAD.Config.UI.Command, function()
+RegisterCommand(Config.UI.Command, function()
     if not canUseCad then
         lib.notify({ title = 'CAD', description = 'No tienes acceso al CAD', type = 'error' })
         return
     end
-    CAD.Client.ToggleUI()
+    Client.ToggleUI()
 end, false)
 
-if CAD.Config.UI.Keybind then
-    RegisterKeyMapping(CAD.Config.UI.Command, 'Open CAD', 'keyboard', CAD.Config.UI.Keybind)
+if Config.UI.Keybind then
+    RegisterKeyMapping(Config.UI.Command, 'Open CAD', 'keyboard', Config.UI.Keybind)
 end
 
 RegisterNUICallback('closeUI', function(_, cb)
-    CAD.Client.SetUIState(false)
+    Client.SetUIState(false)
     cb({ ok = true })
 end)
 
@@ -1044,7 +1050,7 @@ CreateThread(function()
     Wait(1000)
     refreshAccess()
 
-    local mode = tostring((CAD.Config.UI.AccessMode or 'auto')):lower()
+    local mode = tostring((Config.UI.AccessMode or 'auto')):lower()
     useTargetAccess = mode ~= 'zone' and GetResourceState('ox_target') == 'started'
 
     setupFrameworkBridge()
@@ -1054,12 +1060,12 @@ CreateThread(function()
 end)
 
 CreateThread(function()
-    if CAD.IsFeatureEnabled and not CAD.IsFeatureEnabled('Dispatch') then
+    if not Config.IsFeatureEnabled('Dispatch') then
         return
     end
 
     while true do
-        Wait(CAD.Config.Dispatch.PositionBroadcastMs)
+        Wait(Config.Dispatch.PositionBroadcastMs)
 
         local ped = cache.ped
         if ped and ped ~= 0 then
@@ -1099,7 +1105,7 @@ AddEventHandler('onResourceStop', function(resourceName)
     end
 
     lib.hideTextUI()
-    CAD.Client.SetUIState(false)
+    Client.SetUIState(false)
 end)
 
 RegisterNetEvent('cad:client:evidenceStaged')
@@ -1206,3 +1212,6 @@ RegisterNetEvent('cad:client:syncOffline')
 AddEventHandler('cad:client:syncOffline', function(data)
     SendNUIMessage({ action = 'cad:syncOffline', data = data })
 end)
+
+_G.CadActions = _G.CadActions or {}
+_G.CadActions.Client = Client

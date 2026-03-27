@@ -1,6 +1,5 @@
-CAD = CAD or {}
-CAD.Forensic = CAD.Forensic or {}
-CAD.Forensic.Fingerprints = CAD.Forensic.Fingerprints or {}
+local State = require 'modules.shared.state'
+local EvidenceTypes = require 'shared.evidence_types'
 
 local function getPed()
     return cache.ped or PlayerPedId()
@@ -21,7 +20,7 @@ local function isWearingGloves()
 end
 
 local function isCrimeContext()
-    local calls = CAD.State.Dispatch.Calls or {}
+    local calls = State.Dispatch.Calls or {}
     for _, call in pairs(calls) do
         if type(call) == 'table' and call.status == 'ACTIVE' then
             return true
@@ -36,7 +35,7 @@ local function createFingerprintEvidence(entity, boneName, surfaceType)
         return
     end
 
-    local config = CAD.EvidenceTypes.GetType('fingerprint')
+    local config = EvidenceTypes.GetType('fingerprint')
     if not config then
         return
     end

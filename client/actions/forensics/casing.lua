@@ -1,6 +1,5 @@
-CAD = CAD or {}
-CAD.Forensic = CAD.Forensic or {}
-CAD.Forensic.Casings = CAD.Forensic.Casings or {}
+local State = require 'modules.shared.state'
+local EvidenceTypes = require 'shared.evidence_types'
 
 local lastEmitAt = 0
 
@@ -9,7 +8,7 @@ local function getPed()
 end
 
 local function isCrimeContext()
-    local calls = CAD.State.Dispatch.Calls or {}
+    local calls = State.Dispatch.Calls or {}
     for _, call in pairs(calls) do
         if type(call) == 'table' and call.status == 'ACTIVE' then
             return true
@@ -57,7 +56,7 @@ AddEventHandler('gameEventTriggered', function(name, args)
         return
     end
 
-    local config = CAD.EvidenceTypes.GetType('casing')
+    local config = EvidenceTypes.GetType('casing')
     if not config then
         return
     end

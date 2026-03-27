@@ -1,8 +1,13 @@
+local Config = require 'modules.shared.config'
+local Utils = require 'modules.shared.utils'
+
+local function getAction(name) return _G.CadActions and _G.CadActions[name] end
+
 local function wrapNui(name, handler)
     RegisterNUICallback(name, function(data, cb)
         local ok, result = pcall(handler, data or {})
         if not ok then
-            CAD.Log('error', 'NUI callback %s failed: %s', name, tostring(result))
+            Utils.Log('error', 'NUI callback %s failed: %s', name, tostring(result))
             cb({ ok = false, error = 'internal_error' })
             return
         end
@@ -26,23 +31,17 @@ wrapNui('getPlayerData', bridge('cad:getPlayerData'))
 
 wrapNui('cad:getUiFeatures', function()
     local function featureEnabled(name)
-        if CAD.IsFeatureEnabled then
-            return CAD.IsFeatureEnabled(name)
-        end
-        return true
+        return Config.IsFeatureEnabled(name)
     end
 
     local function featureVisible(name, fallback)
-        if CAD.IsFeatureVisibleInUI then
-            return CAD.IsFeatureVisibleInUI(name)
-        end
-        return fallback
+        return Config.IsFeatureVisibleInUI(name)
     end
 
-    local dispatchEnabled = (CAD.Config.Dispatch.Enabled ~= false) and featureEnabled('Dispatch')
+    local dispatchEnabled = (Config.Dispatch.Enabled ~= false) and featureEnabled('Dispatch')
     local dispatchVisible = dispatchEnabled and featureVisible('Dispatch', true)
 
-    local forensicsEnabled = (CAD.Config.ForensicLabs.Enabled ~= false) and featureEnabled('Forensics')
+    local forensicsEnabled = (Config.ForensicLabs.Enabled ~= false) and featureEnabled('Forensics')
     local forensicsVisible = forensicsEnabled and featureVisible('Forensics', true)
 
     local newsEnabled = featureEnabled('News')
@@ -72,7 +71,7 @@ wrapNui('cad:getUiFeatures', function()
         news = {
             enabled = newsEnabled,
             visible = newsVisible,
-            publishWithoutConfirm = CAD.Config.News and CAD.Config.News.PublishWithoutConfirm == true,
+            publishWithoutConfirm = Config.News and Config.News.PublishWithoutConfirm == true,
         },
         ems = {
             enabled = emsEnabled,
@@ -94,20 +93,11 @@ wrapNui('cad:getUiFeatures', function()
 end)
 
 wrapNui('cad:getCodeCatalog', function()
-    if CAD.GetCodeCatalog then
-        return CAD.GetCodeCatalog()
-    end
-
-    return {
-        tenCodes = {},
-        priorityCodes = {},
-        caseTypes = {},
-        statusCodes = {},
-    }
+    return require('shared.catalogs.codes').Get()
 end)
 
 wrapNui('cad:getDispatchSettings', function()
-    local dispatch = CAD.Config.Dispatch or {}
+    local dispatch = Config.Dispatch or {}
     local callTypeOptions = dispatch.CallTypeOptions
     if type(callTypeOptions) ~= 'table' or #callTypeOptions == 0 then
         callTypeOptions = { 'GENERAL' }
@@ -119,8 +109,9 @@ wrapNui('cad:getDispatchSettings', function()
 end)
 
 wrapNui('cad:getComputerContext', function()
-    if CAD.Client.GetComputerContext then
-        return CAD.Client.GetComputerContext()
+    local ClientAction = getAction('Client')
+    if ClientAction and ClientAction.GetComputerContext then
+        return ClientAction.GetComputerContext()
     end
 
     return {
@@ -130,8 +121,9 @@ wrapNui('cad:getComputerContext', function()
 end)
 
 wrapNui('cad:vehicle:getContext', function()
-    if CAD.Vehicle and CAD.Vehicle.GetContext then
-        return CAD.Vehicle.GetContext()
+    local VehicleAction = getAction('Vehicle')
+    if VehicleAction and VehicleAction.GetContext then
+        return VehicleAction.GetContext()
     end
 
     return {
@@ -141,8 +133,9 @@ wrapNui('cad:vehicle:getContext', function()
 end)
 
 wrapNui('cad:vehicle:getReaderContext', function()
-    if CAD.Vehicle and CAD.Vehicle.GetReaderContext then
-        return CAD.Vehicle.GetReaderContext()
+    local VehicleAction = getAction('Vehicle')
+    if VehicleAction and VehicleAction.GetReaderContext then
+        return VehicleAction.GetReaderContext()
     end
 
     return {
@@ -152,8 +145,9 @@ wrapNui('cad:vehicle:getReaderContext', function()
 end)
 
 wrapNui('cad:vehicle:setOpen', function(payload)
-    if CAD.Vehicle and CAD.Vehicle.SetTabletOpen then
-        return CAD.Vehicle.SetTabletOpen(payload and payload.open == true)
+    local VehicleAction = getAction('Vehicle')
+    if VehicleAction and VehicleAction.SetTabletOpen then
+        return VehicleAction.SetTabletOpen(payload and payload.open == true)
     end
 
     return {
@@ -163,8 +157,9 @@ wrapNui('cad:vehicle:setOpen', function(payload)
 end)
 
 wrapNui('cad:vehicle:scanFront', function(payload)
-    if CAD.Vehicle and CAD.Vehicle.ScanFront then
-        return CAD.Vehicle.ScanFront(payload or {})
+    local VehicleAction = getAction('Vehicle')
+    if VehicleAction and VehicleAction.ScanFront then
+        return VehicleAction.ScanFront(payload or {})
     end
 
     return {
@@ -174,8 +169,9 @@ wrapNui('cad:vehicle:scanFront', function(payload)
 end)
 
 wrapNui('cad:vehicle:playAlert', function(payload)
-    if CAD.Vehicle and CAD.Vehicle.PlayAlert then
-        return CAD.Vehicle.PlayAlert(payload or {})
+    local VehicleAction = getAction('Vehicle')
+    if VehicleAction and VehicleAction.PlayAlert then
+        return VehicleAction.PlayAlert(payload or {})
     end
 
     return {
@@ -252,8 +248,9 @@ wrapNui('cad:cameras:get', bridge('cad:cameras:get'))
 wrapNui('cad:cameras:setStatus', bridge('cad:cameras:setStatus'))
 wrapNui('cad:cameras:remove', bridge('cad:cameras:remove'))
 wrapNui('cad:cameras:watch', function(payload)
-    if CAD.SecurityCamera and CAD.SecurityCamera.StartWatch then
-        return CAD.SecurityCamera.StartWatch(payload or {})
+    local SecurityCameraAction = getAction('SecurityCamera')
+    if SecurityCameraAction and SecurityCameraAction.StartWatch then
+        return SecurityCameraAction.StartWatch(payload or {})
     end
 
     return {
@@ -262,8 +259,9 @@ wrapNui('cad:cameras:watch', function(payload)
     }
 end)
 wrapNui('cad:cameras:stopWatch', function()
-    if CAD.SecurityCamera and CAD.SecurityCamera.StopWatch then
-        return CAD.SecurityCamera.StopWatch()
+    local SecurityCameraAction = getAction('SecurityCamera')
+    if SecurityCameraAction and SecurityCameraAction.StopWatch then
+        return SecurityCameraAction.StopWatch()
     end
 
     return {

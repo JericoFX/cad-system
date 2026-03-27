@@ -1,5 +1,7 @@
-CAD = CAD or {}
-CAD.SecurityCamera = CAD.SecurityCamera or {}
+local Config = require 'modules.shared.config'
+local ClientFn = require 'modules.client.functions'
+
+local SecurityCamera = {}
 
 local state = {
     installing = false,
@@ -8,7 +10,7 @@ local state = {
 }
 
 local function getCameraConfig()
-    return CAD.Config.SecurityCameras or {}
+    return Config.SecurityCameras or {}
 end
 
 local function notify(message, nType)
@@ -301,14 +303,11 @@ local function buildAddress(coords)
         crossStreet = GetStreetNameFromHashKey(crossingHash)
     end
 
-    if street == '' and CAD.Client and CAD.Client.GetStreetName then
-        street = CAD.Client.GetStreetName(coords) or ''
+    if street == '' then
+        street = ClientFn.GetStreetName(coords) or ''
     end
 
-    local zone = ''
-    if CAD.Client and CAD.Client.GetZoneName then
-        zone = CAD.Client.GetZoneName(coords) or ''
-    end
+    local zone = ClientFn.GetZoneName(coords) or ''
 
     local display = street
     if display == '' then
@@ -484,7 +483,7 @@ local function startWatchInternal(camera)
     return true
 end
 
-function CAD.SecurityCamera.StartWatch(payload)
+function SecurityCamera.StartWatch(payload)
     local cameraId = payload and tostring(payload.cameraId or '') or ''
     if cameraId == '' then
         return {
@@ -526,7 +525,7 @@ function CAD.SecurityCamera.StartWatch(payload)
     }
 end
 
-function CAD.SecurityCamera.StopWatch()
+function SecurityCamera.StopWatch()
     stopWatchInternal()
     return {
         ok = true,
@@ -551,3 +550,6 @@ AddEventHandler('onResourceStop', function(resourceName)
 
     stopWatchInternal()
 end)
+
+_G.CadActions = _G.CadActions or {}
+_G.CadActions.SecurityCamera = SecurityCamera
