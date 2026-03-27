@@ -1,7 +1,10 @@
+local Config = require 'modules.shared.config'
+local State = require 'modules.shared.state'
+local Utils = require 'modules.shared.utils'
+local Auth = require 'modules.server.auth'
+local Fn = require 'modules.server.functions'
 
-
-CAD = CAD or {}
-CAD.Cases = CAD.Cases or {}
+local Cases = {}
 
 ---@class CaseRecord
 ---@field caseId string
@@ -23,16 +26,16 @@ CAD.Cases = CAD.Cases or {}
 ---@field evidence table[]
 ---@field tasks table[]
 
-local cases = CAD.State.Cases
+local cases = State.Cases
 local casesPublicRev = 0
 local casesPublicFingerprint = ''
 
-local casesPublicCfg = CAD.Config.Cases and CAD.Config.Cases.PublicState or {}
+local casesPublicCfg = Config.Cases and Config.Cases.PublicState or {}
 local CASES_PUBLIC_CLOSED_TTL_MINUTES = math.max(1, tonumber(casesPublicCfg.ClosedRetentionMinutes) or 10)
 local CASES_PUBLIC_MAX_CASES = math.max(10, tonumber(casesPublicCfg.MaxCases) or 300)
 
 local function cloneTable(value)
-    return CAD.DeepCopy(value)
+    return lib.table.deepclone(value)
 end
 
 ---@param value string|nil
@@ -182,12 +185,12 @@ local function publishCasesPublicState(force)
 
     GlobalState:set('cad_cases_public', {
         rev = casesPublicRev,
-        generatedAt = CAD.Server.ToIso(),
+        generatedAt = Utils.ToIso(),
         cases = core,
     }, true)
 end
 
-CAD.Cases.PublishPublicState = publishCasesPublicState
+Cases.PublishPublicState = publishCasesPublicState
 
 local function caseToClient(caseObj)
     return {
@@ -260,14 +263,14 @@ local function saveCaseDb(caseObj)
     end)
 
     if not ok then
-        CAD.Log('error', 'Failed saving case %s: %s', tostring(caseObj and caseObj.caseId), tostring(err))
+        Utils.Log('error', 'Failed saving case %s: %s', tostring(caseObj and caseObj.caseId), tostring(err))
         return false, 'db_write_failed'
     end
 
     return true
 end
 
-lib.callback.register('cad:createCase', CAD.Auth.WithGuard('heavy', function(source, payload, officer)
+lib.callback.register('cad:createCase', Auth.WithGuard('heavy', function(source, payload, officer)
 
     local job = tostring(officer.job or ''):lower()
     local allowedJobs = { police = true, sheriff = true, dispatch = true, ems = true, ambulance = true }
@@ -275,15 +278,15 @@ lib.callback.register('cad:createCase', CAD.Auth.WithGuard('heavy', function(sou
         return { ok = false, error = 'insufficient_permissions' }
     end
 
-    local title = CAD.Server.SanitizeString(payload.title, 255)
+    local title = Fn.SanitizeString(payload.title, 255)
     if title == '' then
         return { ok = false, error = 'title_required' }
     end
 
     local caseType = tostring(payload.caseType or 'GENERAL'):upper()
     local isValidType = false
-    for i = 1, #CAD.Config.Cases.Types do
-        if CAD.Config.Cases.Types[i] == caseType then
+    for i = 1, #Config.Cases.Types do
+        if Config.Cases.Types[i] == caseType then
             isValidType = true
             break
         end
@@ -292,15 +295,15 @@ lib.callback.register('cad:createCase', CAD.Auth.WithGuard('heavy', function(sou
         caseType = 'GENERAL'
     end
 
-    local now = CAD.Server.ToIso()
-    local caseId = CAD.Server.GenerateId('CASE')
+    local now = Utils.ToIso()
+    local caseId = Utils.GenerateId('CASE')
 
     local caseObj = {
         caseId = caseId,
         caseType = caseType,
         title = title,
-        description = CAD.Server.SanitizeString(payload.description, 2000),
-        status = CAD.Config.Cases.DefaultStatus,
+        description = Fn.SanitizeString(payload.description, 2000),
+        status = Config.Cases.DefaultStatus,
         priority = math.max(1, math.min(5, tonumber(payload.priority) or 2)),
         createdBy = officer.identifier,
         assignedTo = payload.assignedTo or nil,
@@ -328,7 +331,7 @@ lib.callback.register('cad:createCase', CAD.Auth.WithGuard('heavy', function(sou
     return caseToClient(caseObj)
 end))
 
-lib.callback.register('cad:getCase', CAD.Auth.WithGuard('default', function(_, payload)
+lib.callback.register('cad:getCase', Auth.WithGuard('default', function(_, payload)
     local caseId = type(payload) == 'string' and payload or payload.caseId or payload.id
     if not caseId then
         return { ok = false, error = 'case_id_required' }
@@ -340,8 +343,8 @@ lib.callback.register('cad:getCase', CAD.Auth.WithGuard('default', function(_, p
     return caseToClient(caseObj)
 end))
 
-lib.callback.register('cad:searchCases', CAD.Auth.WithGuard('default', function(_, payload)
-    local query = string.lower(CAD.Server.SanitizeString(payload.query or payload.searchTerm or '', 120))
+lib.callback.register('cad:searchCases', Auth.WithGuard('default', function(_, payload)
+    local query = string.lower(Fn.SanitizeString(payload.query or payload.searchTerm or '', 120))
     local status = payload.status and string.upper(tostring(payload.status)) or nil
     local priority = payload.priority and tonumber(payload.priority) or nil
 
@@ -372,7 +375,7 @@ lib.callback.register('cad:searchCases', CAD.Auth.WithGuard('default', function(
     return out
 end))
 
-lib.callback.register('cad:updateCase', CAD.Auth.WithGuard('heavy', function(_, payload)
+lib.callback.register('cad:updateCase', Auth.WithGuard('heavy', function(_, payload)
     local caseId = payload.caseId or payload.id
     if not caseId then
         return { ok = false, error = 'case_id_required' }
@@ -385,8 +388,8 @@ lib.callback.register('cad:updateCase', CAD.Auth.WithGuard('heavy', function(_, 
 
     local previous = cloneTable(caseObj)
 
-    if payload.title then caseObj.title = CAD.Server.SanitizeString(payload.title, 255) end
-    if payload.description then caseObj.description = CAD.Server.SanitizeString(payload.description, 2000) end
+    if payload.title then caseObj.title = Fn.SanitizeString(payload.title, 255) end
+    if payload.description then caseObj.description = Fn.SanitizeString(payload.description, 2000) end
     if payload.status then caseObj.status = string.upper(tostring(payload.status)) end
     if payload.priority then caseObj.priority = math.max(1, math.min(5, tonumber(payload.priority) or caseObj.priority)) end
     if payload.assignedTo ~= nil then caseObj.assignedTo = payload.assignedTo end
@@ -394,12 +397,12 @@ lib.callback.register('cad:updateCase', CAD.Auth.WithGuard('heavy', function(_, 
     if payload.linkedUnits ~= nil and type(payload.linkedUnits) == 'table' then caseObj.linkedUnits = payload.linkedUnits end
 
     if caseObj.status == 'CLOSED' then
-        caseObj.closedAt = caseObj.closedAt or CAD.Server.ToIso()
+        caseObj.closedAt = caseObj.closedAt or Utils.ToIso()
     else
         caseObj.closedAt = nil
     end
 
-    caseObj.updatedAt = CAD.Server.ToIso()
+    caseObj.updatedAt = Utils.ToIso()
     local saved, saveErr = saveCaseDb(caseObj)
     if not saved then
         for key in pairs(caseObj) do
@@ -416,7 +419,7 @@ lib.callback.register('cad:updateCase', CAD.Auth.WithGuard('heavy', function(_, 
     return caseToClient(caseObj)
 end))
 
-lib.callback.register('cad:closeCase', CAD.Auth.WithGuard('heavy', function(_, payload)
+lib.callback.register('cad:closeCase', Auth.WithGuard('heavy', function(_, payload)
     local caseId = type(payload) == 'string' and payload or payload.caseId or payload.id
     if not caseId then
         return { ok = false, error = 'case_id_required' }
@@ -431,7 +434,7 @@ lib.callback.register('cad:closeCase', CAD.Auth.WithGuard('heavy', function(_, p
     local previousUpdatedAt = caseObj.updatedAt
     local previousClosedAt = caseObj.closedAt
     caseObj.status = 'CLOSED'
-    caseObj.updatedAt = CAD.Server.ToIso()
+    caseObj.updatedAt = Utils.ToIso()
     caseObj.closedAt = caseObj.updatedAt
     local saved, saveErr = saveCaseDb(caseObj)
     if not saved then
@@ -446,13 +449,13 @@ lib.callback.register('cad:closeCase', CAD.Auth.WithGuard('heavy', function(_, p
     return { ok = true, success = true, caseId = caseId }
 end))
 
-lib.callback.register("cad:case:printReport", CAD.Auth.WithGuard("default", function(source, payload)
+lib.callback.register("cad:case:printReport", Auth.WithGuard("default", function(source, payload)
     local caseId = payload and payload.caseId
     if not caseId then
         return { ok = false, error = "case_id_required" }
     end
 
-    local officer = CAD.Auth.GetOfficer(source)
+    local officer = Auth.GetOfficer(source)
     if not officer then
         return { ok = false, error = "officer_not_found" }
     end
@@ -495,8 +498,8 @@ Badge: %s
     )
 
     local itemId = nil
-    if GetResourceState('ox_inventory') == 'started' and CAD.Config.Evidence and CAD.Config.Evidence.TicketItemName then
-        local itemName = CAD.Config.Evidence.TicketItemName
+    if GetResourceState('ox_inventory') == 'started' and Config.Evidence and Config.Evidence.TicketItemName then
+        local itemName = Config.Evidence.TicketItemName
 
         local itemExists = pcall(function()
             return exports.ox_inventory:GetItem(source, itemName, nil, false)
@@ -507,7 +510,7 @@ Badge: %s
                 caseId = caseId,
                 reportType = "CASE_REPORT",
                 printedBy = officer.name,
-                printedAt = CAD.Server.ToIso(),
+                printedAt = Utils.ToIso(),
                 description = string.format("Case %s Report", caseId)
             }
 
@@ -518,10 +521,10 @@ Badge: %s
             if success and result then
                 itemId = result
             else
-                CAD.Log('warn', 'Failed to add case report item for officer %s: %s', source, tostring(result))
+                Utils.Log('warn', 'Failed to add case report item for officer %s: %s', source, tostring(result))
             end
         else
-            CAD.Log('warn', 'Case report item %s does not exist in ox_inventory', itemName)
+            Utils.Log('warn', 'Case report item %s does not exist in ox_inventory', itemName)
         end
     end
 
@@ -543,3 +546,6 @@ CreateThread(function()
         publishCasesPublicState(false)
     end
 end)
+
+_G.CadActions = _G.CadActions or {}
+_G.CadActions.Cases = Cases

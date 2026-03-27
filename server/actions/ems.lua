@@ -1,10 +1,14 @@
+local Config = require 'modules.shared.config'
+local State = require 'modules.shared.state'
+local Utils = require 'modules.shared.utils'
+local Auth = require 'modules.server.auth'
+local Fn = require 'modules.server.functions'
+
+local function getAction(name) return _G.CadActions and _G.CadActions[name] end
 
 
-CAD = CAD or {}
-CAD.EMS = CAD.EMS or {}
-
-local alerts = CAD.State.EMS.Alerts
-local bloodRequests = CAD.State.EMS.BloodRequests
+local alerts = State.EMS.Alerts
+local bloodRequests = State.EMS.BloodRequests
 local createAlert
 
 local BLOOD_REQUEST_STATUSES = {
@@ -19,8 +23,8 @@ local BLOOD_REQUEST_STATUSES = {
 local bloodSampleStashRegistered = false
 
 local function isEmsEnabled()
-    if CAD.IsFeatureEnabled then
-        return CAD.IsFeatureEnabled('EMS')
+    if Config.IsFeatureEnabled then
+        return Config.IsFeatureEnabled('EMS')
     end
 
     return true
@@ -31,16 +35,16 @@ local function emsDisabledResponse()
 end
 
 local function isBloodSampleVirtualEnabled()
-    local cfg = CAD.Config.Forensics and CAD.Config.Forensics.BloodSampleContainer or {}
+    local cfg = Config.Forensics and Config.Forensics.BloodSampleContainer or {}
     if cfg.enabled == false then
         return false
     end
 
-    return CAD.VirtualContainer ~= nil
+    return getAction("VirtualContainer") ~= nil
 end
 
 local function getBloodSampleContainerConfig()
-    local forensics = CAD.Config.Forensics or {}
+    local forensics = Config.Forensics or {}
     local cfg = forensics.BloodSampleContainer or {}
     local stashCfg = forensics.BloodSampleStash or {}
     local fallbackKey = tostring(stashCfg.stashId or 'cad_ems_blood_lab')
@@ -60,7 +64,7 @@ local function ensureBloodSampleContainer()
     end
 
     local cfg = getBloodSampleContainerConfig()
-    local container, ensureErr = CAD.VirtualContainer.Ensure(cfg.containerKey, {
+    local container, ensureErr = getAction("VirtualContainer") and getAction("VirtualContainer").Ensure(cfg.containerKey, {
         containerType = 'blood_lab',
         endpointId = 'ems_blood_lab',
         slotCount = cfg.slotCount,
@@ -94,7 +98,7 @@ local function getNowMs()
 end
 
 local function getBloodAnalysisDurationMs()
-    local configured = tonumber(CAD.Config.Forensics and CAD.Config.Forensics.BloodAnalysisDurationMs) or 45000
+    local configured = tonumber(Config.Forensics and Config.Forensics.BloodAnalysisDurationMs) or 45000
     if configured < 1000 then
         configured = 1000
     end
@@ -102,7 +106,7 @@ local function getBloodAnalysisDurationMs()
 end
 
 local function getBloodPostAnalysisMode()
-    local cfg = CAD.Config.Forensics and CAD.Config.Forensics.BloodPostAnalysis or {}
+    local cfg = Config.Forensics and Config.Forensics.BloodPostAnalysis or {}
     local mode = tostring(cfg.mode or 'reminder'):lower()
     if mode ~= 'disabled' and mode ~= 'reminder' and mode ~= 'auto_send' then
         return 'reminder'
@@ -111,7 +115,7 @@ local function getBloodPostAnalysisMode()
 end
 
 local function getBloodPostAnalysisTimeoutMs()
-    local cfg = CAD.Config.Forensics and CAD.Config.Forensics.BloodPostAnalysis or {}
+    local cfg = Config.Forensics and Config.Forensics.BloodPostAnalysis or {}
     local timeoutMs = tonumber(cfg.timeoutMs) or 120000
     if timeoutMs < 1000 then
         timeoutMs = 1000
@@ -120,7 +124,7 @@ local function getBloodPostAnalysisTimeoutMs()
 end
 
 local function getBloodReminderIntervalMs()
-    local cfg = CAD.Config.Forensics and CAD.Config.Forensics.BloodPostAnalysis or {}
+    local cfg = Config.Forensics and Config.Forensics.BloodPostAnalysis or {}
     local intervalMs = tonumber(cfg.reminderIntervalMs) or 120000
     if intervalMs < 1000 then
         intervalMs = 1000
@@ -130,20 +134,20 @@ end
 
 local function getBloodToxicologySnapshot(request)
     local snapshot = {
-        testedAt = CAD.Server.ToIso(),
+        testedAt = Utils.ToIso(),
         isPositive = false,
         activeCount = 0,
         substances = {},
         source = 'QBCORE_METADATA',
     }
 
-    local toxicology = CAD.Forensic and CAD.Forensic.Toxicology or nil
+    local toxicology = getAction("Forensic") and getAction("Forensic").Toxicology or nil
     if type(toxicology) ~= 'table' or type(toxicology.GetSnapshotForCitizen) ~= 'function' then
         snapshot.source = 'UNAVAILABLE'
         return snapshot
     end
 
-    local citizenId = CAD.Server.SanitizeString(request and request.citizenId, 64)
+    local citizenId = Fn.SanitizeString(request and request.citizenId, 64)
     if citizenId == '' then
         return snapshot
     end
@@ -174,11 +178,11 @@ local function caseExists(caseId)
         return false
     end
 
-    return CAD.State.Cases[caseId] ~= nil
+    return State.Cases[caseId] ~= nil
 end
 
 local function snapshotTable(input)
-    return CAD.DeepCopy(input)
+    return lib.table.deepclone(input)
 end
 
 local function restoreTable(target, snapshot)
@@ -331,7 +335,7 @@ local function saveBloodRequestDb(request)
     end)
 
     if not ok then
-        CAD.Log('error', 'Failed saving blood request %s: %s', tostring(request.requestId), tostring(err))
+        Utils.Log('error', 'Failed saving blood request %s: %s', tostring(request.requestId), tostring(err))
         return false, 'db_write_failed'
     end
 
@@ -339,7 +343,7 @@ local function saveBloodRequestDb(request)
 end
 
 local function ensureBloodSampleStash()
-    local cfg = CAD.Config.Forensics and CAD.Config.Forensics.BloodSampleStash or nil
+    local cfg = Config.Forensics and Config.Forensics.BloodSampleStash or nil
     if type(cfg) ~= 'table' or cfg.enabled == false then
         return false, 'blood_sample_stash_disabled'
     end
@@ -374,7 +378,7 @@ local function ensureBloodSampleStash()
 end
 
 local function createBloodSampleItem(request, officer)
-    local itemName = tostring(CAD.Config.Forensics and CAD.Config.Forensics.BloodSampleItemName or 'cad_blood_sample')
+    local itemName = tostring(Config.Forensics and Config.Forensics.BloodSampleItemName or 'cad_blood_sample')
     local metadata = {
         requestId = request.requestId,
         caseId = request.caseId,
@@ -383,8 +387,8 @@ local function createBloodSampleItem(request, officer)
         reason = request.reason,
         collectedBy = officer.identifier,
         collectedByName = officer.name,
-        collectedAt = CAD.Server.ToIso(),
-        sealId = CAD.Server.GenerateId('SEAL'),
+        collectedAt = Utils.ToIso(),
+        sealId = Utils.GenerateId('SEAL'),
         toxicologySnapshot = getBloodToxicologySnapshot(request),
     }
 
@@ -399,13 +403,13 @@ local function createBloodSampleItem(request, officer)
             return false, 'blood_sample_container_full'
         end
 
-        local setOk, setErr = CAD.VirtualContainer.SetSlot(container.containerKey, freeSlot, {
+        local setOk, setErr = getAction("VirtualContainer").SetSlot(container.containerKey, freeSlot, {
             itemName = itemName,
             label = 'Blood Sample',
             count = 1,
             metadata = metadata,
             insertedBy = officer.identifier,
-            insertedAt = CAD.Server.ToIso(),
+            insertedAt = Utils.ToIso(),
         })
 
         if not setOk then
@@ -425,7 +429,7 @@ local function createBloodSampleItem(request, officer)
         return false, err
     end
 
-    local stashId = tostring((CAD.Config.Forensics and CAD.Config.Forensics.BloodSampleStash and CAD.Config.Forensics.BloodSampleStash.stashId) or
+    local stashId = tostring((Config.Forensics and Config.Forensics.BloodSampleStash and Config.Forensics.BloodSampleStash.stashId) or
     'cad_ems_blood_lab')
 
     local callOk, addOk, addResponse = pcall(function()
@@ -458,16 +462,16 @@ local function removeBloodSampleItem(request)
         return true
     end
 
-    if CAD.VirtualContainer and CAD.VirtualContainer.Get(request.sampleStashId) then
+    if getAction("VirtualContainer") and getAction("VirtualContainer").Get(request.sampleStashId) then
         if request.sampleSlot then
-            local clearOk, clearErr = CAD.VirtualContainer.ClearSlot(request.sampleStashId, tonumber(request.sampleSlot))
+            local clearOk, clearErr = getAction("VirtualContainer").ClearSlot(request.sampleStashId, tonumber(request.sampleSlot))
             if not clearOk then
                 return false, clearErr or 'cannot_remove_sample_item'
             end
         else
-            local slotIndex, _ = CAD.VirtualContainer.GetFirstOccupied(request.sampleStashId)
+            local slotIndex, _ = getAction("VirtualContainer").GetFirstOccupied(request.sampleStashId)
             if slotIndex then
-                local clearOk, clearErr = CAD.VirtualContainer.ClearSlot(request.sampleStashId, slotIndex)
+                local clearOk, clearErr = getAction("VirtualContainer").ClearSlot(request.sampleStashId, slotIndex)
                 if not clearOk then
                     return false, clearErr or 'cannot_remove_sample_item'
                 end
@@ -487,7 +491,7 @@ local function removeBloodSampleItem(request)
     end
 
     local itemName = request.sampleItemName or
-    tostring(CAD.Config.Forensics and CAD.Config.Forensics.BloodSampleItemName or 'cad_blood_sample')
+    tostring(Config.Forensics and Config.Forensics.BloodSampleItemName or 'cad_blood_sample')
     local removed, response
     local callOk = false
     if request.sampleSlot then
@@ -552,9 +556,9 @@ local function notifyOfficerByIdentifier(identifier, message, notificationType)
     local players = GetPlayers()
     for i = 1, #players do
         local source = tonumber(players[i])
-        local officer = CAD.Auth.GetOfficerData(source)
+        local officer = Auth.GetOfficerData(source)
         if officer and officer.identifier == identifier then
-            CAD.Server.Notify(source, message, notificationType)
+            Fn.Notify(source, message, notificationType)
             return
         end
     end
@@ -565,21 +569,21 @@ local function appendBloodEvidenceToCase(request, officer, notes)
         return nil, 'case_id_required'
     end
 
-    local caseObj = CAD.State.Cases[request.caseId]
+    local caseObj = State.Cases[request.caseId]
     if not caseObj then
         return nil, 'case_not_found'
     end
 
-    local nowIso = CAD.Server.ToIso()
+    local nowIso = Utils.ToIso()
     local toxicologySnapshot = nil
     if type(request.sampleMetadata) == 'table' and type(request.sampleMetadata.toxicologySnapshot) == 'table' then
-        toxicologySnapshot = CAD.DeepCopy(request.sampleMetadata.toxicologySnapshot)
+        toxicologySnapshot = lib.table.deepclone(request.sampleMetadata.toxicologySnapshot)
     else
         toxicologySnapshot = getBloodToxicologySnapshot(request)
     end
 
     local evidence = {
-        evidenceId = CAD.Server.GenerateId('EVID'),
+        evidenceId = Utils.GenerateId('EVID'),
         caseId = request.caseId,
         evidenceType = 'BLOOD',
         data = {
@@ -605,7 +609,7 @@ local function appendBloodEvidenceToCase(request, officer, notes)
         attachedAt = nowIso,
         custodyChain = {
             {
-                eventId = CAD.Server.GenerateId('CUSTODY'),
+                eventId = Utils.GenerateId('CUSTODY'),
                 evidenceId = '',
                 eventType = 'COLLECTED',
                 location = request.location or 'EMS Intake',
@@ -614,7 +618,7 @@ local function appendBloodEvidenceToCase(request, officer, notes)
                 recordedBy = officer.identifier,
             },
             {
-                eventId = CAD.Server.GenerateId('CUSTODY'),
+                eventId = Utils.GenerateId('CUSTODY'),
                 evidenceId = '',
                 eventType = 'ANALYZED',
                 location = 'EMS Lab',
@@ -623,7 +627,7 @@ local function appendBloodEvidenceToCase(request, officer, notes)
                 recordedBy = officer.identifier,
             },
             {
-                eventId = CAD.Server.GenerateId('CUSTODY'),
+                eventId = Utils.GenerateId('CUSTODY'),
                 evidenceId = '',
                 eventType = 'SUBMITTED',
                 location = 'CAD Case File',
@@ -638,8 +642,8 @@ local function appendBloodEvidenceToCase(request, officer, notes)
         evidence.custodyChain[i].evidenceId = evidence.evidenceId
     end
 
-    if CAD.Evidence and CAD.Evidence.AppendCaseEvidence then
-        local ok = CAD.Evidence.AppendCaseEvidence(request.caseId, evidence)
+    if getAction("Evidence") and getAction("Evidence").AppendCaseEvidence then
+        local ok = getAction("Evidence").AppendCaseEvidence(request.caseId, evidence)
         if not ok then
             return nil, 'cannot_attach_evidence'
         end
@@ -657,7 +661,7 @@ local function pushCaseBloodNote(request, emsOfficer, status, notes, evidenceId)
         return
     end
 
-    local caseObj = CAD.State.Cases[request.caseId]
+    local caseObj = State.Cases[request.caseId]
     caseObj.notes = caseObj.notes or {}
 
     local noteContent = ('Blood sample request %s\nPerson: %s (%s)\nRequested by: %s\nHandled by: %s\nEvidence ID: %s\nNotes: %s')
@@ -672,28 +676,28 @@ local function pushCaseBloodNote(request, emsOfficer, status, notes, evidenceId)
     )
 
     caseObj.notes[#caseObj.notes + 1] = {
-        id = CAD.Server.GenerateId('NOTE'),
+        id = Utils.GenerateId('NOTE'),
         caseId = request.caseId,
         author = emsOfficer.identifier,
         content = noteContent,
-        timestamp = CAD.Server.ToIso(),
+        timestamp = Utils.ToIso(),
         type = 'evidence',
     }
 end
 
 local function createBloodRequest(payload, officer)
     local request = {
-        requestId = CAD.Server.GenerateId('BLOODREQ'),
-        caseId = CAD.Server.SanitizeString(payload.caseId, 64),
-        citizenId = CAD.Server.SanitizeString(payload.citizenId, 64),
-        personName = CAD.Server.SanitizeString(payload.personName, 120),
-        reason = CAD.Server.SanitizeString(payload.reason, 500),
-        location = CAD.Server.SanitizeString(payload.location, 120),
+        requestId = Utils.GenerateId('BLOODREQ'),
+        caseId = Fn.SanitizeString(payload.caseId, 64),
+        citizenId = Fn.SanitizeString(payload.citizenId, 64),
+        personName = Fn.SanitizeString(payload.personName, 120),
+        reason = Fn.SanitizeString(payload.reason, 500),
+        location = Fn.SanitizeString(payload.location, 120),
         status = 'PENDING',
         requestedBy = officer.identifier,
         requestedByName = officer.name,
         requestedByJob = officer.job,
-        requestedAt = CAD.Server.ToIso(),
+        requestedAt = Utils.ToIso(),
         handledBy = nil,
         handledByName = nil,
         handledAt = nil,
@@ -715,7 +719,7 @@ local function createBloodRequest(payload, officer)
     }
 
     if request.personName == '' then
-        request.personName = CAD.Config.Forensics.UnknownPersonLabel or 'UNKNOWN'
+        request.personName = Config.Forensics.UnknownPersonLabel or 'UNKNOWN'
     end
 
     if request.reason == '' then
@@ -743,11 +747,11 @@ local function createBloodRequest(payload, officer)
 
     local _, alertErr = createAlert(alertTitle, alertDescription, 'MEDIUM', nil, officer.identifier)
     if alertErr then
-        CAD.Log('warn', 'Blood request %s created without alert: %s', tostring(request.requestId), tostring(alertErr))
+        Utils.Log('warn', 'Blood request %s created without alert: %s', tostring(request.requestId), tostring(alertErr))
     end
-    CAD.Server.NotifyJobs({ 'ambulance', 'ems' }, ('New blood sample request %s'):format(request.requestId), 'warning')
+    Fn.NotifyJobs({ 'ambulance', 'ems' }, ('New blood sample request %s'):format(request.requestId), 'warning')
 
-    CAD.Server.BroadcastToJobs(
+    Fn.BroadcastToJobs(
         {'ambulance', 'ems'},
         'emsBloodRequestCreated',
         { request = request }
@@ -770,9 +774,9 @@ local function beginBloodAnalysis(request, officer, notes)
 
         request.analysisDurationMs = durationMs
         request.analysisStartedAtMs = startedAtMs
-        request.analysisStartedAt = CAD.Server.ToIso(math.floor(startedAtMs / 1000))
+        request.analysisStartedAt = Utils.ToIso(math.floor(startedAtMs / 1000))
         request.analysisEndsAtMs = endsAtMs
-        request.analysisEndsAt = CAD.Server.ToIso(math.floor(endsAtMs / 1000))
+        request.analysisEndsAt = Utils.ToIso(math.floor(endsAtMs / 1000))
 
         local created, createErr = createBloodSampleItem(request, officer)
         if not created then
@@ -783,7 +787,7 @@ local function beginBloodAnalysis(request, officer, notes)
     request.status = 'IN_PROGRESS'
     request.handledBy = officer.identifier
     request.handledByName = officer.name
-    request.handledAt = CAD.Server.ToIso()
+    request.handledAt = Utils.ToIso()
     request.notes = notes
     request.lastReminderAt = nil
     request.lastReminderAtMs = nil
@@ -793,7 +797,7 @@ local function beginBloodAnalysis(request, officer, notes)
         if request.sampleStashId then
             local _, removeErr = removeBloodSampleItem(request)
             if removeErr then
-                CAD.Log('warn', 'Failed cleaning blood sample after save failure %s: %s', tostring(request.requestId),
+                Utils.Log('warn', 'Failed cleaning blood sample after save failure %s: %s', tostring(request.requestId),
                     tostring(removeErr))
             end
         end
@@ -828,9 +832,9 @@ local function finalizeBloodTransfer(request, officer, notes)
     request.status = 'COMPLETED'
     request.handledBy = officer.identifier
     request.handledByName = officer.name
-    request.handledAt = CAD.Server.ToIso()
+    request.handledAt = Utils.ToIso()
     request.analysisCompletedAtMs = completedAtMs
-    request.analysisCompletedAt = CAD.Server.ToIso(math.floor(completedAtMs / 1000))
+    request.analysisCompletedAt = Utils.ToIso(math.floor(completedAtMs / 1000))
     request.notes = notes
     request.evidenceId = evidence.evidenceId
     request.lastReminderAt = nil
@@ -854,7 +858,7 @@ local function shouldSendReminder(request, nowMs, reminderIntervalMs)
 end
 
 local function runBloodPostAnalysisPolicy()
-    if CAD.IsFeatureEnabled and not CAD.IsFeatureEnabled('Forensics') then
+    if Config.IsFeatureEnabled and not Config.IsFeatureEnabled('Forensics') then
         return
     end
 
@@ -889,13 +893,13 @@ local function runBloodPostAnalysisPolicy()
 
                         if evidence then
                             local caseLabel = request.caseId or 'NO_CASE'
-                            CAD.Server.NotifyJobs(
+                            Fn.NotifyJobs(
                                 { 'police', 'sheriff', 'csi' },
                                 ('Evidence added to case %s (blood sample %s) [AUTO]'):format(caseLabel,
                                     evidence.evidenceId),
                                 'success'
                             )
-                            CAD.Server.NotifyJobs(
+                            Fn.NotifyJobs(
                                 { 'ambulance', 'ems' },
                                 ('Blood request %s auto-sent to case %s'):format(request.requestId, caseLabel),
                                 'inform'
@@ -915,14 +919,14 @@ local function runBloodPostAnalysisPolicy()
                         else
                             if shouldSendReminder(request, nowMs, reminderIntervalMs) then
                                 request.lastReminderAtMs = nowMs
-                                request.lastReminderAt = CAD.Server.ToIso(math.floor(nowMs / 1000))
+                                request.lastReminderAt = Utils.ToIso(math.floor(nowMs / 1000))
                                 local saved = saveBloodRequestDb(request)
                                 if not saved then
-                                    CAD.Log('warn', 'Failed persisting reminder state for blood request %s',
+                                    Utils.Log('warn', 'Failed persisting reminder state for blood request %s',
                                         tostring(request.requestId))
                                 end
 
-                                CAD.Server.NotifyJobs(
+                                Fn.NotifyJobs(
                                     { 'ambulance', 'ems' },
                                     ('Blood request %s auto-send failed (%s)'):format(
                                         request.requestId,
@@ -935,14 +939,14 @@ local function runBloodPostAnalysisPolicy()
                     elseif mode == 'reminder' then
                         if shouldSendReminder(request, nowMs, reminderIntervalMs) then
                             request.lastReminderAtMs = nowMs
-                            request.lastReminderAt = CAD.Server.ToIso(math.floor(nowMs / 1000))
+                            request.lastReminderAt = Utils.ToIso(math.floor(nowMs / 1000))
                             local saved = saveBloodRequestDb(request)
                             if not saved then
-                                CAD.Log('warn', 'Failed persisting reminder state for blood request %s',
+                                Utils.Log('warn', 'Failed persisting reminder state for blood request %s',
                                     tostring(request.requestId))
                             end
 
-                            CAD.Server.NotifyJobs(
+                            Fn.NotifyJobs(
                                 { 'ambulance', 'ems' },
                                 ('Reminder: blood request %s is ready to send (%ss overdue)'):format(
                                     request.requestId,
@@ -978,7 +982,7 @@ local function saveAlertDb(alert)
     end)
 
     if not ok then
-        CAD.Log('error', 'Failed saving EMS alert %s: %s', tostring(alert and alert.alertId), tostring(err))
+        Utils.Log('error', 'Failed saving EMS alert %s: %s', tostring(alert and alert.alertId), tostring(err))
         return false, 'db_write_failed'
     end
 
@@ -987,14 +991,14 @@ end
 
 createAlert = function(title, description, severity, coords, createdBy)
     local alert = {
-        alertId = CAD.Server.GenerateId('EMSALERT'),
-        title = CAD.Server.SanitizeString(title, 255),
-        description = CAD.Server.SanitizeString(description, 2000),
+        alertId = Utils.GenerateId('EMSALERT'),
+        title = Fn.SanitizeString(title, 255),
+        description = Fn.SanitizeString(description, 2000),
         severity = tostring(severity or 'MEDIUM'):upper(),
         coords = coords,
         status = 'ACTIVE',
         createdBy = createdBy,
-        createdAt = CAD.Server.ToIso(),
+        createdAt = Utils.ToIso(),
     }
     local saved, saveErr = saveAlertDb(alert)
     if not saved then
@@ -1003,7 +1007,7 @@ createAlert = function(title, description, severity, coords, createdBy)
 
     alerts[alert.alertId] = alert
 
-    CAD.Server.BroadcastToJobs(
+    Fn.BroadcastToJobs(
         {'ambulance', 'ems', 'dispatch'},
         'emsAlertCreated',
         { alert = alert }
@@ -1012,15 +1016,15 @@ createAlert = function(title, description, severity, coords, createdBy)
     return alert
 end
 
-lib.callback.register('cad:ems:getUnits', CAD.Auth.WithGuard('default', function()
+lib.callback.register('cad:ems:getUnits', Auth.WithGuard('default', function()
     if not isEmsEnabled() then
         return {}
     end
 
-    return CAD.State.EMS.Units
+    return State.EMS.Units
 end))
 
-lib.callback.register('cad:ems:getAlerts', CAD.Auth.WithGuard('default', function()
+lib.callback.register('cad:ems:getAlerts', Auth.WithGuard('default', function()
     if not isEmsEnabled() then
         return {}
     end
@@ -1035,12 +1039,12 @@ lib.callback.register('cad:ems:getAlerts', CAD.Auth.WithGuard('default', functio
     return out
 end))
 
-lib.callback.register('cad:ems:createAlert', CAD.Auth.WithGuard('heavy', function(source, payload, officer)
+lib.callback.register('cad:ems:createAlert', Auth.WithGuard('heavy', function(source, payload, officer)
     if not isEmsEnabled() then
         return emsDisabledResponse()
     end
 
-    if not CAD.Server.HasRole(source, { 'ambulance', 'ems', 'dispatch', 'admin' }) then
+    if not Fn.HasRole(source, { 'ambulance', 'ems', 'dispatch', 'admin' }) then
         return { ok = false, error = 'forbidden' }
     end
 
@@ -1056,35 +1060,35 @@ lib.callback.register('cad:ems:createAlert', CAD.Auth.WithGuard('heavy', functio
         return { ok = false, error = alertErr or 'cannot_create_alert' }
     end
 
-    CAD.Server.NotifyJobs({ 'ambulance', 'ems', 'dispatch' }, ('EMS ALERT: %s'):format(alert.title), 'warning')
+    Fn.NotifyJobs({ 'ambulance', 'ems', 'dispatch' }, ('EMS ALERT: %s'):format(alert.title), 'warning')
     return alert
 end))
 
-lib.callback.register('cad:ems:updateUnit', CAD.Auth.WithGuard('default', function(_, payload)
+lib.callback.register('cad:ems:updateUnit', Auth.WithGuard('default', function(_, payload)
     if not isEmsEnabled() then
         return emsDisabledResponse()
     end
 
     local unitId = payload.unitId
-    if not unitId or not CAD.State.EMS.Units[unitId] then
+    if not unitId or not State.EMS.Units[unitId] then
         return { ok = false, error = 'unit_not_found' }
     end
 
-    if payload.status and CAD.Config.EMS.UnitStatuses[payload.status] then
-        CAD.State.EMS.Units[unitId].status = payload.status
+    if payload.status and Config.EMS.UnitStatuses[payload.status] then
+        State.EMS.Units[unitId].status = payload.status
     end
     if payload.currentCall ~= nil then
-        CAD.State.EMS.Units[unitId].currentCall = payload.currentCall
+        State.EMS.Units[unitId].currentCall = payload.currentCall
     end
     if type(payload.location) == 'table' then
-        CAD.State.EMS.Units[unitId].location = payload.location
+        State.EMS.Units[unitId].location = payload.location
     end
 
-    CAD.State.EMS.Units[unitId].updatedAt = CAD.Server.ToIso()
-    return CAD.State.EMS.Units[unitId]
+    State.EMS.Units[unitId].updatedAt = Utils.ToIso()
+    return State.EMS.Units[unitId]
 end))
 
-lib.callback.register('cad:ems:critical_patient', CAD.Auth.WithGuard('default', function(_, payload, officer)
+lib.callback.register('cad:ems:critical_patient', Auth.WithGuard('default', function(_, payload, officer)
     if not isEmsEnabled() then
         return emsDisabledResponse()
     end
@@ -1102,20 +1106,20 @@ lib.callback.register('cad:ems:critical_patient', CAD.Auth.WithGuard('default', 
         return { ok = false, error = alertErr or 'cannot_create_alert' }
     end
 
-    CAD.Server.NotifyJobs({ 'ambulance', 'ems' }, ('Critical patient admitted: %s'):format(patientName), 'error')
+    Fn.NotifyJobs({ 'ambulance', 'ems' }, ('Critical patient admitted: %s'):format(patientName), 'error')
     return alert
 end))
 
-lib.callback.register('cad:ems:getMedicalHistory', CAD.Auth.WithGuard('default', function(source, payload)
+lib.callback.register('cad:ems:getMedicalHistory', Auth.WithGuard('default', function(source, payload)
     if not isEmsEnabled() then
         return { ok = true, records = {} }
     end
 
-    if not CAD.Server.HasRole(source, { 'ambulance', 'ems', 'police', 'sheriff', 'admin' }) then
+    if not Fn.HasRole(source, { 'ambulance', 'ems', 'police', 'sheriff', 'admin' }) then
         return { ok = false, error = 'forbidden' }
     end
 
-    local citizenId = CAD.Server.SanitizeString(payload and payload.citizenId, 64)
+    local citizenId = Fn.SanitizeString(payload and payload.citizenId, 64)
     if citizenId == '' then
         return { ok = false, error = 'citizen_id_required' }
     end
@@ -1128,7 +1132,7 @@ lib.callback.register('cad:ems:getMedicalHistory', CAD.Auth.WithGuard('default',
     end)
 
     if not ok then
-        CAD.Log('error', 'Failed loading medical records for %s: %s', citizenId, tostring(rows))
+        Utils.Log('error', 'Failed loading medical records for %s: %s', citizenId, tostring(rows))
         return { ok = false, error = 'db_read_failed' }
     end
 
@@ -1170,22 +1174,22 @@ lib.callback.register('cad:ems:getMedicalHistory', CAD.Auth.WithGuard('default',
     return { ok = true, records = records }
 end))
 
-lib.callback.register('cad:ems:createMedicalRecord', CAD.Auth.WithGuard('heavy', function(source, payload)
+lib.callback.register('cad:ems:createMedicalRecord', Auth.WithGuard('heavy', function(source, payload)
     if not isEmsEnabled() then
         return emsDisabledResponse()
     end
 
-    if not CAD.Server.HasRole(source, { 'ambulance', 'ems', 'admin' }) then
+    if not Fn.HasRole(source, { 'ambulance', 'ems', 'admin' }) then
         return { ok = false, error = 'forbidden' }
     end
 
-    local citizenId = CAD.Server.SanitizeString(payload and payload.citizenId, 64)
+    local citizenId = Fn.SanitizeString(payload and payload.citizenId, 64)
     if citizenId == '' then
         return { ok = false, error = 'citizen_id_required' }
     end
 
-    local recordId = CAD.Server.GenerateId('MEDREC')
-    local nowIso = CAD.Server.ToIso()
+    local recordId = Utils.GenerateId('MEDREC')
+    local nowIso = Utils.ToIso()
 
     local prescriptionsJson = nil
     if type(payload.prescriptions) == 'table' and #payload.prescriptions > 0 then
@@ -1210,28 +1214,28 @@ lib.callback.register('cad:ems:createMedicalRecord', CAD.Auth.WithGuard('heavy',
         ]], {
             recordId,
             citizenId,
-            CAD.Server.SanitizeString(payload.citizenName, 128),
-            CAD.Server.SanitizeString(payload.visitDate, 32) ~= '' and payload.visitDate or nowIso,
-            CAD.Server.SanitizeString(payload.diagnosis, 500),
-            CAD.Server.SanitizeString(payload.treatmentSummary, 10000),
+            Fn.SanitizeString(payload.citizenName, 128),
+            Fn.SanitizeString(payload.visitDate, 32) ~= '' and payload.visitDate or nowIso,
+            Fn.SanitizeString(payload.diagnosis, 500),
+            Fn.SanitizeString(payload.treatmentSummary, 10000),
             prescriptionsJson,
-            CAD.Server.SanitizeString(payload.treatingMedic, 128),
-            CAD.Server.SanitizeString(payload.treatingMedicName, 128),
+            Fn.SanitizeString(payload.treatingMedic, 128),
+            Fn.SanitizeString(payload.treatingMedicName, 128),
             vitalsJson,
-            CAD.Server.SanitizeString(payload.notes, 5000),
+            Fn.SanitizeString(payload.notes, 5000),
             nowIso,
         })
     end)
 
     if not ok then
-        CAD.Log('error', 'Failed saving medical record %s: %s', recordId, tostring(err))
+        Utils.Log('error', 'Failed saving medical record %s: %s', recordId, tostring(err))
         return { ok = false, error = 'db_write_failed' }
     end
 
     return { ok = true, recordId = recordId }
 end))
 
-lib.callback.register('cad:ems:handoff_complete', CAD.Auth.WithGuard('default', function(_, payload)
+lib.callback.register('cad:ems:handoff_complete', Auth.WithGuard('default', function(_, payload)
     if not isEmsEnabled() then
         return emsDisabledResponse()
     end
@@ -1251,12 +1255,12 @@ lib.callback.register('cad:ems:handoff_complete', CAD.Auth.WithGuard('default', 
     return alert
 end))
 
-lib.callback.register('cad:ems:createBloodRequest', CAD.Auth.WithGuard('heavy', function(source, payload, officer)
+lib.callback.register('cad:ems:createBloodRequest', Auth.WithGuard('heavy', function(source, payload, officer)
     if not isEmsEnabled() then
         return emsDisabledResponse()
     end
 
-    if not CAD.Server.HasRole(source, { 'police', 'sheriff', 'csi', 'admin' }) then
+    if not Fn.HasRole(source, { 'police', 'sheriff', 'csi', 'admin' }) then
         return { ok = false, error = 'forbidden' }
     end
 
@@ -1271,7 +1275,7 @@ lib.callback.register('cad:ems:createBloodRequest', CAD.Auth.WithGuard('heavy', 
     }
 end))
 
-lib.callback.register('cad:ems:getBloodRequests', CAD.Auth.WithGuard('default', function(source, payload)
+lib.callback.register('cad:ems:getBloodRequests', Auth.WithGuard('default', function(source, payload)
     if not isEmsEnabled() then
         return {
             ok = true,
@@ -1279,7 +1283,7 @@ lib.callback.register('cad:ems:getBloodRequests', CAD.Auth.WithGuard('default', 
         }
     end
 
-    if not CAD.Server.HasRole(source, { 'ambulance', 'ems', 'police', 'sheriff', 'csi', 'admin' }) then
+    if not Fn.HasRole(source, { 'ambulance', 'ems', 'police', 'sheriff', 'csi', 'admin' }) then
         return { ok = false, error = 'forbidden' }
     end
 
@@ -1302,18 +1306,18 @@ lib.callback.register('cad:ems:getBloodRequests', CAD.Auth.WithGuard('default', 
     }
 end))
 
-lib.callback.register('cad:ems:updateBloodRequest', CAD.Auth.WithGuard('default', function(source, payload, officer)
+lib.callback.register('cad:ems:updateBloodRequest', Auth.WithGuard('default', function(source, payload, officer)
     if not isEmsEnabled() then
         return emsDisabledResponse()
     end
 
-    if not CAD.Server.HasRole(source, { 'ambulance', 'ems', 'admin' }) then
+    if not Fn.HasRole(source, { 'ambulance', 'ems', 'admin' }) then
         return { ok = false, error = 'forbidden' }
     end
 
-    local requestId = CAD.Server.SanitizeString(payload and payload.requestId, 64)
+    local requestId = Fn.SanitizeString(payload and payload.requestId, 64)
     local status = tostring(payload and payload.status or ''):upper()
-    local notes = CAD.Server.SanitizeString(payload and payload.notes, 1000)
+    local notes = Fn.SanitizeString(payload and payload.notes, 1000)
 
     if requestId == '' then
         return { ok = false, error = 'request_id_required' }
@@ -1336,14 +1340,14 @@ lib.callback.register('cad:ems:updateBloodRequest', CAD.Auth.WithGuard('default'
         request.status = status
         request.handledBy = officer.identifier
         request.handledByName = officer.name
-        request.handledAt = CAD.Server.ToIso()
+        request.handledAt = Utils.ToIso()
         request.notes = notes
         local saved, saveErr = saveBloodRequestDb(request)
         if not saved then
             return { ok = false, error = saveErr or 'db_write_failed' }
         end
 
-        CAD.Server.NotifyJobs(
+        Fn.NotifyJobs(
             { 'police', 'sheriff', 'csi' },
             ('Blood request %s is now ACKNOWLEDGED by %s'):format(request.requestId, officer.name),
             'inform'
@@ -1365,7 +1369,7 @@ lib.callback.register('cad:ems:updateBloodRequest', CAD.Auth.WithGuard('default'
             return { ok = false, error = startErr or 'cannot_start_analysis' }
         end
 
-        CAD.Server.NotifyJobs(
+        Fn.NotifyJobs(
             { 'police', 'sheriff', 'csi' },
             ('Blood request %s analysis started by EMS (%s)'):format(request.requestId, officer.name),
             'inform'
@@ -1388,7 +1392,7 @@ lib.callback.register('cad:ems:updateBloodRequest', CAD.Auth.WithGuard('default'
         end
 
         local caseLabel = request.caseId or 'NO_CASE'
-        CAD.Server.NotifyJobs(
+        Fn.NotifyJobs(
             { 'police', 'sheriff', 'csi' },
             ('Evidence added to case %s (blood sample %s)'):format(caseLabel, evidence.evidenceId),
             'success'
@@ -1416,7 +1420,7 @@ lib.callback.register('cad:ems:updateBloodRequest', CAD.Auth.WithGuard('default'
         request.status = status
         request.handledBy = officer.identifier
         request.handledByName = officer.name
-        request.handledAt = CAD.Server.ToIso()
+        request.handledAt = Utils.ToIso()
         request.notes = notes
         request.lastReminderAt = nil
         request.lastReminderAtMs = nil
@@ -1432,7 +1436,7 @@ lib.callback.register('cad:ems:updateBloodRequest', CAD.Auth.WithGuard('default'
             return { ok = false, error = saveErr or 'db_write_failed' }
         end
 
-        CAD.Server.NotifyJobs(
+        Fn.NotifyJobs(
             { 'police', 'sheriff', 'csi' },
             ('Blood request %s %s by EMS'):format(request.requestId, string.lower(status)),
             status == 'DECLINED' and 'error' or 'warning'
@@ -1454,6 +1458,6 @@ lib.cron.new('* * * * *', function()
 
     local ok, result = pcall(runBloodPostAnalysisPolicy)
     if not ok then
-        CAD.Log('error', 'Blood post-analysis cron failure: %s', tostring(result))
+        Utils.Log('error', 'Blood post-analysis cron failure: %s', tostring(result))
     end
 end)

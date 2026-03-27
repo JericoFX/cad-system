@@ -1,10 +1,16 @@
+local Config = require 'modules.shared.config'
+local State = require 'modules.shared.state'
+local Utils = require 'modules.shared.utils'
+local Auth = require 'modules.server.auth'
+local Fn = require 'modules.server.functions'
+local DB = require 'modules.server.database'
 
+local function getAction(name) return _G.CadActions and _G.CadActions[name] end
 
-CAD = CAD or {}
 
 local function dispatchEnabled()
-    if CAD.IsFeatureEnabled then
-        return CAD.IsFeatureEnabled('Dispatch')
+    if Config.IsFeatureEnabled then
+        return Config.IsFeatureEnabled('Dispatch')
     end
 
     return true
@@ -47,7 +53,7 @@ local function saveCaseDb(caseObj)
     end)
 
     if not ok then
-        CAD.Log('error', 'exports: Failed saving case %s: %s', tostring(caseObj and caseObj.caseId), tostring(err))
+        Utils.Log('error', 'exports: Failed saving case %s: %s', tostring(caseObj and caseObj.caseId), tostring(err))
         return false, 'db_write_failed'
     end
 
@@ -85,7 +91,7 @@ local function saveCallDb(call)
     end)
 
     if not ok then
-        CAD.Log('error', 'exports: Failed saving dispatch call %s: %s', tostring(call and call.callId), tostring(err))
+        Utils.Log('error', 'exports: Failed saving dispatch call %s: %s', tostring(call and call.callId), tostring(err))
         return false, 'db_write_failed'
     end
 
@@ -93,9 +99,9 @@ local function saveCallDb(call)
 end
 
 local function requireOfficer(source)
-    local officer = CAD.Auth.GetOfficerData(source)
+    local officer = Auth.GetOfficerData(source)
     if not officer then
-        CAD.Log('warn', 'exports: unauthorized access attempt from source %s', tostring(source))
+        Utils.Log('warn', 'exports: unauthorized access attempt from source %s', tostring(source))
         return nil
     end
     return officer
@@ -106,13 +112,13 @@ exports('CreateCase', function(source, data)
     if not officer then return nil end
 
     local payload = data or {}
-    local title = CAD.Server.SanitizeString(payload.title, 255)
+    local title = Fn.SanitizeString(payload.title, 255)
     if title == '' then return nil end
 
     local caseType = tostring(payload.caseType or 'GENERAL'):upper()
     local isValidType = false
-    for i = 1, #CAD.Config.Cases.Types do
-        if CAD.Config.Cases.Types[i] == caseType then
+    for i = 1, #Config.Cases.Types do
+        if Config.Cases.Types[i] == caseType then
             isValidType = true
             break
         end
@@ -121,14 +127,14 @@ exports('CreateCase', function(source, data)
         caseType = 'GENERAL'
     end
 
-    local now = CAD.Server.ToIso()
-    local caseId = CAD.Server.GenerateId('CASE')
+    local now = Utils.ToIso()
+    local caseId = Utils.GenerateId('CASE')
     local caseObj = {
         caseId = caseId,
         caseType = caseType,
         title = title,
-        description = CAD.Server.SanitizeString(payload.description, 2000),
-        status = CAD.Config.Cases.DefaultStatus or 'OPEN',
+        description = Fn.SanitizeString(payload.description, 2000),
+        status = Config.Cases.DefaultStatus or 'OPEN',
         priority = math.max(1, math.min(5, tonumber(payload.priority) or 2)),
         createdBy = officer.identifier,
         assignedTo = payload.assignedTo or nil,
@@ -146,14 +152,14 @@ exports('CreateCase', function(source, data)
 
     local saved, saveErr = saveCaseDb(caseObj)
     if not saved then
-        CAD.Log('error', 'exports: CreateCase DB failed: %s', tostring(saveErr))
+        Utils.Log('error', 'exports: CreateCase DB failed: %s', tostring(saveErr))
         return nil
     end
 
-    CAD.State.Cases[caseId] = caseObj
+    State.Cases[caseId] = caseObj
 
-    if CAD.Cases and CAD.Cases.PublishPublicState then
-        CAD.Cases.PublishPublicState(false)
+    local CasesAct = getAction("Cases"); if CasesAct and CasesAct.PublishPublicState then
+        CasesAct.PublishPublicState(false)
     end
 
     return caseObj
@@ -161,35 +167,35 @@ end)
 
 exports('GetCase', function(source, caseId)
     if not requireOfficer(source) then return nil end
-    return CAD.State.Cases[caseId]
+    return State.Cases[caseId]
 end)
 
 exports('UpdateCase', function(source, caseId, data)
     if not requireOfficer(source) then return nil end
 
-    local caseObj = CAD.State.Cases[caseId]
+    local caseObj = State.Cases[caseId]
     if not caseObj then return nil end
 
     local patch = data or {}
-    if patch.title then caseObj.title = CAD.Server.SanitizeString(patch.title, 255) end
-    if patch.description then caseObj.description = CAD.Server.SanitizeString(patch.description, 2000) end
+    if patch.title then caseObj.title = Fn.SanitizeString(patch.title, 255) end
+    if patch.description then caseObj.description = Fn.SanitizeString(patch.description, 2000) end
     if patch.status then caseObj.status = tostring(patch.status):upper() end
     if patch.priority then caseObj.priority = math.max(1, math.min(5, tonumber(patch.priority) or caseObj.priority)) end
     if patch.assignedTo ~= nil then caseObj.assignedTo = patch.assignedTo end
 
     if caseObj.status == 'CLOSED' then
-        caseObj.closedAt = caseObj.closedAt or CAD.Server.ToIso()
+        caseObj.closedAt = caseObj.closedAt or Utils.ToIso()
     end
 
-    caseObj.updatedAt = CAD.Server.ToIso()
+    caseObj.updatedAt = Utils.ToIso()
 
     local saved = saveCaseDb(caseObj)
     if not saved then
-        CAD.Log('error', 'exports: UpdateCase DB failed for %s', tostring(caseId))
+        Utils.Log('error', 'exports: UpdateCase DB failed for %s', tostring(caseId))
     end
 
-    if CAD.Cases and CAD.Cases.PublishPublicState then
-        CAD.Cases.PublishPublicState(false)
+    local CasesAct = getAction("Cases"); if CasesAct and CasesAct.PublishPublicState then
+        CasesAct.PublishPublicState(false)
     end
 
     return caseObj
@@ -198,20 +204,20 @@ end)
 exports('CloseCase', function(source, caseId)
     if not requireOfficer(source) then return false end
 
-    local caseObj = CAD.State.Cases[caseId]
+    local caseObj = State.Cases[caseId]
     if not caseObj then return false end
 
     caseObj.status = 'CLOSED'
-    caseObj.closedAt = CAD.Server.ToIso()
+    caseObj.closedAt = Utils.ToIso()
     caseObj.updatedAt = caseObj.closedAt
 
     local saved = saveCaseDb(caseObj)
     if not saved then
-        CAD.Log('error', 'exports: CloseCase DB failed for %s', tostring(caseId))
+        Utils.Log('error', 'exports: CloseCase DB failed for %s', tostring(caseId))
     end
 
-    if CAD.Cases and CAD.Cases.PublishPublicState then
-        CAD.Cases.PublishPublicState(false)
+    local CasesAct = getAction("Cases"); if CasesAct and CasesAct.PublishPublicState then
+        CasesAct.PublishPublicState(false)
     end
 
     return true
@@ -222,7 +228,7 @@ exports('SearchCases', function(source, query)
 
     local q = string.lower(tostring(query or ''))
     local out = {}
-    for _, caseObj in pairs(CAD.State.Cases) do
+    for _, caseObj in pairs(State.Cases) do
         local title = string.lower(caseObj.title or '')
         local desc = string.lower(caseObj.description or '')
         local cid = string.lower(caseObj.caseId or '')
@@ -237,13 +243,13 @@ exports('CreateEvidenceBag', function(source, data)
     local officer = requireOfficer(source)
     if not officer then return nil end
 
-    local stagingId = CAD.Server.GenerateId('STAGE')
-    CAD.State.Evidence.Staging[source] = CAD.State.Evidence.Staging[source] or {}
-    CAD.State.Evidence.Staging[source][#CAD.State.Evidence.Staging[source] + 1] = {
+    local stagingId = Utils.GenerateId('STAGE')
+    State.Evidence.Staging[source] = State.Evidence.Staging[source] or {}
+    State.Evidence.Staging[source][#State.Evidence.Staging[source] + 1] = {
         stagingId = stagingId,
         evidenceType = tostring(data and data.evidenceType or 'PHOTO'):upper(),
         data = type(data and data.data) == 'table' and data.data or {},
-        createdAt = CAD.Server.ToIso(),
+        createdAt = Utils.ToIso(),
     }
     return stagingId
 end)
@@ -251,7 +257,7 @@ end)
 exports('GetEvidenceById', function(source, evidenceId)
     if not requireOfficer(source) then return nil end
 
-    for _, caseObj in pairs(CAD.State.Cases) do
+    for _, caseObj in pairs(State.Cases) do
         for i = 1, #(caseObj.evidence or {}) do
             local evidence = caseObj.evidence[i]
             if evidence.evidenceId == evidenceId then
@@ -266,7 +272,7 @@ exports('AttachEvidenceToCase', function(source, evidenceId, caseId)
     local officer = requireOfficer(source)
     if not officer then return nil end
 
-    local bucket = CAD.State.Evidence.Staging[source] or {}
+    local bucket = State.Evidence.Staging[source] or {}
     local selected = nil
     local index = nil
     for i = 1, #bucket do
@@ -276,18 +282,18 @@ exports('AttachEvidenceToCase', function(source, evidenceId, caseId)
             break
         end
     end
-    if not selected or not CAD.State.Cases[caseId] then return nil end
+    if not selected or not State.Cases[caseId] then return nil end
 
     local evidence = {
-        evidenceId = CAD.Server.GenerateId('EVID'),
+        evidenceId = Utils.GenerateId('EVID'),
         caseId = caseId,
         evidenceType = selected.evidenceType,
         data = selected.data,
         attachedBy = officer.identifier,
-        attachedAt = CAD.Server.ToIso(),
+        attachedAt = Utils.ToIso(),
         custodyChain = {},
     }
-    CAD.State.Cases[caseId].evidence[#CAD.State.Cases[caseId].evidence + 1] = evidence
+    State.Cases[caseId].evidence[#State.Cases[caseId].evidence + 1] = evidence
     table.remove(bucket, index)
     return evidence
 end)
@@ -297,27 +303,27 @@ exports('CreateDispatchCall', function(source, data)
     if not requireOfficer(source) then return nil end
 
     local payload = data or {}
-    local callId = CAD.Server.GenerateId('CALL')
+    local callId = Utils.GenerateId('CALL')
     local call = {
         callId = callId,
         type = tostring(payload.type or 'GENERAL'):upper(),
         priority = math.max(1, math.min(3, tonumber(payload.priority) or 2)),
-        title = CAD.Server.SanitizeString(payload.title, 255),
-        description = CAD.Server.SanitizeString(payload.description, 2000),
-        location = CAD.Server.SanitizeString(payload.location, 255),
+        title = Fn.SanitizeString(payload.title, 255),
+        description = Fn.SanitizeString(payload.description, 2000),
+        location = Fn.SanitizeString(payload.location, 255),
         coordinates = payload.coordinates or nil,
         status = 'PENDING',
         assignedUnits = {},
-        createdAt = CAD.Server.ToIso(),
+        createdAt = Utils.ToIso(),
     }
 
     local saved = saveCallDb(call)
     if not saved then
-        CAD.Log('error', 'exports: CreateDispatchCall DB failed')
+        Utils.Log('error', 'exports: CreateDispatchCall DB failed')
         return nil
     end
 
-    CAD.State.Dispatch.Calls[callId] = call
+    State.Dispatch.Calls[callId] = call
     return call
 end)
 
@@ -325,25 +331,25 @@ exports('GetActiveCalls', function(source)
     if not dispatchEnabled() then return {} end
     if not requireOfficer(source) then return {} end
 
-    return CAD.State.Dispatch.Calls
+    return State.Dispatch.Calls
 end)
 
 exports('AssignUnit', function(source, callId, unitId)
     if not dispatchEnabled() then return false end
     if not requireOfficer(source) then return false end
 
-    local call = CAD.State.Dispatch.Calls[callId]
-    local unit = CAD.State.Dispatch.Units[unitId]
+    local call = State.Dispatch.Calls[callId]
+    local unit = State.Dispatch.Units[unitId]
     if not call or not unit then return false end
 
-    call.assignedUnits[unitId] = { assignedAt = CAD.Server.ToIso() }
+    call.assignedUnits[unitId] = { assignedAt = Utils.ToIso() }
     call.status = 'ACTIVE'
     unit.status = 'BUSY'
     unit.currentCall = callId
 
     local saved = saveCallDb(call)
     if not saved then
-        CAD.Log('error', 'exports: AssignUnit DB failed for call %s', tostring(callId))
+        Utils.Log('error', 'exports: AssignUnit DB failed for call %s', tostring(callId))
     end
 
     return true
@@ -353,25 +359,25 @@ exports('GetUnitStatus', function(source, unitId)
     if not dispatchEnabled() then return nil end
     if not requireOfficer(source) then return nil end
 
-    return CAD.State.Dispatch.Units[unitId]
+    return State.Dispatch.Units[unitId]
 end)
 
 exports('SetUnitStatus', function(source, unitId, statusCode)
     if not dispatchEnabled() then return false end
     if not requireOfficer(source) then return false end
 
-    local unit = CAD.State.Dispatch.Units[unitId]
+    local unit = State.Dispatch.Units[unitId]
     if not unit then return false end
     unit.status = tostring(statusCode or 'AVAILABLE'):upper()
     return true
 end)
 
 exports('CheckPermission', function(source, role)
-    return CAD.Server.HasRole(source, role)
+    return Fn.HasRole(source, role)
 end)
 
 exports('GetOfficerData', function(source)
-    return CAD.Auth.GetOfficerData(source)
+    return Auth.GetOfficerData(source)
 end)
 
 exports('LogJailTransfer', function(source, data)
@@ -379,7 +385,7 @@ exports('LogJailTransfer', function(source, data)
     if not officer then return nil end
 
     local payload = data or {}
-    local transferId = CAD.Server.GenerateId('JAIL')
+    local transferId = Utils.GenerateId('JAIL')
 
     local ok, err = pcall(function()
         MySQL.insert.await([[
@@ -392,16 +398,16 @@ exports('LogJailTransfer', function(source, data)
             payload.caseId or '',
             officer.identifier,
             officer.name or '',
-            CAD.Server.SanitizeString(payload.inmateName, 100),
+            Fn.SanitizeString(payload.inmateName, 100),
             payload.inmateId or '',
             math.max(0, tonumber(payload.jailTime) or 0),
-            CAD.Server.SanitizeString(payload.reason, 500),
-            CAD.Server.ToIso(),
+            Fn.SanitizeString(payload.reason, 500),
+            Utils.ToIso(),
         })
     end)
 
     if not ok then
-        CAD.Log('error', 'exports: LogJailTransfer DB failed: %s', tostring(err))
+        Utils.Log('error', 'exports: LogJailTransfer DB failed: %s', tostring(err))
         return nil
     end
 

@@ -1,10 +1,14 @@
+local Config = require 'modules.shared.config'
+local State = require 'modules.shared.state'
+local Utils = require 'modules.shared.utils'
+local Auth = require 'modules.server.auth'
+local Fn = require 'modules.server.functions'
 
+local function getAction(name) return _G.CadActions and _G.CadActions[name] end
 
-CAD = CAD or {}
-CAD.Photos = CAD.Photos or {}
-
-CAD.Photos.Providers = {}
-CAD.Photos.State = {
+local Photos = {}
+Photos.Providers = {}
+Photos.State = {
     Photos = {},
     Staging = {},
     ReviewQueue = {},
@@ -13,24 +17,24 @@ CAD.Photos.State = {
 }
 
 local function generatePhotoId()
-    CAD.Photos.State.LastId = CAD.Photos.State.LastId + 1
-    return string.format('PHOTO_%s_%05d', os.time(), CAD.Photos.State.LastId)
+    Photos.State.LastId = Photos.State.LastId + 1
+    return string.format('PHOTO_%s_%05d', os.time(), Photos.State.LastId)
 end
 
-function CAD.Photos.RegisterProvider(name, handler)
+function Photos.RegisterProvider(name, handler)
     if type(name) ~= 'string' or type(handler) ~= 'function' then
-        CAD.Log('error', 'Invalid photo provider registration')
+        Utils.Log('error', 'Invalid photo provider registration')
         return false
     end
-    CAD.Photos.Providers[name] = handler
-    CAD.Log('info', 'Registered photo provider: %s', name)
+    Photos.Providers[name] = handler
+    Utils.Log('info', 'Registered photo provider: %s', name)
     return true
 end
 
 local function getProvider()
-    local config = CAD.Config.PhotoSystem
+    local config = Config.PhotoSystem
     local providerName = config and config.Provider or 'screenshot-basic'
-    return CAD.Photos.Providers[providerName] or CAD.Photos.Providers['screenshot-basic']
+    return Photos.Providers[providerName] or Photos.Providers['screenshot-basic']
 end
 
 local function appendQueryParam(url, key, value)
@@ -43,7 +47,7 @@ local function appendQueryParam(url, key, value)
 end
 
 local function getUploadSelectionConfig()
-    local photoConfig = CAD.Config.PhotoSystem or {}
+    local photoConfig = Config.PhotoSystem or {}
     local upload = type(photoConfig.Upload) == 'table' and photoConfig.Upload or {}
     local methodByType = type(upload.MethodByType) == 'table' and upload.MethodByType or {}
     local apiConfig = type(photoConfig.UploadAPI) == 'table' and photoConfig.UploadAPI or {}
@@ -68,8 +72,8 @@ local function getFiveManageConfig(apiConfig)
         apiKey = tostring(cfg.ApiKey or GetConvar('CAD_FIVEMANAGE_API_KEY', '')),
         useApiKeyQueryForClientDirect = cfg.UseApiKeyQueryForClientDirect == true,
         apiKeyQueryParam = tostring(cfg.ApiKeyQueryParam or 'apiKey'),
-        filenamePrefix = CAD.Server.SanitizeString(cfg.FilenamePrefix, 64),
-        uploadPath = CAD.Server.SanitizeString(cfg.Path, 120),
+        filenamePrefix = Fn.SanitizeString(cfg.FilenamePrefix, 64),
+        uploadPath = Fn.SanitizeString(cfg.Path, 120),
     }
 end
 
@@ -388,7 +392,7 @@ local function uploadScreenshotToFiveManage(dataUri, payload)
         metadata = json.encode({
             source = 'cad-system',
             category = tostring(payload and payload.job or 'unknown'),
-            capturedAt = CAD.Server.ToIso(),
+            capturedAt = Utils.ToIso(),
         }),
     }
 
@@ -420,7 +424,7 @@ local function uploadScreenshotToFiveManage(dataUri, payload)
 end
 
 local function uploadToExternalAPI(imageData, metadata)
-    local config = CAD.Config.PhotoSystem
+    local config = Config.PhotoSystem
     local apiConfig = config and config.UploadAPI
 
     if not apiConfig then
@@ -459,7 +463,7 @@ local function uploadToExternalAPI(imageData, metadata)
 
         local statusCode = tonumber(response and response.statusCode) or 0
         if statusCode < 200 or statusCode >= 300 then
-            CAD.Log('error', 'Discord upload failed with status %d', statusCode)
+            Utils.Log('error', 'Discord upload failed with status %d', statusCode)
             return nil, 'discord_upload_http_' .. tostring(statusCode)
         end
 
@@ -472,27 +476,27 @@ local function uploadToExternalAPI(imageData, metadata)
     end
 
     if apiType == 'imgur' then
-        CAD.Log('warn', 'Imgur upload provider is not yet implemented')
+        Utils.Log('warn', 'Imgur upload provider is not yet implemented')
         return nil, 'imgur_not_implemented'
     end
 
     return nil, 'no_upload_provider_configured'
 end
 
-CAD.Photos.RegisterProvider('screenshot-basic', function(source, payload)
+Photos.RegisterProvider('screenshot-basic', function(source, payload)
 
     return {
         ok = true,
         provider = 'screenshot-basic',
         sourceType = 'url',
         url = payload.url,
-        capturedAt = CAD.Server.ToIso(),
+        capturedAt = Utils.ToIso(),
         capturedBy = payload.officerId,
         metadata = payload.metadata or {}
     }
 end)
 
-CAD.Photos.RegisterProvider('cad-upload', function(source, payload)
+Photos.RegisterProvider('cad-upload', function(source, payload)
     local url, err = uploadToExternalAPI(payload.imageData, payload.metadata)
 
     if not url then
@@ -504,14 +508,14 @@ CAD.Photos.RegisterProvider('cad-upload', function(source, payload)
         provider = 'cad-upload',
         sourceType = 'url',
         url = url,
-        capturedAt = CAD.Server.ToIso(),
+        capturedAt = Utils.ToIso(),
         capturedBy = payload.officerId,
         metadata = payload.metadata or {}
     }
 end)
 
 local function createPhotoMetadata(source, payload, job)
-    local officer = CAD.Auth.GetOfficer(source)
+    local officer = Auth.GetOfficer(source)
     if not officer then
         return nil, 'officer_not_found'
     end
@@ -526,7 +530,7 @@ local function createPhotoMetadata(source, payload, job)
         takenBy = officer.name or 'Unknown',
         takenByCitizenId = officer.identifier or 'UNKNOWN',
         takenBySource = source,
-        takenAt = CAD.Server.ToIso(),
+        takenAt = Utils.ToIso(),
         location = {
             x = payload.location and payload.location.x or coords.x,
             y = payload.location and payload.location.y or coords.y,
@@ -535,7 +539,7 @@ local function createPhotoMetadata(source, payload, job)
         description = payload.description or '',
         provider = payload.provider or 'unknown',
         isLocalOnly = payload.isLocalOnly or false,
-        uploadedAt = CAD.Server.ToIso(),
+        uploadedAt = Utils.ToIso(),
 
         fov = payload.fov or {
             hit = false,
@@ -549,7 +553,7 @@ local function createPhotoMetadata(source, payload, job)
         custodyChain = job == 'police' and {{
             eventId = 'CUSTODY_' .. photoId,
             eventType = 'COLLECTED',
-            timestamp = CAD.Server.ToIso(),
+            timestamp = Utils.ToIso(),
             recordedBy = officer.identifier,
             notes = 'Photo captured with evidence camera'
         }} or nil,
@@ -566,25 +570,25 @@ local function createPhotoMetadata(source, payload, job)
         }
     }
 
-    CAD.Photos.State.Photos[photoId] = metadata
+    Photos.State.Photos[photoId] = metadata
 
     return metadata, nil
 end
 
 local function addToStaging(source, photoId)
-    if not CAD.Photos.State.Staging[source] then
-        CAD.Photos.State.Staging[source] = {}
+    if not Photos.State.Staging[source] then
+        Photos.State.Staging[source] = {}
     end
 
-    local photo = CAD.Photos.State.Photos[photoId]
+    local photo = Photos.State.Photos[photoId]
     if photo then
         photo.stagingId = 'STAGE_' .. photoId
-        table.insert(CAD.Photos.State.Staging[source], photo)
+        table.insert(Photos.State.Staging[source], photo)
     end
 end
 
 local function removePhotoFromAllStaging(photoId)
-    for source, bucket in pairs(CAD.Photos.State.Staging) do
+    for source, bucket in pairs(Photos.State.Staging) do
         if type(bucket) == 'table' then
             for i = #bucket, 1, -1 do
                 if bucket[i] and bucket[i].photoId == photoId then
@@ -593,7 +597,7 @@ local function removePhotoFromAllStaging(photoId)
             end
 
             if #bucket == 0 then
-                CAD.Photos.State.Staging[source] = nil
+                Photos.State.Staging[source] = nil
             end
         end
     end
@@ -604,7 +608,7 @@ local function isSupervisor(officer)
         return false
     end
 
-    local config = CAD.Config.PhotoSystem
+    local config = Config.PhotoSystem
     local requiredRank = config and config.ReleaseRanks and config.ReleaseRanks[officer.job]
 
     if not requiredRank then
@@ -615,12 +619,12 @@ local function isSupervisor(officer)
 end
 
 local function withPhotoGuard(bucket, handler)
-    return CAD.Auth.WithGuard(bucket, function(source, payload, officer)
+    return Auth.WithGuard(bucket, function(source, payload, officer)
         return handler(source, type(payload) == 'table' and payload or {}, officer)
     end)
 end
 
-lib.callback.register('cad:photos:getCaptureConfig', CAD.Auth.WithGuard('default', function()
+lib.callback.register('cad:photos:getCaptureConfig', Auth.WithGuard('default', function()
     local uploadConfig, err = getCaptureUploadConfig()
     if not uploadConfig then
         return {
@@ -639,7 +643,7 @@ lib.callback.register('cad:photos:getCaptureConfig', CAD.Auth.WithGuard('default
     }
 end))
 
-lib.callback.register('cad:photos:uploadCapture', CAD.Auth.WithGuard('default', function(source, payload, officer)
+lib.callback.register('cad:photos:uploadCapture', Auth.WithGuard('default', function(source, payload, officer)
     local uploadConfig, configErr = getCaptureUploadConfig()
     if not uploadConfig then
         return { ok = false, error = configErr or 'upload_config_missing' }
@@ -703,7 +707,7 @@ lib.callback.register('cad:photos:capturePolicePhoto', withPhotoGuard('default',
     print(string.format('[CAD:Photos] Police photo captured: %s by %s',
         metadata.photoId, officer.name))
 
-    CAD.Server.BroadcastToPlayer(source, 'photoCaptured', {
+    Fn.BroadcastToPlayer(source, 'photoCaptured', {
         photo = metadata
     })
 
@@ -734,7 +738,7 @@ lib.callback.register('cad:photos:captureNewsPhoto', withPhotoGuard('default', f
     print(string.format('[CAD:Photos] News photo captured: %s by %s',
         metadata.photoId, officer.name))
 
-    CAD.Server.BroadcastToPlayer(source, 'photoCaptured', {
+    Fn.BroadcastToPlayer(source, 'photoCaptured', {
         photo = metadata
     })
 
@@ -748,7 +752,7 @@ end))
 lib.callback.register('cad:photos:getInventoryPhotos', withPhotoGuard('default', function(_, _, officer)
 
     local photos = {}
-    for photoId, photo in pairs(CAD.Photos.State.Photos) do
+    for photoId, photo in pairs(Photos.State.Photos) do
         if photo.takenByCitizenId == officer.identifier then
             table.insert(photos, photo)
         end
@@ -759,7 +763,7 @@ end))
 
 lib.callback.register('cad:photos:getStagingPhotos', withPhotoGuard('default', function(source)
 
-    local staging = CAD.Photos.State.Staging[source] or {}
+    local staging = Photos.State.Staging[source] or {}
     return { ok = true, photos = staging }
 end))
 
@@ -769,8 +773,8 @@ lib.callback.register('cad:photos:releaseToPress', withPhotoGuard('heavy', funct
         return { ok = false, error = 'insufficient_rank', required = 'Sargento+' }
     end
 
-    local photoId = CAD.Server.SanitizeString(payload.photoId, 64)
-    local photo = CAD.Photos.State.Photos[photoId]
+    local photoId = Fn.SanitizeString(payload.photoId, 64)
+    local photo = Photos.State.Photos[photoId]
 
     if not photo then
         return { ok = false, error = 'photo_not_found' }
@@ -786,14 +790,14 @@ lib.callback.register('cad:photos:releaseToPress', withPhotoGuard('heavy', funct
 
     photo.releasedToPress = true
     photo.releasedBy = officer.identifier
-    photo.releasedAt = CAD.Server.ToIso()
+    photo.releasedAt = Utils.ToIso()
     photo.releaseReason = payload.reason or 'Authorized for press publication'
     photo.releaseRestrictions = {
         editLevel = 'none',
         expiryDate = payload.expiryDate or nil
     }
 
-    CAD.Photos.State.ReleasedPhotos[photoId] = photo
+    Photos.State.ReleasedPhotos[photoId] = photo
 
     print(string.format('[CAD:Photos] Photo released to press: %s by %s',
         photoId, officer.name))
@@ -809,7 +813,7 @@ lib.callback.register('cad:photos:getReleasedPhotos', withPhotoGuard('default', 
 
     local photos = {}
     local now = os.time()
-    for photoId, photo in pairs(CAD.Photos.State.ReleasedPhotos) do
+    for photoId, photo in pairs(Photos.State.ReleasedPhotos) do
 
         if photo.releaseRestrictions.expiryDate then
             local expiry = isoToTime(photo.releaseRestrictions.expiryDate)
@@ -834,8 +838,8 @@ lib.callback.register('cad:photos:submitToPolice', withPhotoGuard('heavy', funct
         return { ok = false, error = 'invalid_job' }
     end
 
-    local photoId = CAD.Server.SanitizeString(payload.photoId, 64)
-    local photo = CAD.Photos.State.Photos[photoId]
+    local photoId = Fn.SanitizeString(payload.photoId, 64)
+    local photo = Photos.State.Photos[photoId]
 
     if not photo then
         return { ok = false, error = 'photo_not_found' }
@@ -851,10 +855,10 @@ lib.callback.register('cad:photos:submitToPolice', withPhotoGuard('heavy', funct
         photoId = photoId,
         submittedBy = officer.identifier,
         submittedByName = officer.name,
-        caseId = CAD.Server.SanitizeString(payload.caseId, 64),
-        reason = CAD.Server.SanitizeString(payload.reason, 300),
+        caseId = Fn.SanitizeString(payload.caseId, 64),
+        reason = Fn.SanitizeString(payload.reason, 300),
         status = 'PENDING_REVIEW',
-        submittedAt = CAD.Server.ToIso(),
+        submittedAt = Utils.ToIso(),
         reviewedBy = nil,
         reviewedAt = nil,
         reviewNotes = nil
@@ -868,9 +872,9 @@ lib.callback.register('cad:photos:submitToPolice', withPhotoGuard('heavy', funct
         submission.reason = 'Submitted as potential evidence'
     end
 
-    CAD.Photos.State.ReviewQueue[submissionId] = submission
+    Photos.State.ReviewQueue[submissionId] = submission
 
-    CAD.Server.NotifyJobs({'police', 'sheriff'},
+    Fn.NotifyJobs({'police', 'sheriff'},
         string.format('New photo submitted for evidence review by %s', officer.name),
         'info')
 
@@ -890,8 +894,8 @@ lib.callback.register('cad:photos:reviewSubmission', withPhotoGuard('heavy', fun
         return { ok = false, error = 'invalid_job' }
     end
 
-    local submissionId = CAD.Server.SanitizeString(payload.submissionId, 64)
-    local submission = CAD.Photos.State.ReviewQueue[submissionId]
+    local submissionId = Fn.SanitizeString(payload.submissionId, 64)
+    local submission = Photos.State.ReviewQueue[submissionId]
 
     if not submission then
         return { ok = false, error = 'submission_not_found' }
@@ -901,25 +905,25 @@ lib.callback.register('cad:photos:reviewSubmission', withPhotoGuard('heavy', fun
         return { ok = false, error = 'already_reviewed', status = submission.status }
     end
 
-    local action = CAD.Server.SanitizeString(payload.action, 16):upper()
+    local action = Fn.SanitizeString(payload.action, 16):upper()
     if action ~= 'ACCEPT' and action ~= 'REJECT' then
         return { ok = false, error = 'invalid_action' }
     end
 
     submission.status = action == 'ACCEPT' and 'ACCEPTED' or 'REJECTED'
     submission.reviewedBy = officer.identifier
-    submission.reviewedAt = CAD.Server.ToIso()
-    submission.reviewNotes = CAD.Server.SanitizeString(payload.notes, 500)
+    submission.reviewedAt = Utils.ToIso()
+    submission.reviewNotes = Fn.SanitizeString(payload.notes, 500)
 
     if action == 'ACCEPT' then
-        local photo = CAD.Photos.State.Photos[submission.photoId]
+        local photo = Photos.State.Photos[submission.photoId]
         if photo then
             photo.job = 'police'
             photo.isEvidence = true
             photo.custodyChain = {{
                 eventId = 'CUSTODY_' .. submission.photoId,
                 eventType = 'SUBMITTED_BY_PRESS',
-                timestamp = CAD.Server.ToIso(),
+                timestamp = Utils.ToIso(),
                 recordedBy = officer.identifier,
                 notes = string.format('Submitted by %s, reviewed by %s',
                     submission.submittedByName, officer.name)
@@ -933,7 +937,7 @@ lib.callback.register('cad:photos:reviewSubmission', withPhotoGuard('heavy', fun
         end
     end
 
-    CAD.Photos.State.ReviewQueue[submissionId] = nil
+    Photos.State.ReviewQueue[submissionId] = nil
 
     print(string.format('[CAD:Photos] Submission reviewed: %s - %s by %s',
         submissionId, submission.status, officer.name))
@@ -952,7 +956,7 @@ lib.callback.register('cad:photos:getReviewQueue', withPhotoGuard('default', fun
     end
 
     local queue = {}
-    for id, submission in pairs(CAD.Photos.State.ReviewQueue) do
+    for id, submission in pairs(Photos.State.ReviewQueue) do
         if submission.status == 'PENDING_REVIEW' then
             table.insert(queue, submission)
         end
@@ -971,15 +975,15 @@ lib.callback.register('cad:photos:attachToCase', withPhotoGuard('heavy', functio
         return { ok = false, error = 'invalid_job' }
     end
 
-    local photoId = CAD.Server.SanitizeString(payload.photoId, 64)
-    local caseId = CAD.Server.SanitizeString(payload.caseId, 64)
+    local photoId = Fn.SanitizeString(payload.photoId, 64)
+    local caseId = Fn.SanitizeString(payload.caseId, 64)
 
-    local caseObj = CAD.State.Cases and CAD.State.Cases[caseId] or nil
+    local caseObj = State.Cases and State.Cases[caseId] or nil
     if not caseObj then
         return { ok = false, error = 'case_not_found' }
     end
 
-    local photo = CAD.Photos.State.Photos[photoId]
+    local photo = Photos.State.Photos[photoId]
     if not photo then
         return { ok = false, error = 'photo_not_found' }
     end
@@ -989,13 +993,13 @@ lib.callback.register('cad:photos:attachToCase', withPhotoGuard('heavy', functio
     table.insert(photo.custodyChain, {
         eventId = 'CUSTODY_' .. os.time(),
         eventType = 'ATTACHED_TO_CASE',
-        timestamp = CAD.Server.ToIso(),
+        timestamp = Utils.ToIso(),
         recordedBy = officer.identifier,
         notes = string.format('Attached to case %s', caseId)
     })
 
     local evidence = {
-        evidenceId = CAD.Server.GenerateId('EVID'),
+        evidenceId = Utils.GenerateId('EVID'),
         caseId = caseId,
         evidenceType = 'PHOTO',
         data = {
@@ -1009,39 +1013,39 @@ lib.callback.register('cad:photos:attachToCase', withPhotoGuard('heavy', functio
             fov = photo.fov,
         },
         attachedBy = officer.identifier,
-        attachedAt = CAD.Server.ToIso(),
+        attachedAt = Utils.ToIso(),
         custodyChain = {
             {
-                eventId = CAD.Server.GenerateId('CUSTODY'),
+                eventId = Utils.GenerateId('CUSTODY'),
                 evidenceId = '',
                 eventType = 'ATTACHED_FROM_PHOTO_STAGING',
                 location = photo.location and string.format('%.2f, %.2f, %.2f', photo.location.x or 0.0, photo.location.y or 0.0, photo.location.z or 0.0) or 'Unknown',
                 notes = ('Photo %s attached to case %s'):format(photo.photoId, caseId),
-                timestamp = CAD.Server.ToIso(),
+                timestamp = Utils.ToIso(),
                 recordedBy = officer.identifier,
             }
         },
     }
     evidence.custodyChain[1].evidenceId = evidence.evidenceId
 
-    if CAD.Evidence and type(CAD.Evidence.AppendCaseEvidence) == 'function' then
-        local ok, appendErr = CAD.Evidence.AppendCaseEvidence(caseId, evidence)
+    if getAction("Evidence") and type(getAction("Evidence").AppendCaseEvidence) == 'function' then
+        local ok, appendErr = getAction("Evidence").AppendCaseEvidence(caseId, evidence)
         if not ok then
             return { ok = false, error = appendErr or 'cannot_attach_evidence' }
         end
     else
         caseObj.evidence = caseObj.evidence or {}
         caseObj.evidence[#caseObj.evidence + 1] = evidence
-        caseObj.updatedAt = CAD.Server.ToIso()
+        caseObj.updatedAt = Utils.ToIso()
 
-        if CAD.Cases and type(CAD.Cases.PublishPublicState) == 'function' then
-            CAD.Cases.PublishPublicState(false)
+        if getAction("Cases") and type(getAction("Cases").PublishPublicState) == 'function' then
+            getAction("Cases").PublishPublicState(false)
         end
     end
 
     removePhotoFromAllStaging(photoId)
 
-    CAD.Log('info', 'Photo %s attached to case %s by %s', photoId, caseId, officer.name)
+    Utils.Log('info', 'Photo %s attached to case %s by %s', photoId, caseId, officer.name)
 
     return {
         ok = true,
@@ -1051,18 +1055,18 @@ lib.callback.register('cad:photos:attachToCase', withPhotoGuard('heavy', functio
     }
 end))
 
-lib.callback.register('cad:photos:getPhoto', CAD.Auth.WithGuard('default', function(source, payload, officer)
+lib.callback.register('cad:photos:getPhoto', Auth.WithGuard('default', function(source, payload, officer)
     if not officer then
         return { ok = false, error = 'officer_not_found' }
     end
 
     local photoIdRaw = type(payload) == 'string' and payload or (payload and payload.photoId)
-    local photoId = CAD.Server.SanitizeString(photoIdRaw, 64)
+    local photoId = Fn.SanitizeString(photoIdRaw, 64)
     if photoId == '' then
         return { ok = false, error = 'photo_id_required' }
     end
 
-    local photo = CAD.Photos.State.Photos[photoId]
+    local photo = Photos.State.Photos[photoId]
     if not photo then
         return { ok = false, error = 'photo_not_found' }
     end
@@ -1084,21 +1088,21 @@ lib.callback.register('cad:photos:getPhoto', CAD.Auth.WithGuard('default', funct
         return { ok = false, error = 'not_owner' }
     end
 
-    return { ok = true, photo = CAD.DeepCopy(photo) }
+    return { ok = true, photo = lib.table.deepclone(photo) }
 end))
 
-lib.callback.register('cad:photos:updateDescription', CAD.Auth.WithGuard('default', function(_, payload, officer)
+lib.callback.register('cad:photos:updateDescription', Auth.WithGuard('default', function(_, payload, officer)
     if not officer then
         return { ok = false, error = 'officer_not_found' }
     end
 
-    local photoId = CAD.Server.SanitizeString(payload and payload.photoId, 64)
-    local description = CAD.Server.SanitizeString(payload and payload.description, 300)
+    local photoId = Fn.SanitizeString(payload and payload.photoId, 64)
+    local description = Fn.SanitizeString(payload and payload.description, 300)
     if photoId == '' then
         return { ok = false, error = 'photo_id_required' }
     end
 
-    local photo = CAD.Photos.State.Photos[photoId]
+    local photo = Photos.State.Photos[photoId]
     if not photo then
         return { ok = false, error = 'photo_not_found' }
     end
@@ -1112,17 +1116,17 @@ lib.callback.register('cad:photos:updateDescription', CAD.Auth.WithGuard('defaul
     return { ok = true, photoId = photoId }
 end))
 
-lib.callback.register('cad:photos:deletePhoto', CAD.Auth.WithGuard('heavy', function(source, payload, officer)
+lib.callback.register('cad:photos:deletePhoto', Auth.WithGuard('heavy', function(source, payload, officer)
     if not officer then
         return { ok = false, error = 'officer_not_found' }
     end
 
-    local photoId = CAD.Server.SanitizeString(payload and payload.photoId, 64)
+    local photoId = Fn.SanitizeString(payload and payload.photoId, 64)
     if photoId == '' then
         return { ok = false, error = 'photo_id_required' }
     end
 
-    local photo = CAD.Photos.State.Photos[photoId]
+    local photo = Photos.State.Photos[photoId]
     if not photo then
         return { ok = false, error = 'photo_not_found' }
     end
@@ -1132,9 +1136,9 @@ lib.callback.register('cad:photos:deletePhoto', CAD.Auth.WithGuard('heavy', func
         return { ok = false, error = 'not_owner' }
     end
 
-    CAD.Photos.State.Photos[photoId] = nil
+    Photos.State.Photos[photoId] = nil
 
-    local staging = CAD.Photos.State.Staging[source]
+    local staging = Photos.State.Staging[source]
     if type(staging) == 'table' then
         for i = #staging, 1, -1 do
             if staging[i].photoId == photoId then
@@ -1146,4 +1150,7 @@ lib.callback.register('cad:photos:deletePhoto', CAD.Auth.WithGuard('heavy', func
     return { ok = true, photoId = photoId }
 end))
 
-CAD.Log('info', 'Photo system initialized')
+Utils.Log('info', 'Photo system initialized')
+
+_G.CadActions = _G.CadActions or {}
+_G.CadActions.Photos = Photos

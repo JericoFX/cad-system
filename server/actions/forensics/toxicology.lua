@@ -1,6 +1,9 @@
-CAD = CAD or {}
-CAD.Forensic = CAD.Forensic or {}
-CAD.Forensic.Toxicology = CAD.Forensic.Toxicology or {}
+local Config = require 'modules.shared.config'
+local Utils = require 'modules.shared.utils'
+local Fn = require 'modules.server.functions'
+
+local Forensic = {}
+Forensic.Toxicology = {}
 
 local sourceCitizenIndex = {}
 local citizenExposureCache = {}
@@ -55,7 +58,7 @@ local function parseIsoToMs(value)
 end
 
 local function getConfig()
-    local forensics = CAD.Config and CAD.Config.Forensics or {}
+    local forensics = Config and Config.Forensics or {}
     return forensics.Toxicology or {}
 end
 
@@ -70,7 +73,7 @@ end
 
 local function getMetadataKey()
     local cfg = getConfig()
-    local key = CAD.Server.SanitizeString(cfg.MetadataKey, 64)
+    local key = Fn.SanitizeString(cfg.MetadataKey, 64)
     if key == '' then
         return 'cad_toxicology'
     end
@@ -79,7 +82,7 @@ end
 
 local function getStateBagKey()
     local cfg = getConfig()
-    local key = CAD.Server.SanitizeString(cfg.StateBagKey, 64)
+    local key = Fn.SanitizeString(cfg.StateBagKey, 64)
     if key == '' then
         return 'cad_toxicology'
     end
@@ -96,12 +99,12 @@ local function getDefaultWindowMs()
 end
 
 local function normalizeItemName(value)
-    local itemName = string.lower(CAD.StringTrim(tostring(value or '')))
+    local itemName = string.lower(Utils.Trim(tostring(value or '')))
     return itemName
 end
 
 local function normalizeSubstance(value)
-    local substance = CAD.Server.SanitizeString(value, 64)
+    local substance = Fn.SanitizeString(value, 64)
     if substance == '' then
         return 'UNKNOWN'
     end
@@ -109,7 +112,7 @@ local function normalizeSubstance(value)
 end
 
 local function normalizeSeverity(value)
-    local severity = string.upper(CAD.Server.SanitizeString(value, 16))
+    local severity = string.upper(Fn.SanitizeString(value, 16))
     if severity ~= 'LOW' and severity ~= 'MEDIUM' and severity ~= 'HIGH' and severity ~= 'CRITICAL' then
         return 'MEDIUM'
     end
@@ -150,7 +153,7 @@ end
 
 local function buildEmptySnapshot(sourceLabel)
     return {
-        testedAt = CAD.Server.ToIso(),
+        testedAt = Utils.ToIso(),
         isPositive = false,
         activeCount = 0,
         substances = {},
@@ -186,9 +189,9 @@ local function normalizeActiveExposures(rawExposures, nowMs)
                 sourceItem = normalizeItemName(entry.sourceItem or entry.itemName),
                 severity = normalizeSeverity(entry.severity),
                 usedAtMs = usedAtMs,
-                usedAt = entry.usedAt or CAD.Server.ToIso(math.floor(usedAtMs / 1000)),
+                usedAt = entry.usedAt or Utils.ToIso(math.floor(usedAtMs / 1000)),
                 expiresAtMs = expiresAtMs,
-                expiresAt = entry.expiresAt or CAD.Server.ToIso(math.floor(expiresAtMs / 1000)),
+                expiresAt = entry.expiresAt or Utils.ToIso(math.floor(expiresAtMs / 1000)),
                 slotId = tonumber(entry.slotId) or nil,
             }
         end
@@ -214,7 +217,7 @@ end
 
 local function buildMetadataStore(exposures, nowMs)
     return {
-        updatedAt = CAD.Server.ToIso(math.floor(nowMs / 1000)),
+        updatedAt = Utils.ToIso(math.floor(nowMs / 1000)),
         updatedAtMs = nowMs,
         exposures = exposures,
     }
@@ -244,7 +247,7 @@ local function buildSnapshot(exposures, nowMs, sourceLabel)
     end)
 
     return {
-        testedAt = CAD.Server.ToIso(math.floor(nowMs / 1000)),
+        testedAt = Utils.ToIso(math.floor(nowMs / 1000)),
         isPositive = #list > 0,
         activeCount = #list,
         substances = list,
@@ -320,7 +323,7 @@ end
 
 local function getCitizenIdFromQbPlayer(qbPlayer)
     local playerData = qbPlayer and qbPlayer.PlayerData or {}
-    local citizenId = CAD.Server.SanitizeString(playerData.citizenid, 64)
+    local citizenId = Fn.SanitizeString(playerData.citizenid, 64)
     if citizenId == '' then
         return nil
     end
@@ -362,7 +365,7 @@ local function setPlayerStateBag(playerSource, snapshot)
     end)
 
     if not ok then
-        CAD.Log('warn', 'Failed to set toxicology state bag for %s: %s', tostring(source), tostring(err))
+        Utils.Log('warn', 'Failed to set toxicology state bag for %s: %s', tostring(source), tostring(err))
     end
 end
 
@@ -377,7 +380,7 @@ local function setToxicologyMetadataOnQbPlayer(qbPlayer, exposures, nowMs)
 end
 
 local function getDataSourceConfig()
-    local forensics = CAD.Config.Forensics or {}
+    local forensics = Config.Forensics or {}
     local idReader = type(forensics.IdReader) == 'table' and forensics.IdReader or {}
     local tablet = type(idReader.VehicleTablet) == 'table' and idReader.VehicleTablet or {}
     local data = type(tablet.DataSource) == 'table' and tablet.DataSource or {}
@@ -399,7 +402,7 @@ local function loadMetadataFromDatabase(citizenId)
     end)
 
     if not ok then
-        CAD.Log('warn', 'Failed loading toxicology metadata for %s: %s', citizenId, tostring(rows))
+        Utils.Log('warn', 'Failed loading toxicology metadata for %s: %s', citizenId, tostring(rows))
         return {}
     end
 
@@ -444,8 +447,8 @@ local function resolveActiveExposuresByCitizenId(citizenId)
     return active, nowMs, 'QBCORE_DB_METADATA'
 end
 
-function CAD.Forensic.Toxicology.GetSnapshotForCitizen(citizenId)
-    local normalizedCitizenId = CAD.Server.SanitizeString(citizenId, 64)
+function Forensic.Toxicology.GetSnapshotForCitizen(citizenId)
+    local normalizedCitizenId = Fn.SanitizeString(citizenId, 64)
     if normalizedCitizenId == '' then
         return buildEmptySnapshot('QBCORE_METADATA')
     end
@@ -458,7 +461,7 @@ function CAD.Forensic.Toxicology.GetSnapshotForCitizen(citizenId)
     return buildSnapshot(exposures, nowMs, sourceLabel)
 end
 
-function CAD.Forensic.Toxicology.GetSnapshotForSource(playerSource)
+function Forensic.Toxicology.GetSnapshotForSource(playerSource)
     local source = tonumber(playerSource)
     if not source or source <= 0 then
         return buildEmptySnapshot('QBCORE_METADATA')
@@ -483,7 +486,7 @@ function CAD.Forensic.Toxicology.GetSnapshotForSource(playerSource)
     return snapshot
 end
 
-function CAD.Forensic.Toxicology.RecordItemUse(playerSource, itemName, slotId)
+function Forensic.Toxicology.RecordItemUse(playerSource, itemName, slotId)
     local source = tonumber(playerSource)
     if not source or source <= 0 then
         return nil, 'invalid_source'
@@ -524,9 +527,9 @@ function CAD.Forensic.Toxicology.RecordItemUse(playerSource, itemName, slotId)
         sourceItem = tracked.itemName,
         severity = tracked.severity,
         usedAtMs = nowMs,
-        usedAt = CAD.Server.ToIso(math.floor(nowMs / 1000)),
+        usedAt = Utils.ToIso(math.floor(nowMs / 1000)),
         expiresAtMs = expiresAtMs,
-        expiresAt = CAD.Server.ToIso(math.floor(expiresAtMs / 1000)),
+        expiresAt = Utils.ToIso(math.floor(expiresAtMs / 1000)),
         slotId = tonumber(slotId) or nil,
     }
 
@@ -543,8 +546,8 @@ function CAD.Forensic.Toxicology.RecordItemUse(playerSource, itemName, slotId)
     return snapshot
 end
 
-function CAD.Forensic.Toxicology.SyncPlayerState(playerSource)
-    return CAD.Forensic.Toxicology.GetSnapshotForSource(playerSource)
+function Forensic.Toxicology.SyncPlayerState(playerSource)
+    return Forensic.Toxicology.GetSnapshotForSource(playerSource)
 end
 
 AddEventHandler('ox_inventory:usedItem', function(playerId, name, slotId)
@@ -553,9 +556,9 @@ AddEventHandler('ox_inventory:usedItem', function(playerId, name, slotId)
         return
     end
 
-    local _, err = CAD.Forensic.Toxicology.RecordItemUse(source, name, slotId)
+    local _, err = Forensic.Toxicology.RecordItemUse(source, name, slotId)
     if err and err ~= 'item_not_tracked' and err ~= 'disabled' then
-        CAD.Log('warn', 'Toxicology record failed for %s using %s: %s', tostring(source), tostring(name), tostring(err))
+        Utils.Log('warn', 'Toxicology record failed for %s using %s: %s', tostring(source), tostring(name), tostring(err))
     end
 end)
 
@@ -566,7 +569,7 @@ RegisterNetEvent('QBCore:Server:OnPlayerLoaded', function(playerSource)
         return
     end
 
-    CAD.Forensic.Toxicology.SyncPlayerState(playerId)
+    Forensic.Toxicology.SyncPlayerState(playerId)
 end)
 
 AddEventHandler('playerDropped', function()
@@ -591,7 +594,11 @@ AddEventHandler('onResourceStart', function(resourceName)
     for i = 1, #players do
         local source = tonumber(players[i])
         if source and source > 0 then
-            CAD.Forensic.Toxicology.SyncPlayerState(source)
+            Forensic.Toxicology.SyncPlayerState(source)
         end
     end
 end)
+
+_G.CadActions = _G.CadActions or {}
+_G.CadActions.Forensic = _G.CadActions.Forensic or {}
+_G.CadActions.Forensic.Toxicology = Forensic.Toxicology

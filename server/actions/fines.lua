@@ -1,17 +1,20 @@
+local Config = require 'modules.shared.config'
+local State = require 'modules.shared.state'
+local Utils = require 'modules.shared.utils'
+local Auth = require 'modules.server.auth'
+local Fn = require 'modules.server.functions'
 
 
-CAD = CAD or {}
-CAD.Fines = CAD.Fines or {}
-
-local fines = CAD.State.Fines
+local fines = State.Fines
 
 local function getFineCatalog()
-    if CAD.GetFineCatalog then
-        return CAD.GetFineCatalog()
+    local catalogOk, catalog = pcall(require, 'shared.catalogs.fines')
+    if catalogOk and catalog and catalog.Get then
+        return catalog.Get()
     end
 
-    if CAD.Config.Fines and type(CAD.Config.Fines.DefaultCatalog) == 'table' then
-        return CAD.Config.Fines.DefaultCatalog
+    if Config.Fines and type(Config.Fines.DefaultCatalog) == 'table' then
+        return Config.Fines.DefaultCatalog
     end
 
     return {}
@@ -68,7 +71,7 @@ local function saveFineDb(fine)
     end)
 
     if not ok then
-        CAD.Log('error', 'Failed saving fine %s: %s', tostring(fine and fine.fineId), tostring(err))
+        Utils.Log('error', 'Failed saving fine %s: %s', tostring(fine and fine.fineId), tostring(err))
         return false, 'db_write_failed'
     end
 
@@ -79,7 +82,7 @@ local function getSourceByIdentifier(identifier)
     local players = GetPlayers()
     for i = 1, #players do
         local source = tonumber(players[i])
-        if CAD.Server.GetIdentifier(source) == identifier then
+        if Fn.GetIdentifier(source) == identifier then
             return source
         end
     end
@@ -87,25 +90,25 @@ local function getSourceByIdentifier(identifier)
 end
 
 local function issueFine(payload, officer)
-    local fineCode = CAD.Server.SanitizeString(payload.fineCode, 32)
+    local fineCode = Fn.SanitizeString(payload.fineCode, 32)
     local def = findFineDefinition(fineCode)
 
-    if not def and (not CAD.Config.Fines or CAD.Config.Fines.AllowCustomCode ~= true) then
+    if not def and (not Config.Fines or Config.Fines.AllowCustomCode ~= true) then
         return { ok = false, error = 'invalid_fine_code' }
     end
 
     local fine = {
-        fineId = CAD.Server.GenerateId('FINE'),
+        fineId = Utils.GenerateId('FINE'),
         targetType = tostring(payload.targetType or 'PERSON'):upper(),
-        targetId = CAD.Server.SanitizeString(payload.targetId, 128),
-        targetName = CAD.Server.SanitizeString(payload.targetName, 128),
+        targetId = Fn.SanitizeString(payload.targetId, 128),
+        targetName = Fn.SanitizeString(payload.targetName, 128),
         fineCode = def and tostring(def.code) or fineCode,
-        description = def and CAD.Server.SanitizeString(def.description, 255) or CAD.Server.SanitizeString(payload.description, 255),
+        description = def and Fn.SanitizeString(def.description, 255) or Fn.SanitizeString(payload.description, 255),
         amount = def and math.max(0, tonumber(def.amount) or 0) or math.max(0, tonumber(payload.amount) or 0),
         jailTime = def and math.max(0, tonumber(def.jailTime) or 0) or math.max(0, tonumber(payload.jailTime) or 0),
         issuedBy = officer.identifier,
         issuedByName = officer.name,
-        issuedAt = CAD.Server.ToIso(),
+        issuedAt = Utils.ToIso(),
         paid = false,
         paidAt = nil,
         paidMethod = nil,
@@ -126,10 +129,10 @@ local function issueFine(payload, officer)
 
     local targetSource = getSourceByIdentifier(fine.targetId)
     if targetSource then
-        CAD.Server.Notify(targetSource, ('New fine: $%s (%s)'):format(fine.amount, fine.fineCode), 'warning')
+        Fn.Notify(targetSource, ('New fine: $%s (%s)'):format(fine.amount, fine.fineCode), 'warning')
     end
 
-    CAD.Server.BroadcastToJobs(
+    Fn.BroadcastToJobs(
         {'police', 'sheriff'},
         'fineCreated',
         { fine = fine }
@@ -148,7 +151,7 @@ local function issueFine(payload, officer)
 
         local recipient = targetSource or officer.source
         pcall(function()
-            exports.ox_inventory:AddItem(recipient, CAD.Config.Evidence.TicketItemName, 1, ticketMetadata)
+            exports.ox_inventory:AddItem(recipient, Config.Evidence.TicketItemName, 1, ticketMetadata)
         end)
     end
 
@@ -156,12 +159,12 @@ local function issueFine(payload, officer)
 end
 
 local function canPlayerPayFine(source, fine)
-    local payerIdentifier = CAD.Server.GetIdentifier(source)
+    local payerIdentifier = Fn.GetIdentifier(source)
     if payerIdentifier and payerIdentifier == fine.targetId then
         return true
     end
 
-    local officer = CAD.Auth.GetOfficerData(source)
+    local officer = Auth.GetOfficerData(source)
     if officer and officer.isAdmin then
         return true
     end
@@ -193,7 +196,7 @@ local function payFine(source, fineId, method)
     local previousStatus = fine.status
 
     fine.paid = true
-    fine.paidAt = CAD.Server.ToIso()
+    fine.paidAt = Utils.ToIso()
     fine.paidMethod = tostring(method or 'BANK')
     fine.status = 'PAID'
 
@@ -206,7 +209,7 @@ local function payFine(source, fineId, method)
         return { ok = false, error = saveErr or 'db_write_failed' }
     end
 
-    CAD.Server.BroadcastToJobs(
+    Fn.BroadcastToJobs(
         {'police', 'sheriff'},
         'finePaid',
         {
@@ -220,23 +223,23 @@ local function payFine(source, fineId, method)
     return fine
 end
 
-lib.callback.register('cad:getFineCatalog', CAD.Auth.WithGuard('default', function()
+lib.callback.register('cad:getFineCatalog', Auth.WithGuard('default', function()
     return getFineCatalog()
 end))
 
-lib.callback.register('cad:createFine', CAD.Auth.WithGuard('heavy', function(source, payload, officer)
-    if not CAD.Server.HasRole(source, { 'police', 'sheriff', 'admin' }) then
+lib.callback.register('cad:createFine', Auth.WithGuard('heavy', function(source, payload, officer)
+    if not Fn.HasRole(source, { 'police', 'sheriff', 'admin' }) then
         return { ok = false, error = 'forbidden' }
     end
     return issueFine(payload, officer)
 end))
 
-lib.callback.register('cad:getFines', CAD.Auth.WithGuard('default', function(source, payload)
+lib.callback.register('cad:getFines', Auth.WithGuard('default', function(source, payload)
     local targetId = payload.targetId and tostring(payload.targetId) or nil
     local status = payload.status and string.upper(tostring(payload.status)) or nil
     local includeMine = payload.mine == true
     local out = {}
-    local myIdentifier = includeMine and CAD.Server.GetIdentifier(source) or nil
+    local myIdentifier = includeMine and Fn.GetIdentifier(source) or nil
 
     for _, fine in pairs(fines) do
         local ok = true
@@ -253,7 +256,7 @@ lib.callback.register('cad:getFines', CAD.Auth.WithGuard('default', function(sou
     return out
 end))
 
-lib.callback.register('cad:payFine', CAD.Auth.WithGuard('payments', function(source, payload)
+lib.callback.register('cad:payFine', Auth.WithGuard('payments', function(source, payload)
     if type(payload) ~= 'table' then
         return { ok = false, error = 'invalid_payload' }
     end
@@ -263,7 +266,7 @@ lib.callback.register('cad:payFine', CAD.Auth.WithGuard('payments', function(sou
     return payFine(source, payload.fineId, payload.method)
 end))
 
-lib.callback.register('cad:payFineByTicket', CAD.Auth.WithGuard('payments', function(source, payload)
+lib.callback.register('cad:payFineByTicket', Auth.WithGuard('payments', function(source, payload)
     if type(payload) ~= 'table' then
         return { ok = false, error = 'invalid_payload' }
     end
@@ -281,7 +284,7 @@ lib.callback.register('cad:payFineByTicket', CAD.Auth.WithGuard('payments', func
 
     if GetResourceState('ox_inventory') == 'started' then
         pcall(function()
-            exports.ox_inventory:RemoveItem(source, CAD.Config.Evidence.TicketItemName, 1, nil, payload.slot, true, false)
+            exports.ox_inventory:RemoveItem(source, Config.Evidence.TicketItemName, 1, nil, payload.slot, true, false)
         end)
     end
 

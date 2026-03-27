@@ -1,10 +1,12 @@
+local Config = require 'modules.shared.config'
+local State = require 'modules.shared.state'
+local Utils = require 'modules.shared.utils'
+local Auth = require 'modules.server.auth'
+local Fn = require 'modules.server.functions'
 
-
-CAD.Police = CAD.Police or {}
-
-CAD.State.Police = CAD.State.Police or {}
-CAD.State.Police.JailTransfers = CAD.State.Police.JailTransfers or {}
-local jailTransfers = CAD.State.Police.JailTransfers
+State.Police = State.Police or {}
+State.Police.JailTransfers = State.Police.JailTransfers or {}
+local jailTransfers = State.Police.JailTransfers
 
 local function toArraySorted(transfers, caseId)
     local out = {}
@@ -26,7 +28,7 @@ local function addCaseNote(caseObj, officer, transfer)
         return true
     end
 
-    local noteId = CAD.Server.GenerateId('NOTE')
+    local noteId = Utils.GenerateId('NOTE')
     local content = ('Jail transfer logged\nCitizen: %s (%s)\nTime: %s months\nReason: %s\nFacility: %s\nOfficer: %s'):format(
         transfer.personName,
         transfer.citizenId,
@@ -62,7 +64,7 @@ local function addCaseNote(caseObj, officer, transfer)
 
     if not ok then
         table.remove(caseObj.notes, #caseObj.notes)
-        CAD.Log('error', 'Failed saving jail note %s: %s', tostring(noteId), tostring(err))
+        Utils.Log('error', 'Failed saving jail note %s: %s', tostring(noteId), tostring(err))
         return false, 'db_write_failed'
     end
 
@@ -70,12 +72,12 @@ local function addCaseNote(caseObj, officer, transfer)
 end
 
 local function createJailTransfer(officer, payload)
-    local citizenId = CAD.Server.SanitizeString(payload.citizenId, 64)
-    local personName = CAD.Server.SanitizeString(payload.personName, 128)
-    local caseId = CAD.Server.SanitizeString(payload.caseId, 64)
-    local reason = CAD.Server.SanitizeString(payload.reason, 500)
-    local facility = CAD.Server.SanitizeString(payload.facility, 128)
-    local notes = CAD.Server.SanitizeString(payload.notes, 1200)
+    local citizenId = Fn.SanitizeString(payload.citizenId, 64)
+    local personName = Fn.SanitizeString(payload.personName, 128)
+    local caseId = Fn.SanitizeString(payload.caseId, 64)
+    local reason = Fn.SanitizeString(payload.reason, 500)
+    local facility = Fn.SanitizeString(payload.facility, 128)
+    local notes = Fn.SanitizeString(payload.notes, 1200)
     local jailMonths = math.max(0, math.floor(tonumber(payload.jailMonths) or 0))
 
     if citizenId == '' or personName == '' then
@@ -86,7 +88,7 @@ local function createJailTransfer(officer, payload)
         return nil, 'invalid_jail_time'
     end
 
-    local transferId = CAD.Server.GenerateId('JAIL')
+    local transferId = Utils.GenerateId('JAIL')
     local transfer = {
         transferId = transferId,
         citizenId = citizenId,
@@ -98,13 +100,13 @@ local function createJailTransfer(officer, payload)
         notes = notes,
         createdBy = officer.identifier,
         createdByName = officer.name,
-        createdAt = CAD.Server.ToIso(),
+        createdAt = Utils.ToIso(),
     }
 
-    local caseObj = transfer.caseId and CAD.State.Cases[transfer.caseId] or nil
+    local caseObj = transfer.caseId and State.Cases[transfer.caseId] or nil
 
     if caseObj then
-        local noteId = CAD.Server.GenerateId('NOTE')
+        local noteId = Utils.GenerateId('NOTE')
         local content = ('Jail transfer logged\nCitizen: %s (%s)\nTime: %s months\nReason: %s\nFacility: %s\nOfficer: %s'):format(
             transfer.personName,
             transfer.citizenId,
@@ -140,7 +142,7 @@ local function createJailTransfer(officer, payload)
         end)
 
         if not txnOk then
-            CAD.Log('error', 'Jail transfer transaction failed for %s: %s', transferId, tostring(txnErr))
+            Utils.Log('error', 'Jail transfer transaction failed for %s: %s', transferId, tostring(txnErr))
             return nil, 'db_transaction_failed'
         end
 
@@ -166,7 +168,7 @@ local function createJailTransfer(officer, payload)
         end)
 
         if not ok then
-            CAD.Log('error', 'Failed saving jail transfer %s: %s', transferId, tostring(err))
+            Utils.Log('error', 'Failed saving jail transfer %s: %s', transferId, tostring(err))
             return nil, 'db_write_failed'
         end
     end
@@ -179,8 +181,8 @@ local function createJailTransfer(officer, payload)
     return transfer
 end
 
-lib.callback.register('cad:police:getJailTransfers', CAD.Auth.WithGuard('default', function(_, payload)
-    local caseId = payload and CAD.Server.SanitizeString(payload.caseId, 64) or nil
+lib.callback.register('cad:police:getJailTransfers', Auth.WithGuard('default', function(_, payload)
+    local caseId = payload and Fn.SanitizeString(payload.caseId, 64) or nil
     if caseId == '' then
         caseId = nil
     end
@@ -191,8 +193,8 @@ lib.callback.register('cad:police:getJailTransfers', CAD.Auth.WithGuard('default
     }
 end))
 
-lib.callback.register('cad:police:logJailTransfer', CAD.Auth.WithGuard('heavy', function(source, payload, officer)
-    if not CAD.Server.HasRole(source, { 'police', 'sheriff', 'admin' }) then
+lib.callback.register('cad:police:logJailTransfer', Auth.WithGuard('heavy', function(source, payload, officer)
+    if not Fn.HasRole(source, { 'police', 'sheriff', 'admin' }) then
         return { ok = false, error = 'forbidden' }
     end
 
@@ -201,13 +203,13 @@ lib.callback.register('cad:police:logJailTransfer', CAD.Auth.WithGuard('heavy', 
         return { ok = false, error = err or 'cannot_create_jail_transfer' }
     end
 
-    CAD.Server.NotifyJobs(
+    Fn.NotifyJobs(
         { 'police', 'sheriff', 'dispatch' },
         ('Jail transfer logged: %s (%s) %s months'):format(transfer.personName, transfer.citizenId, transfer.jailMonths),
         'inform'
     )
 
-    CAD.Server.BroadcastToJobs(
+    Fn.BroadcastToJobs(
         {'police', 'sheriff', 'dispatch'},
         'policeJailTransferLogged',
         { transfer = transfer }
@@ -220,7 +222,7 @@ lib.callback.register('cad:police:logJailTransfer', CAD.Auth.WithGuard('heavy', 
 end))
 
 exports('LogJailTransfer', function(source, data)
-    local officer = CAD.Auth.GetOfficerData(source)
+    local officer = Auth.GetOfficerData(source)
     if not officer then
         return nil, 'officer_not_found'
     end
