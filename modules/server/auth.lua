@@ -123,35 +123,32 @@ AddEventHandler('playerDropped', function()
     Auth.ClearPlayer(source)
 end)
 
-CreateThread(function()
-    while true do
-        Wait(60000)
-        local now = os.time()
-        local activePlayers = {}
-        for _, playerId in ipairs(GetPlayers()) do
-            activePlayers[tonumber(playerId)] = true
-        end
+lib.cron.new('*/1 * * * *', function()
+    local now = os.time()
+    local activePlayers = {}
+    for _, playerId in ipairs(GetPlayers()) do
+        activePlayers[tonumber(playerId)] = true
+    end
 
-        for src, cached in pairs(officerCache) do
-            if not activePlayers[src] or (now - (cached.updatedAt or 0)) > CACHE_TTL_SECONDS then
-                officerCache[src] = nil
-            end
+    for src, cached in pairs(officerCache) do
+        if not activePlayers[src] or (now - (cached.updatedAt or 0)) > CACHE_TTL_SECONDS then
+            officerCache[src] = nil
         end
+    end
 
-        for src, buckets in pairs(rateLimits) do
-            if not activePlayers[src] then
-                rateLimits[src] = nil
-            else
-                local hasActive = false
-                for key, state in pairs(buckets) do
-                    if now >= (state.resetAt or 0) + RATE_BUCKET_TTL_SECONDS then
-                        buckets[key] = nil
-                    else
-                        hasActive = true
-                    end
+    for src, buckets in pairs(rateLimits) do
+        if not activePlayers[src] then
+            rateLimits[src] = nil
+        else
+            local hasActive = false
+            for key, state in pairs(buckets) do
+                if now >= (state.resetAt or 0) + RATE_BUCKET_TTL_SECONDS then
+                    buckets[key] = nil
+                else
+                    hasActive = true
                 end
-                if not hasActive then rateLimits[src] = nil end
             end
+            if not hasActive then rateLimits[src] = nil end
         end
     end
 end)

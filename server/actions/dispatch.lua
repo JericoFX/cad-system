@@ -59,40 +59,12 @@ local function touchUnit(unit)
     unit.updatedAt = Utils.ToIso()
 end
 
----@param value string|nil
----@return integer|nil
-local function isoToEpoch(value)
-    if type(value) ~= 'string' then
-        return nil
-    end
-
-    local year, month, day, hour, minute, second = string.match(value, '^(%d+)%-(%d+)%-(%d+)T(%d+):(%d+):(%d+)Z$')
-    if not year then
-        return nil
-    end
-
-    local localEpoch = os.time({
-        year = tonumber(year),
-        month = tonumber(month),
-        day = tonumber(day),
-        hour = tonumber(hour),
-        min = tonumber(minute),
-        sec = tonumber(second),
-    })
-
-    if not localEpoch then
-        return nil
-    end
-
-    local utcOffset = os.difftime(os.time(), os.time(os.date('!*t')))
-    return localEpoch + utcOffset
-end
 
 ---@param unit DispatchUnitRecord
 ---@return boolean
 local function isUnitStale(unit)
     local staleSeconds = math.max(5, tonumber(Config.Dispatch.UnitStaleSeconds) or 300)
-    local updatedEpoch = tonumber(unit.updatedAtEpoch) or isoToEpoch(unit.updatedAt)
+    local updatedEpoch = tonumber(unit.updatedAtEpoch) or Utils.IsoToEpoch(unit.updatedAt)
     if not updatedEpoch then
         return false
     end
@@ -130,7 +102,7 @@ local function shouldPublishCall(call)
         return true
     end
 
-    local closedEpoch = isoToEpoch(call.closedAt) or isoToEpoch(call.createdAt)
+    local closedEpoch = Utils.IsoToEpoch(call.closedAt) or Utils.IsoToEpoch(call.createdAt)
     if not closedEpoch then
         return true
     end
@@ -442,7 +414,7 @@ lib.callback.register('cad:createDispatchCall', withDispatchGuard('heavy', funct
     local call = {
         callId = callId,
         type = tostring(payload.type or 'GENERAL'):upper(),
-        priority = math.max(1, math.min(3, tonumber(payload.priority) or 2)),
+        priority = lib.math.clamp(tonumber(payload.priority) or 2, 1, 3),
         title = title,
         description = Fn.SanitizeString(payload.description, 2000),
         location = Fn.SanitizeString(payload.location, 255),

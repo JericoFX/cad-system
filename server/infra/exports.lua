@@ -134,7 +134,7 @@ exports('CreateCase', function(source, data)
         title = title,
         description = Fn.SanitizeString(payload.description, 2000),
         status = Config.Cases.DefaultStatus or 'OPEN',
-        priority = math.max(1, math.min(5, tonumber(payload.priority) or 2)),
+        priority = lib.math.clamp(tonumber(payload.priority) or 2, 1, 5),
         createdBy = officer.identifier,
         assignedTo = payload.assignedTo or nil,
         linkedCallId = payload.linkedCallId or nil,
@@ -179,7 +179,7 @@ exports('UpdateCase', function(source, caseId, data)
     if patch.title then caseObj.title = Fn.SanitizeString(patch.title, 255) end
     if patch.description then caseObj.description = Fn.SanitizeString(patch.description, 2000) end
     if patch.status then caseObj.status = tostring(patch.status):upper() end
-    if patch.priority then caseObj.priority = math.max(1, math.min(5, tonumber(patch.priority) or caseObj.priority)) end
+    if patch.priority then caseObj.priority = lib.math.clamp(tonumber(patch.priority) or caseObj.priority, 1, 5) end
     if patch.assignedTo ~= nil then caseObj.assignedTo = patch.assignedTo end
 
     if caseObj.status == 'CLOSED' then
@@ -306,7 +306,7 @@ exports('CreateDispatchCall', function(source, data)
     local call = {
         callId = callId,
         type = tostring(payload.type or 'GENERAL'):upper(),
-        priority = math.max(1, math.min(3, tonumber(payload.priority) or 2)),
+        priority = lib.math.clamp(tonumber(payload.priority) or 2, 1, 3),
         title = Fn.SanitizeString(payload.title, 255),
         description = Fn.SanitizeString(payload.description, 2000),
         location = Fn.SanitizeString(payload.location, 255),

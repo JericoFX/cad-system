@@ -39,34 +39,6 @@ local function cloneTable(value)
     return lib.table.deepclone(value)
 end
 
----@param value string|nil
----@return integer|nil
-local function isoToEpoch(value)
-    if type(value) ~= 'string' then
-        return nil
-    end
-
-    local year, month, day, hour, minute, second = string.match(value, '^(%d+)%-(%d+)%-(%d+)T(%d+):(%d+):(%d+)Z$') --this i take it from somewhere i think it was from a function from ox
-    if not year then
-        return nil
-    end
-
-    local localEpoch = os.time({
-        year = tonumber(year),
-        month = tonumber(month),
-        day = tonumber(day),
-        hour = tonumber(hour),
-        min = tonumber(minute),
-        sec = tonumber(second),
-    })
-
-    if not localEpoch then
-        return nil
-    end
-
-    local utcOffset = os.difftime(os.time(), os.time(os.date('!*t')))
-    return localEpoch + utcOffset
-end
 
 ---@param caseObj CaseRecord
 ---@return boolean
@@ -75,7 +47,7 @@ local function shouldPublishCase(caseObj)
         return true
     end
 
-    local closedEpoch = isoToEpoch(caseObj.closedAt) or isoToEpoch(caseObj.updatedAt)
+    local closedEpoch = Utils.IsoToEpoch(caseObj.closedAt) or Utils.IsoToEpoch(caseObj.updatedAt)
     if not closedEpoch then
         return true
     end
@@ -305,7 +277,7 @@ lib.callback.register('cad:createCase', Auth.WithGuard('heavy', function(source,
         title = title,
         description = Fn.SanitizeString(payload.description, 2000),
         status = Config.Cases.DefaultStatus,
-        priority = math.max(1, math.min(5, tonumber(payload.priority) or 2)),
+        priority = lib.math.clamp(tonumber(payload.priority) or 2, 1, 5),
         createdBy = officer.identifier,
         assignedTo = payload.assignedTo or nil,
         linkedCallId = payload.linkedCallId or nil,
@@ -392,7 +364,7 @@ lib.callback.register('cad:updateCase', Auth.WithGuard('heavy', function(_, payl
     if payload.title then caseObj.title = Fn.SanitizeString(payload.title, 255) end
     if payload.description then caseObj.description = Fn.SanitizeString(payload.description, 2000) end
     if payload.status then caseObj.status = string.upper(tostring(payload.status)) end
-    if payload.priority then caseObj.priority = math.max(1, math.min(5, tonumber(payload.priority) or caseObj.priority)) end
+    if payload.priority then caseObj.priority = lib.math.clamp(tonumber(payload.priority) or caseObj.priority, 1, 5) end
     if payload.assignedTo ~= nil then caseObj.assignedTo = payload.assignedTo end
     if payload.linkedCallId ~= nil then caseObj.linkedCallId = payload.linkedCallId end
     if payload.linkedUnits ~= nil and type(payload.linkedUnits) == 'table' then caseObj.linkedUnits = payload.linkedUnits end

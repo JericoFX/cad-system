@@ -131,19 +131,16 @@ function Fn.SendOfflineQueue(playerId, source)
     end
 end
 
-CreateThread(function()
-    while true do
-        Wait(300000)
-        local now = os.time()
-        for playerId, queue in pairs(offlineQueue) do
-            for i = #queue, 1, -1 do
-                if (now - (queue[i].timestamp or 0)) > OFFLINE_QUEUE_TTL_SECONDS then
-                    table.remove(queue, i)
-                end
+lib.cron.new('*/5 * * * *', function()
+    local now = os.time()
+    for playerId, queue in pairs(offlineQueue) do
+        for i = #queue, 1, -1 do
+            if (now - (queue[i].timestamp or 0)) > OFFLINE_QUEUE_TTL_SECONDS then
+                table.remove(queue, i)
             end
-            if #queue == 0 then
-                offlineQueue[playerId] = nil
-            end
+        end
+        if #queue == 0 then
+            offlineQueue[playerId] = nil
         end
     end
 end)

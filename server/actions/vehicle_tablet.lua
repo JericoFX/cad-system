@@ -382,7 +382,7 @@ lib.callback.register('cad:lookup:searchPersons', Auth.WithGuard('default', func
         return { ok = true, persons = {} }
     end
 
-    local limit = math.max(1, math.min(30, tonumber(payload and payload.limit) or 10))
+    local limit = lib.math.clamp(tonumber(payload and payload.limit) or 10, 1, 30)
     local dataSource = resolveDataSource()
     local wildcard = ('%%%s%%'):format(query)
 
@@ -411,7 +411,7 @@ lib.callback.register('cad:lookup:searchVehicles', Auth.WithGuard('default', fun
         return { ok = true, vehicles = {} }
     end
 
-    local limit = math.max(1, math.min(30, tonumber(payload and payload.limit) or 10))
+    local limit = lib.math.clamp(tonumber(payload and payload.limit) or 10, 1, 30)
     local dataSource = resolveDataSource()
     local wildcard = ('%%%s%%'):format(query)
 
@@ -444,7 +444,7 @@ lib.callback.register('cad:entityNotes:list', Auth.WithGuard('default', function
 
     local entityType = normalizeEntityType(payload and payload.entityType)
     local entityId = Fn.SanitizeString(payload and payload.entityId, 128)
-    local limit = math.max(1, math.min(50, tonumber(payload and payload.limit) or 20))
+    local limit = lib.math.clamp(tonumber(payload and payload.limit) or 20, 1, 50)
 
     if not entityType or entityId == '' then
         return { ok = false, error = 'invalid_entity' }
@@ -528,7 +528,7 @@ lib.callback.register('cad:vehicle:getRecentStops', Auth.WithGuard('default', fu
         return { ok = false, error = 'officer_not_found' }
     end
 
-    local limit = math.max(1, math.min(30, tonumber(payload and payload.limit) or 8))
+    local limit = lib.math.clamp(tonumber(payload and payload.limit) or 8, 1, 30)
     local plate = Fn.SanitizeString(payload and payload.plate, 32)
 
     local rows

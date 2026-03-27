@@ -143,7 +143,7 @@ local function adjustCameraPlacement(hitData)
 
     local camRot = GetGameplayCamRot(2)
     local yaw = computeInitialYaw(hitData.surfaceNormal)
-    local pitch = math.max(pitchMin, math.min(pitchMax, tonumber(camRot.x) or 0.0))
+    local pitch = lib.math.clamp(tonumber(camRot.x) or 0.0, pitchMin, pitchMax)
     local fov = defaultFov
 
     local offsetX = 0.0
