@@ -1,8 +1,12 @@
+local Config = require 'modules.shared.config'
+local State = require 'modules.shared.state'
+local Utils = require 'modules.shared.utils'
+local Auth = require 'modules.server.auth'
+local Fn = require 'modules.server.functions'
 
+local function getAction(name) return _G.CadActions and _G.CadActions[name] end
 
-CAD = CAD or {}
-
-local idReaders = CAD.State.Forensics.IdReaders
+local idReaders = State.Forensics.IdReaders
 
 local LEGACY_DOC_HINTS = {
     id_card = true,
@@ -46,8 +50,8 @@ local function firstString(tbl, keys)
 
     for i = 1, #keys do
         local value = deepGet(tbl, keys[i])
-        if type(value) == 'string' and not CAD.StringIsBlank(value) then
-            return CAD.Server.SanitizeString(value, 255)
+        if type(value) == 'string' and not Utils.IsBlank(value) then
+            return Fn.SanitizeString(value, 255)
         end
     end
 
@@ -113,7 +117,7 @@ local function splitFullName(name)
         return nil, nil
     end
 
-    local trimmed = CAD.Server.SanitizeString(name, 120)
+    local trimmed = Fn.SanitizeString(name, 120)
     if trimmed == '' then
         return nil, nil
     end
@@ -249,7 +253,7 @@ local function normalizeDocumentPerson(itemName, metadata, sourceSlot)
         'photo', 'image', 'mugshot', 'url', 'info.photo', 'info.image',
     })
 
-    local createdAt = CAD.Server.ToIso()
+    local createdAt = Utils.ToIso()
     local resolvedCitizenId = citizenId or ('DOC_%s_%s'):format(tostring(itemName or 'id'), tostring(sourceSlot or os.time()))
 
     local person = {
@@ -302,7 +306,7 @@ local function normalizeVehicleDocument(metadata)
             'lastname', 'lastName', 'charinfo.lastname', 'info.lastname',
         })
         if firstName or lastName then
-            ownerName = CAD.StringTrim(('%s %s'):format(firstName or '', lastName or ''))
+            ownerName = Utils.Trim(('%s %s'):format(firstName or '', lastName or ''))
         end
     end
 
@@ -348,11 +352,11 @@ local function normalizeVehicleDocument(metadata)
     if type(rawFlags) == 'table' then
         for i = 1, #rawFlags do
             if type(rawFlags[i]) == 'string' then
-                flags[#flags + 1] = CAD.Server.SanitizeString(rawFlags[i], 64)
+                flags[#flags + 1] = Fn.SanitizeString(rawFlags[i], 64)
             end
         end
     elseif type(rawFlags) == 'string' and rawFlags ~= '' then
-        flags[1] = CAD.Server.SanitizeString(rawFlags, 64)
+        flags[1] = Fn.SanitizeString(rawFlags, 64)
     end
 
     return {
@@ -368,7 +372,7 @@ local function normalizeVehicleDocument(metadata)
         insuranceStatus = insuranceStatus,
         stolen = stolen,
         flags = flags,
-        createdAt = CAD.Server.ToIso(),
+        createdAt = Utils.ToIso(),
     }
 end
 
@@ -400,7 +404,7 @@ local function normalizeDocumentPayload(itemName, metadata, sourceSlot)
 end
 
 local function getTerminalById(terminalId)
-    local points = CAD.Config.UI.AccessPoints or {}
+    local points = Config.UI.AccessPoints or {}
     for i = 1, #points do
         local point = points[i]
         if point.id == terminalId then
@@ -451,7 +455,7 @@ local function hasVehicleTabletAccess(officer, allowedJobs)
 end
 
 local function resolveVehicleReaderContext(source, payload, officer, rawTerminalId)
-    local global = CAD.Config.Forensics and CAD.Config.Forensics.IdReader or {}
+    local global = Config.Forensics and Config.Forensics.IdReader or {}
     local vehicleCfg = type(global.VehicleTablet) == 'table' and global.VehicleTablet or {}
     if vehicleCfg.Enabled ~= true then
         return nil, nil, nil, {
@@ -539,7 +543,7 @@ local function resolveVehicleReaderContext(source, payload, officer, rawTerminal
 end
 
 local function normalizeReaderConfig(terminal)
-    local global = CAD.Config.Forensics and CAD.Config.Forensics.IdReader or {}
+    local global = Config.Forensics and Config.Forensics.IdReader or {}
     local reader = terminal.idReader
     if type(reader) ~= 'table' or reader.enabled ~= true then
         return nil
@@ -626,12 +630,12 @@ local function isDocumentCandidate(readerConfig, item)
 end
 
 local function readerFeatureEnabled()
-    local cfg = CAD.Config.Forensics and CAD.Config.Forensics.IdReader or {}
-    return cfg.Enabled == true and cfg.UseVirtualContainer == true and CAD.VirtualContainer ~= nil
+    local cfg = Config.Forensics and Config.Forensics.IdReader or {}
+    return cfg.Enabled == true and cfg.UseVirtualContainer == true and getAction("VirtualContainer") ~= nil
 end
 
 local function resolveReaderContext(source, payload, officer)
-    local terminalId = CAD.Server.SanitizeString(payload and payload.terminalId, 64)
+    local terminalId = Fn.SanitizeString(payload and payload.terminalId, 64)
     if terminalId == '' then
         return nil, nil, nil, {
             ok = false,
@@ -679,7 +683,7 @@ end
 
 local function ensureVirtualReaderContainer(terminalId, readerConfig)
     local containerKey = getVirtualContainerKey(terminalId)
-    local container, ensureErr = CAD.VirtualContainer.Ensure(containerKey, {
+    local container, ensureErr = getAction("VirtualContainer").Ensure(containerKey, {
         containerType = 'id_reader',
         endpointId = terminalId,
         slotCount = readerConfig.slots,
@@ -710,7 +714,7 @@ end
 local function getVirtualReaderSlot(containerKey, readerConfig, requestedSlot)
     local targetSlot = tonumber(requestedSlot)
     if targetSlot and targetSlot > 0 then
-        local slotData = CAD.VirtualContainer.GetSlot(containerKey, targetSlot)
+        local slotData = getAction("VirtualContainer").GetSlot(containerKey, targetSlot)
         if slotData and slotData.itemName then
             return targetSlot, slotData
         end
@@ -718,13 +722,13 @@ local function getVirtualReaderSlot(containerKey, readerConfig, requestedSlot)
 
     local preferredSlot = tonumber(readerConfig.readSlot)
     if preferredSlot and preferredSlot > 0 then
-        local slotData = CAD.VirtualContainer.GetSlot(containerKey, preferredSlot)
+        local slotData = getAction("VirtualContainer").GetSlot(containerKey, preferredSlot)
         if slotData and slotData.itemName then
             return preferredSlot, slotData
         end
     end
 
-    local firstSlot, firstData = CAD.VirtualContainer.GetFirstOccupied(containerKey)
+    local firstSlot, firstData = getAction("VirtualContainer").GetFirstOccupied(containerKey)
     if firstData and firstData.itemName then
         return firstSlot, firstData
     end
@@ -788,7 +792,7 @@ local function getReaderStashSlotItem(readerConfig, slot)
     return nil
 end
 
-lib.callback.register('cad:idreader:listDocuments', CAD.Auth.WithGuard('default', function(source, payload, officer)
+lib.callback.register('cad:idreader:listDocuments', Auth.WithGuard('default', function(source, payload, officer)
     if not readerFeatureEnabled() then
         return {
             ok = false,
@@ -834,7 +838,7 @@ lib.callback.register('cad:idreader:listDocuments', CAD.Auth.WithGuard('default'
     }
 end))
 
-lib.callback.register('cad:idreader:insert', CAD.Auth.WithGuard('default', function(source, payload, officer)
+lib.callback.register('cad:idreader:insert', Auth.WithGuard('default', function(source, payload, officer)
     if not readerFeatureEnabled() then
         return {
             ok = false,
@@ -870,7 +874,7 @@ lib.callback.register('cad:idreader:insert', CAD.Auth.WithGuard('default', funct
         }
     end
 
-    if CAD.VirtualContainer.GetSlot(container.containerKey, targetSlot) then
+    if getAction("VirtualContainer").GetSlot(container.containerKey, targetSlot) then
         return {
             ok = false,
             error = 'slot_occupied',
@@ -937,7 +941,7 @@ lib.callback.register('cad:idreader:insert', CAD.Auth.WithGuard('default', funct
         }
     end
 
-    local setOk, setErr = CAD.VirtualContainer.SetSlot(container.containerKey, targetSlot, {
+    local setOk, setErr = getAction("VirtualContainer").SetSlot(container.containerKey, targetSlot, {
         itemName = selected.name,
         label = selected.label or selected.name,
         count = 1,
@@ -945,7 +949,7 @@ lib.callback.register('cad:idreader:insert', CAD.Auth.WithGuard('default', funct
         sourceSlot = selected.slot,
         documentType = normalized.documentType,
         insertedBy = officer.identifier,
-        insertedAt = CAD.Server.ToIso(),
+        insertedAt = Utils.ToIso(),
     })
 
     if not setOk then
@@ -970,7 +974,7 @@ lib.callback.register('cad:idreader:insert', CAD.Auth.WithGuard('default', funct
     }
 end))
 
-lib.callback.register('cad:idreader:eject', CAD.Auth.WithGuard('default', function(source, payload, officer)
+lib.callback.register('cad:idreader:eject', Auth.WithGuard('default', function(source, payload, officer)
     if not readerFeatureEnabled() then
         return {
             ok = false,
@@ -1024,7 +1028,7 @@ lib.callback.register('cad:idreader:eject', CAD.Auth.WithGuard('default', functi
         }
     end
 
-    local clearOk, clearErr = CAD.VirtualContainer.ClearSlot(container.containerKey, targetSlot)
+    local clearOk, clearErr = getAction("VirtualContainer").ClearSlot(container.containerKey, targetSlot)
     if not clearOk then
         exports.ox_inventory:RemoveItem(source, itemName, math.max(1, tonumber(slotData.count) or 1), metadata, nil, true, false)
         return {
@@ -1045,7 +1049,7 @@ lib.callback.register('cad:idreader:eject', CAD.Auth.WithGuard('default', functi
     }
 end))
 
-lib.callback.register('cad:idreader:getContainer', CAD.Auth.WithGuard('default', function(source, payload, officer)
+lib.callback.register('cad:idreader:getContainer', Auth.WithGuard('default', function(source, payload, officer)
     if not readerFeatureEnabled() then
         return {
             ok = false,
@@ -1072,11 +1076,11 @@ lib.callback.register('cad:idreader:getContainer', CAD.Auth.WithGuard('default',
         containerKey = container.containerKey,
         slotCount = container.slotCount,
         readSlot = container.readSlot,
-        slots = CAD.VirtualContainer.List(container.containerKey),
+        slots = getAction("VirtualContainer").List(container.containerKey),
     }
 end))
 
-lib.callback.register('cad:idreader:read', CAD.Auth.WithGuard('default', function(source, payload, officer)
+lib.callback.register('cad:idreader:read', Auth.WithGuard('default', function(source, payload, officer)
     local terminalId, terminal, readerConfig, errorResponse = resolveReaderContext(source, payload, officer)
     if errorResponse then
         return errorResponse

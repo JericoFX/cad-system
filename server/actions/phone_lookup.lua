@@ -1,5 +1,7 @@
-CAD = CAD or {}
-CAD.PhoneLookup = CAD.PhoneLookup or {}
+local Utils = require 'modules.shared.utils'
+local Auth = require 'modules.server.auth'
+local Fn = require 'modules.server.functions'
+
 
 local PHONE_LOOKUP_JOBS = { 'police', 'sheriff', 'csi', 'dispatch', 'admin' }
 local GCPHONE_RESOURCE = 'gcphone-next'
@@ -10,7 +12,7 @@ local function safeQuery(sql, params, context)
     end)
 
     if not ok then
-        CAD.Log('warn', 'Phone lookup query failed (%s): %s', tostring(context or sql), tostring(rows))
+        Utils.Log('warn', 'Phone lookup query failed (%s): %s', tostring(context or sql), tostring(rows))
         return {}
     end
 
@@ -36,7 +38,7 @@ local function decodeJson(raw)
 end
 
 local function sanitizeLookupValue(value, maxLen)
-    local sanitized = CAD.Server.SanitizeString(value, maxLen)
+    local sanitized = Fn.SanitizeString(value, maxLen)
     if sanitized == '' then
         return nil
     end
@@ -50,13 +52,13 @@ local function normalizePhoneLookupRecord(row)
     end
 
     return {
-        identifier = CAD.Server.SanitizeString(row.identifier, 80),
-        phoneNumber = CAD.Server.SanitizeString(row.phone_number, 20),
-        imei = CAD.Server.SanitizeString(row.imei, 32),
+        identifier = Fn.SanitizeString(row.identifier, 80),
+        phoneNumber = Fn.SanitizeString(row.phone_number, 20),
+        imei = Fn.SanitizeString(row.imei, 32),
         isStolen = tonumber(row.is_stolen) == 1,
         stolenAt = row.stolen_at,
-        stolenReason = CAD.Server.SanitizeString(row.stolen_reason, 255),
-        stolenReporter = CAD.Server.SanitizeString(row.stolen_reporter, 80),
+        stolenReason = Fn.SanitizeString(row.stolen_reason, 255),
+        stolenReporter = Fn.SanitizeString(row.stolen_reporter, 80),
     }
 end
 
@@ -118,8 +120,8 @@ local function buildPersonFromIdentifier(identifier)
 
     local charinfo = decodeJson(row.charinfo) or {}
     local metadata = decodeJson(row.metadata) or {}
-    local firstName = CAD.Server.SanitizeString(charinfo.firstname or charinfo.firstName, 64)
-    local lastName = CAD.Server.SanitizeString(charinfo.lastname or charinfo.lastName, 64)
+    local firstName = Fn.SanitizeString(charinfo.firstname or charinfo.firstName, 64)
+    local lastName = Fn.SanitizeString(charinfo.lastname or charinfo.lastName, 64)
     local genderRaw = charinfo.gender
     local gender = 'OTHER'
 
@@ -133,15 +135,15 @@ local function buildPersonFromIdentifier(identifier)
         citizenid = safeIdentifier,
         firstName = firstName ~= '' and firstName or 'UNKNOWN',
         lastName = lastName ~= '' and lastName or 'UNKNOWN',
-        dateOfBirth = CAD.Server.SanitizeString(charinfo.birthdate or charinfo.dateOfBirth, 32),
-        ssn = CAD.Server.SanitizeString(charinfo.ssn or safeIdentifier, 64),
-        phone = CAD.Server.SanitizeString(charinfo.phone or charinfo.phone_number, 32),
-        address = CAD.Server.SanitizeString(charinfo.address or metadata.address, 128),
-        bloodType = CAD.Server.SanitizeString(metadata.bloodtype or metadata.bloodType or charinfo.bloodtype, 16),
-        allergies = CAD.Server.SanitizeString(metadata.allergies, 120),
+        dateOfBirth = Fn.SanitizeString(charinfo.birthdate or charinfo.dateOfBirth, 32),
+        ssn = Fn.SanitizeString(charinfo.ssn or safeIdentifier, 64),
+        phone = Fn.SanitizeString(charinfo.phone or charinfo.phone_number, 32),
+        address = Fn.SanitizeString(charinfo.address or metadata.address, 128),
+        bloodType = Fn.SanitizeString(metadata.bloodtype or metadata.bloodType or charinfo.bloodtype, 16),
+        allergies = Fn.SanitizeString(metadata.allergies, 120),
         gender = gender,
-        createdAt = CAD.Server.ToIso(),
-        lastUpdated = CAD.Server.ToIso(),
+        createdAt = Utils.ToIso(),
+        lastUpdated = Utils.ToIso(),
         isDead = metadata.isdead == true or metadata.isDead == true or metadata.isdead == 1 or metadata.isDead == 1,
     }
 end
@@ -177,7 +179,7 @@ local function buildPhoneLookupResponse(phone)
 end
 
 local function isAllowedOfficer(source)
-    return CAD.Server.HasRole(source, PHONE_LOOKUP_JOBS)
+    return Fn.HasRole(source, PHONE_LOOKUP_JOBS)
 end
 
 local function isGcPhoneAvailable()
@@ -189,10 +191,10 @@ local function executeStolenAction(action, phoneNumber, imei, officerName)
         return nil, 'gcphone_unavailable'
     end
 
-    local safeAction = CAD.Server.SanitizeString(action, 16):upper()
-    local safePhoneNumber = CAD.Server.SanitizeString(phoneNumber, 20)
-    local safeImei = CAD.Server.SanitizeString(imei, 32)
-    local reporter = CAD.Server.SanitizeString(officerName, 80)
+    local safeAction = Fn.SanitizeString(action, 16):upper()
+    local safePhoneNumber = Fn.SanitizeString(phoneNumber, 20)
+    local safeImei = Fn.SanitizeString(imei, 32)
+    local reporter = Fn.SanitizeString(officerName, 80)
     local reason = 'CAD investigation flag'
 
     local ok, result = pcall(function()
@@ -222,7 +224,7 @@ local function executeStolenAction(action, phoneNumber, imei, officerName)
     return result.phone or {}, nil
 end
 
-lib.callback.register('cad:phone:lookupByNumber', CAD.Auth.WithGuard('default', function(source, payload)
+lib.callback.register('cad:phone:lookupByNumber', Auth.WithGuard('default', function(source, payload)
     if not isAllowedOfficer(source) then
         return { ok = false, error = 'forbidden' }
     end
@@ -238,7 +240,7 @@ lib.callback.register('cad:phone:lookupByNumber', CAD.Auth.WithGuard('default', 
     }
 end))
 
-lib.callback.register('cad:phone:lookupByImei', CAD.Auth.WithGuard('default', function(source, payload)
+lib.callback.register('cad:phone:lookupByImei', Auth.WithGuard('default', function(source, payload)
     if not isAllowedOfficer(source) then
         return { ok = false, error = 'forbidden' }
     end
@@ -254,14 +256,14 @@ lib.callback.register('cad:phone:lookupByImei', CAD.Auth.WithGuard('default', fu
     }
 end))
 
-lib.callback.register('cad:phone:setStolenPlaceholder', CAD.Auth.WithGuard('heavy', function(source, payload, officer)
+lib.callback.register('cad:phone:setStolenPlaceholder', Auth.WithGuard('heavy', function(source, payload, officer)
     if not isAllowedOfficer(source) then
         return { ok = false, error = 'forbidden' }
     end
 
-    local action = CAD.Server.SanitizeString(payload and payload.action, 16):upper()
-    local phoneNumber = CAD.Server.SanitizeString(payload and payload.phoneNumber, 20)
-    local imei = CAD.Server.SanitizeString(payload and payload.imei, 32)
+    local action = Fn.SanitizeString(payload and payload.action, 16):upper()
+    local phoneNumber = Fn.SanitizeString(payload and payload.phoneNumber, 20)
+    local imei = Fn.SanitizeString(payload and payload.imei, 32)
 
     if action ~= 'MARK' and action ~= 'CLEAR' then
         return { ok = false, error = 'invalid_action' }

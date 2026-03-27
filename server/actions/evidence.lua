@@ -1,17 +1,20 @@
+local Config = require 'modules.shared.config'
+local State = require 'modules.shared.state'
+local Utils = require 'modules.shared.utils'
+local Auth = require 'modules.server.auth'
+local Fn = require 'modules.server.functions'
 
+local Evidence = {}
 
-CAD = CAD or {}
-CAD.Evidence = CAD.Evidence or {}
-
-local staging = CAD.State.Evidence.Staging
+local staging = State.Evidence.Staging
 
 local function evidenceVirtualEnabled()
-    local cfg = CAD.Config.Evidence or {}
-    return cfg.UseVirtualContainer ~= false and CAD.VirtualContainer ~= nil
+    local cfg = Config.Evidence or {}
+    return cfg.UseVirtualContainer ~= false and _G.CadActions and _G.CadActions.VirtualContainer ~= nil
 end
 
 local function getTerminalById(terminalId)
-    local points = CAD.Config.UI.AccessPoints or {}
+    local points = Config.UI.AccessPoints or {}
     for i = 1, #points do
         local point = points[i]
         if point.id == terminalId then
@@ -46,7 +49,7 @@ local function normalizeContainerConfig(terminal)
         return nil
     end
 
-    local global = CAD.Config.Evidence or {}
+    local global = Config.Evidence or {}
     local slots = tonumber(container.slots) or tonumber(global.VirtualContainerSlotCount) or 200
 
     return {
@@ -79,7 +82,7 @@ local function isPlayerNearTerminal(source, terminal)
 end
 
 local function resolveContainerContext(payload, officer)
-    local terminalId = CAD.Server.SanitizeString(payload and payload.terminalId, 64)
+    local terminalId = Fn.SanitizeString(payload and payload.terminalId, 64)
     if terminalId == '' then
         return nil, nil, nil, {
             ok = false,
@@ -126,7 +129,7 @@ end
 
 local function ensureVirtualEvidenceContainer(terminalId, containerConfig)
     local containerKey = getContainerKey(terminalId)
-    local container, ensureErr = CAD.VirtualContainer.Ensure(containerKey, {
+    local container, ensureErr = _G.CadActions and _G.CadActions.VirtualContainer.Ensure(containerKey, {
         containerType = 'evidence',
         endpointId = terminalId,
         slotCount = containerConfig.slots,
@@ -160,7 +163,7 @@ local function getContainerSlot(container, requestedSlot)
         end
     end
 
-    local slotIndex, entry = CAD.VirtualContainer.GetFirstOccupied(container.containerKey)
+    local slotIndex, entry = _G.CadActions and _G.CadActions.VirtualContainer.GetFirstOccupied(container.containerKey)
     if slotIndex and entry then
         return slotIndex, entry
     end
@@ -174,14 +177,14 @@ local function getOfficerStaging(source)
 end
 
 local function appendCaseEvidence(caseId, evidence)
-    local caseObj = CAD.State.Cases[caseId]
+    local caseObj = State.Cases[caseId]
     if not caseObj then
         return false, 'case_not_found'
     end
 
     caseObj.evidence = caseObj.evidence or {}
     local previousUpdatedAt = caseObj.updatedAt
-    local newUpdatedAt = CAD.Server.ToIso()
+    local newUpdatedAt = Utils.ToIso()
 
     local ok, err = pcall(function()
         MySQL.transaction.await({
@@ -211,39 +214,39 @@ local function appendCaseEvidence(caseId, evidence)
     end)
 
     if not ok then
-        CAD.Log('error', 'Failed saving evidence %s to case %s: %s', tostring(evidence.evidenceId), tostring(caseId), tostring(err))
+        Utils.Log('error', 'Failed saving evidence %s to case %s: %s', tostring(evidence.evidenceId), tostring(caseId), tostring(err))
         return false, 'db_write_failed'
     end
 
     caseObj.evidence[#caseObj.evidence + 1] = evidence
     caseObj.updatedAt = newUpdatedAt
 
-    if CAD.Cases and type(CAD.Cases.PublishPublicState) == 'function' then
-        CAD.Cases.PublishPublicState(false)
+    local CasesAction = getAction("Cases"); if CasesAction and type(CasesAction.PublishPublicState) == 'function' then
+        CasesAction.PublishPublicState(false)
     end
 
     return true
 end
 
-CAD.Evidence.AppendCaseEvidence = appendCaseEvidence
+Evidence.AppendCaseEvidence = appendCaseEvidence
 
-lib.callback.register('cad:addEvidenceToStaging', CAD.Auth.WithGuard('default', function(source, payload)
+lib.callback.register('cad:addEvidenceToStaging', Auth.WithGuard('default', function(source, payload)
     local bucket = getOfficerStaging(source)
-    if #bucket >= CAD.Config.Evidence.MaxStagingPerOfficer then
+    if #bucket >= Config.Evidence.MaxStagingPerOfficer then
         return { ok = false, error = 'staging_limit_reached' }
     end
 
-    local stagingId = CAD.Server.GenerateId('STAGE')
+    local stagingId = Utils.GenerateId('STAGE')
     local record = {
         stagingId = stagingId,
         evidenceType = tostring(payload.evidenceType or 'PHOTO'):upper(),
         data = type(payload.data) == 'table' and payload.data or {},
-        createdAt = CAD.Server.ToIso(),
+        createdAt = Utils.ToIso(),
     }
 
     bucket[#bucket + 1] = record
 
-    CAD.Server.BroadcastToPlayer(source, 'evidenceStaged', {
+    Fn.BroadcastToPlayer(source, 'evidenceStaged', {
         stagingId = stagingId,
         evidenceType = record.evidenceType,
         data = record.data,
@@ -253,12 +256,12 @@ lib.callback.register('cad:addEvidenceToStaging', CAD.Auth.WithGuard('default', 
     return record
 end))
 
-lib.callback.register('cad:getStagingEvidence', CAD.Auth.WithGuard('default', function(source)
+lib.callback.register('cad:getStagingEvidence', Auth.WithGuard('default', function(source)
     local bucket = getOfficerStaging(source)
     return bucket
 end))
 
-lib.callback.register('cad:removeFromStaging', CAD.Auth.WithGuard('default', function(source, payload)
+lib.callback.register('cad:removeFromStaging', Auth.WithGuard('default', function(source, payload)
     local stagingId = type(payload) == 'string' and payload or payload.stagingId
     if not stagingId then
         return false
@@ -275,7 +278,7 @@ lib.callback.register('cad:removeFromStaging', CAD.Auth.WithGuard('default', fun
     return false
 end))
 
-lib.callback.register('cad:evidence:container:list', CAD.Auth.WithGuard('default', function(_, payload, officer)
+lib.callback.register('cad:evidence:container:list', Auth.WithGuard('default', function(_, payload, officer)
     if not evidenceVirtualEnabled() then
         return {
             ok = false,
@@ -301,11 +304,11 @@ lib.callback.register('cad:evidence:container:list', CAD.Auth.WithGuard('default
         terminalId = terminalId,
         containerKey = container.containerKey,
         slotCount = container.slotCount,
-        slots = CAD.VirtualContainer.List(container.containerKey),
+        slots = _G.CadActions and _G.CadActions.VirtualContainer.List(container.containerKey),
     }
 end))
 
-lib.callback.register('cad:evidence:container:store', CAD.Auth.WithGuard('heavy', function(source, payload, officer)
+lib.callback.register('cad:evidence:container:store', Auth.WithGuard('heavy', function(source, payload, officer)
     if not evidenceVirtualEnabled() then
         return {
             ok = false,
@@ -314,7 +317,7 @@ lib.callback.register('cad:evidence:container:store', CAD.Auth.WithGuard('heavy'
     end
 
     payload = type(payload) == 'table' and payload or {}
-    local stagingId = CAD.Server.SanitizeString(payload.stagingId, 64)
+    local stagingId = Fn.SanitizeString(payload.stagingId, 64)
     if stagingId == '' then
         return {
             ok = false,
@@ -383,17 +386,17 @@ lib.callback.register('cad:evidence:container:store', CAD.Auth.WithGuard('heavy'
         evidenceType = selected.evidenceType,
         data = selected.data,
         createdAt = selected.createdAt,
-        storedAt = CAD.Server.ToIso(),
+        storedAt = Utils.ToIso(),
         storedBy = officer.identifier,
     }
 
-    local setOk, setErr = CAD.VirtualContainer.SetSlot(container.containerKey, targetSlot, {
+    local setOk, setErr = _G.CadActions and _G.CadActions.VirtualContainer.SetSlot(container.containerKey, targetSlot, {
         itemName = 'cad_evidence_record',
         label = ('%s Evidence'):format(tostring(selected.evidenceType or 'UNKNOWN')),
         count = 1,
         metadata = metadata,
         insertedBy = officer.identifier,
-        insertedAt = CAD.Server.ToIso(),
+        insertedAt = Utils.ToIso(),
     })
 
     if not setOk then
@@ -414,7 +417,7 @@ lib.callback.register('cad:evidence:container:store', CAD.Auth.WithGuard('heavy'
     }
 end))
 
-lib.callback.register('cad:evidence:container:pull', CAD.Auth.WithGuard('heavy', function(source, payload, officer)
+lib.callback.register('cad:evidence:container:pull', Auth.WithGuard('heavy', function(source, payload, officer)
     if not evidenceVirtualEnabled() then
         return {
             ok = false,
@@ -438,7 +441,7 @@ lib.callback.register('cad:evidence:container:pull', CAD.Auth.WithGuard('heavy',
     end
 
     local bucket = getOfficerStaging(source)
-    if #bucket >= CAD.Config.Evidence.MaxStagingPerOfficer then
+    if #bucket >= Config.Evidence.MaxStagingPerOfficer then
         return {
             ok = false,
             error = 'staging_limit_reached',
@@ -455,15 +458,15 @@ lib.callback.register('cad:evidence:container:pull', CAD.Auth.WithGuard('heavy',
 
     local metadata = type(slotData.metadata) == 'table' and slotData.metadata or {}
     local staged = {
-        stagingId = CAD.Server.GenerateId('STAGE'),
+        stagingId = Utils.GenerateId('STAGE'),
         evidenceType = tostring(metadata.evidenceType or 'PHYSICAL'):upper(),
         data = type(metadata.data) == 'table' and metadata.data or {},
-        createdAt = tostring(metadata.createdAt or CAD.Server.ToIso()),
+        createdAt = tostring(metadata.createdAt or Utils.ToIso()),
     }
 
     bucket[#bucket + 1] = staged
 
-    local clearOk, clearErr = CAD.VirtualContainer.ClearSlot(container.containerKey, targetSlot)
+    local clearOk, clearErr = _G.CadActions and _G.CadActions.VirtualContainer.ClearSlot(container.containerKey, targetSlot)
     if not clearOk then
         table.remove(bucket, #bucket)
         return {
@@ -481,14 +484,14 @@ lib.callback.register('cad:evidence:container:pull', CAD.Auth.WithGuard('heavy',
     }
 end))
 
-lib.callback.register('cad:attachEvidence', CAD.Auth.WithGuard('heavy', function(source, payload, officer)
+lib.callback.register('cad:attachEvidence', Auth.WithGuard('heavy', function(source, payload, officer)
     local stagingId = payload.stagingId
     local caseId = payload.caseId
     if not stagingId or not caseId then
         return { ok = false, error = 'invalid_payload' }
     end
 
-    local caseObj = CAD.State.Cases[caseId]
+    local caseObj = State.Cases[caseId]
     if not caseObj then
         return { ok = false, error = 'case_not_found' }
     end
@@ -508,20 +511,20 @@ lib.callback.register('cad:attachEvidence', CAD.Auth.WithGuard('heavy', function
     end
 
     local evidence = {
-        evidenceId = CAD.Server.GenerateId('EVID'),
+        evidenceId = Utils.GenerateId('EVID'),
         caseId = caseId,
         evidenceType = selected.evidenceType,
         data = selected.data,
         attachedBy = officer.identifier,
-        attachedAt = CAD.Server.ToIso(),
+        attachedAt = Utils.ToIso(),
         custodyChain = {
             {
-                eventId = CAD.Server.GenerateId('CUSTODY'),
+                eventId = Utils.GenerateId('CUSTODY'),
                 evidenceId = '',
                 eventType = 'COLLECTED',
                 location = selected.data.location or 'Unknown',
                 notes = 'Collected and attached to case',
-                timestamp = CAD.Server.ToIso(),
+                timestamp = Utils.ToIso(),
                 recordedBy = officer.identifier,
             }
         },
@@ -538,17 +541,17 @@ lib.callback.register('cad:attachEvidence', CAD.Auth.WithGuard('heavy', function
     return evidence
 end))
 
-lib.callback.register('cad:getCaseEvidence', CAD.Auth.WithGuard('default', function(_, payload)
+lib.callback.register('cad:getCaseEvidence', Auth.WithGuard('default', function(_, payload)
     local caseId = type(payload) == 'string' and payload or payload.caseId
-    local caseObj = caseId and CAD.State.Cases[caseId] or nil
+    local caseObj = caseId and State.Cases[caseId] or nil
     if not caseObj then
         return {}
     end
     return caseObj.evidence or {}
 end))
 
-lib.callback.register('cad:debug:createEvidenceItem', CAD.Auth.WithGuard('default', function(source, data)
-    if not CAD.Config.Debug then
+lib.callback.register('cad:debug:createEvidenceItem', Auth.WithGuard('default', function(source, data)
+    if not Config.Debug then
         return { ok = false, error = 'debug_disabled' }
     end
 
@@ -556,14 +559,14 @@ lib.callback.register('cad:debug:createEvidenceItem', CAD.Auth.WithGuard('defaul
         return { ok = false, error = 'ox_inventory_not_available' }
     end
 
-    local itemName = CAD.Config.Evidence and CAD.Config.Evidence.TicketItemName or 'cad_ticket'
+    local itemName = Config.Evidence and Config.Evidence.TicketItemName or 'cad_ticket'
     local metadata = {
         type = 'EVIDENCE',
         evidenceType = data.evidenceType or 'PHOTO',
         imageUrl = data.imageUrl,
         description = data.description or 'Debug evidence',
-        createdAt = CAD.Server.ToIso(),
-        createdBy = CAD.Auth.GetOfficerData(source).name,
+        createdAt = Utils.ToIso(),
+        createdBy = Auth.GetOfficerData(source).name,
         isCADEvidence = true,
     }
 
@@ -577,3 +580,6 @@ lib.callback.register('cad:debug:createEvidenceItem', CAD.Auth.WithGuard('defaul
         return { ok = false, error = 'inventory_error' }
     end
 end))
+
+_G.CadActions = _G.CadActions or {}
+_G.CadActions.Evidence = Evidence

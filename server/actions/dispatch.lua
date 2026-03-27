@@ -1,7 +1,10 @@
+local Config = require 'modules.shared.config'
+local State = require 'modules.shared.state'
+local Utils = require 'modules.shared.utils'
+local Auth = require 'modules.server.auth'
+local Fn = require 'modules.server.functions'
 
-
-CAD = CAD or {}
-CAD.Dispatch = CAD.Dispatch or {}
+local Dispatch = {}
 
 ---@class DispatchUnitRecord
 ---@field unitId string
@@ -28,12 +31,12 @@ CAD.Dispatch = CAD.Dispatch or {}
 ---@field closedAt? string
 ---@field resolution? string
 
-local units = CAD.State.Dispatch.Units
-local calls = CAD.State.Dispatch.Calls
+local units = State.Dispatch.Units
+local calls = State.Dispatch.Calls
 local sourceToUnit = {}
 local saveCallDb
 
-local dispatchPublicCfg = CAD.Config.Dispatch and CAD.Config.Dispatch.PublicState or {}
+local dispatchPublicCfg = Config.Dispatch and Config.Dispatch.PublicState or {}
 local DISPATCH_PUBLIC_CLOSED_TTL_MINUTES = math.max(1, tonumber(dispatchPublicCfg.ClosedRetentionMinutes) or 10)
 local DISPATCH_PUBLIC_MAX_CALLS = math.max(10, tonumber(dispatchPublicCfg.MaxCalls) or 250)
 
@@ -45,14 +48,14 @@ local function markDirty()
 end
 
 local function isDispatchEnabled()
-    return CAD.Config.Dispatch.Enabled ~= false and CAD.IsFeatureEnabled('Dispatch')
+    return Config.Dispatch.Enabled ~= false and Config.IsFeatureEnabled('Dispatch')
 end
 
 ---@param unit DispatchUnitRecord
 local function touchUnit(unit)
     local nowEpoch = os.time()
     unit.updatedAtEpoch = nowEpoch
-    unit.updatedAt = CAD.Server.ToIso()
+    unit.updatedAt = Utils.ToIso()
 end
 
 ---@param value string|nil
@@ -87,7 +90,7 @@ end
 ---@param unit DispatchUnitRecord
 ---@return boolean
 local function isUnitStale(unit)
-    local staleSeconds = math.max(5, tonumber(CAD.Config.Dispatch.UnitStaleSeconds) or 300)
+    local staleSeconds = math.max(5, tonumber(Config.Dispatch.UnitStaleSeconds) or 300)
     local updatedEpoch = tonumber(unit.updatedAtEpoch) or isoToEpoch(unit.updatedAt)
     if not updatedEpoch then
         return false
@@ -107,10 +110,10 @@ end
 ---@param unitId string
 ---@param unit DispatchUnitRecord|nil
 local function syncEmsUnit(unitId, unit)
-    local ems = CAD.State.EMS.Units[unitId]
+    local ems = State.EMS.Units[unitId]
     if not ems then return end
     if not unit then
-        CAD.State.EMS.Units[unitId] = nil
+        State.EMS.Units[unitId] = nil
         return
     end
     ems.status = unit.status
@@ -179,7 +182,7 @@ local function publishIfDirty()
 
     GlobalState:set('cad_dispatch_public', {
         rev = rev,
-        generatedAt = CAD.Server.ToIso(),
+        generatedAt = Utils.ToIso(),
         calls = publicCalls,
         units = publicUnits,
     }, true)
@@ -253,14 +256,14 @@ local function canUseDispatchControl(officer)
     end
 
     if job == 'ambulance' or job == 'ems' then
-        return CAD.Config.Dispatch.AllowEMSControl ~= false
+        return Config.Dispatch.AllowEMSControl ~= false
     end
 
     return false
 end
 
 local function withDispatchGuard(bucket, handler)
-    return CAD.Auth.WithGuard(bucket, function(source, payload, officer)
+    return Auth.WithGuard(bucket, function(source, payload, officer)
         if not isDispatchEnabled() then
             return {
                 ok = false,
@@ -310,7 +313,7 @@ saveCallDb = function(call)
     end)
 
     if not ok then
-        CAD.Log('error', 'Failed saving dispatch call %s: %s', tostring(call and call.callId), tostring(err))
+        Utils.Log('error', 'Failed saving dispatch call %s: %s', tostring(call and call.callId), tostring(err))
         return false, 'db_write_failed'
     end
 
@@ -350,7 +353,7 @@ lib.callback.register('cad:registerDispatchUnit', withDispatchGuard('default', f
     units[unitId] = unit
 
     if officer.job == 'ambulance' or officer.job == 'ems' then
-        CAD.State.EMS.Units[unitId] = {
+        State.EMS.Units[unitId] = {
             unitId = unitId,
             status = unit.status,
             unitType = 'AMBULANCE',
@@ -387,7 +390,7 @@ lib.callback.register('cad:updateUnitStatus', withDispatchGuard('default', funct
         return { ok = false, error = 'unit_not_found' }
     end
 
-    local officer = CAD.Auth.GetOfficerData(source)
+    local officer = Auth.GetOfficerData(source)
     if not officer then
         return { ok = false, error = 'officer_not_found' }
     end
@@ -429,19 +432,19 @@ lib.callback.register('cad:updateUnitStatus', withDispatchGuard('default', funct
 end))
 
 lib.callback.register('cad:createDispatchCall', withDispatchGuard('heavy', function(_, payload)
-    local title = CAD.Server.SanitizeString(payload.title, 255)
+    local title = Fn.SanitizeString(payload.title, 255)
     if title == '' then
         return { ok = false, error = 'title_required' }
     end
 
-    local callId = CAD.Server.GenerateId('CALL')
+    local callId = Utils.GenerateId('CALL')
     local call = {
         callId = callId,
         type = tostring(payload.type or 'GENERAL'):upper(),
         priority = math.max(1, math.min(3, tonumber(payload.priority) or 2)),
         title = title,
-        description = CAD.Server.SanitizeString(payload.description, 2000),
-        location = CAD.Server.SanitizeString(payload.location, 255),
+        description = Fn.SanitizeString(payload.description, 2000),
+        location = Fn.SanitizeString(payload.location, 255),
         coordinates = type(payload.coordinates) == 'table' and {
             x = tonumber(payload.coordinates.x) or 0.0,
             y = tonumber(payload.coordinates.y) or 0.0,
@@ -449,7 +452,7 @@ lib.callback.register('cad:createDispatchCall', withDispatchGuard('heavy', funct
         } or nil,
         status = 'PENDING',
         assignedUnits = {},
-        createdAt = CAD.Server.ToIso(),
+        createdAt = Utils.ToIso(),
     }
 
     local saved, saveErr = saveCallDb(call)
@@ -490,17 +493,17 @@ lib.callback.register('cad:assignUnitToCall', withDispatchGuard('heavy', functio
     local previousCurrentCall = unit.currentCall
 
     call.assignedUnits[payload.unitId] = {
-        assignedAt = CAD.Server.ToIso(),
+        assignedAt = Utils.ToIso(),
     }
     call.status = 'ACTIVE'
     unit.status = 'BUSY'
     unit.currentCall = call.callId
     touchUnit(unit)
 
-    if CAD.State.EMS.Units[payload.unitId] then
-        CAD.State.EMS.Units[payload.unitId].status = 'EN_ROUTE'
-        CAD.State.EMS.Units[payload.unitId].currentCall = call.callId
-        CAD.State.EMS.Units[payload.unitId].updatedAt = unit.updatedAt
+    if State.EMS.Units[payload.unitId] then
+        State.EMS.Units[payload.unitId].status = 'EN_ROUTE'
+        State.EMS.Units[payload.unitId].currentCall = call.callId
+        State.EMS.Units[payload.unitId].updatedAt = unit.updatedAt
     end
 
     local saved, saveErr = saveCallDb(call)
@@ -569,7 +572,7 @@ local function closeCallInternal(call, payload)
     local previousUnits = {}
 
     call.status = 'CLOSED'
-    call.closedAt = CAD.Server.ToIso()
+    call.closedAt = Utils.ToIso()
     call.resolution = payload.resolution or nil
 
     for unitId in pairs(call.assignedUnits) do
@@ -583,14 +586,14 @@ local function closeCallInternal(call, payload)
             unit.status = 'AVAILABLE'
             touchUnit(unit)
             syncEmsUnit(unitId, unit)
-        elseif CAD.State.EMS.Units[unitId] then
+        elseif State.EMS.Units[unitId] then
             previousUnits[unitId] = {
-                emsStatus = CAD.State.EMS.Units[unitId].status,
-                emsCurrentCall = CAD.State.EMS.Units[unitId].currentCall,
+                emsStatus = State.EMS.Units[unitId].status,
+                emsCurrentCall = State.EMS.Units[unitId].currentCall,
             }
-            CAD.State.EMS.Units[unitId].status = 'AVAILABLE'
-            CAD.State.EMS.Units[unitId].currentCall = nil
-            CAD.State.EMS.Units[unitId].updatedAt = CAD.Server.ToIso()
+            State.EMS.Units[unitId].status = 'AVAILABLE'
+            State.EMS.Units[unitId].currentCall = nil
+            State.EMS.Units[unitId].updatedAt = Utils.ToIso()
         end
     end
 
@@ -606,10 +609,10 @@ local function closeCallInternal(call, payload)
                 touchUnit(unit)
                 syncEmsUnit(unitId, unit)
             end
-            if CAD.State.EMS.Units[unitId] and snapshot.emsStatus then
-                CAD.State.EMS.Units[unitId].status = snapshot.emsStatus
-                CAD.State.EMS.Units[unitId].currentCall = snapshot.emsCurrentCall
-                CAD.State.EMS.Units[unitId].updatedAt = unit and unit.updatedAt or CAD.Server.ToIso()
+            if State.EMS.Units[unitId] and snapshot.emsStatus then
+                State.EMS.Units[unitId].status = snapshot.emsStatus
+                State.EMS.Units[unitId].currentCall = snapshot.emsCurrentCall
+                State.EMS.Units[unitId].updatedAt = unit and unit.updatedAt or Utils.ToIso()
             end
         end
         return nil, saveErr or 'db_write_failed'
@@ -761,7 +764,7 @@ RegisterNetEvent('cad:server:updatePosition', function(coords)
         return
     end
 
-    local allowed, officerOrError = CAD.Auth.RequireOfficer(source)
+    local allowed, officerOrError = Auth.RequireOfficer(source)
     if not allowed then
         return
     end
@@ -806,7 +809,7 @@ RegisterNetEvent('cad:server:statusChanged', function(statusCode)
         return
     end
 
-    local allowed, officerOrError = CAD.Auth.RequireOfficer(source)
+    local allowed, officerOrError = Auth.RequireOfficer(source)
     if not allowed then
         return
     end
@@ -880,3 +883,6 @@ CreateThread(function()
         publishIfDirty()
     end
 end)
+
+_G.CadActions = _G.CadActions or {}
+_G.CadActions.Dispatch = Dispatch

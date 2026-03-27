@@ -1,8 +1,5 @@
+local EvidenceTypes = require 'shared.evidence_types'
 
-
-CAD = CAD or {}
-CAD.Forensic = CAD.Forensic or {}
-CAD.Forensic.Decay = {}
 
 CreateThread(function()
     while true do
@@ -26,7 +23,7 @@ CreateThread(function()
         for bloodId, blood in pairs(evidences.blood) do
             local createdAt = tonumber(blood.createdAt) or now
             local age = now - createdAt
-            local config = CAD.EvidenceTypes.GetType('blood')
+            local config = EvidenceTypes.GetType('blood')
             if not config or type(config.decay) ~= 'table' then
                 goto continue
             end
@@ -75,7 +72,7 @@ CreateThread(function()
         for fpId, fp in pairs(evidences.fingerprints) do
             local createdAt = tonumber(fp.createdAt) or now
             local age = now - createdAt
-            local config = CAD.EvidenceTypes.GetType('fingerprint')
+            local config = EvidenceTypes.GetType('fingerprint')
             if not config or type(config.decay) ~= 'table' then
                 goto continueFingerprint
             end
@@ -120,7 +117,7 @@ CreateThread(function()
         for casingId, casing in pairs(evidences.casings) do
             local createdAt = tonumber(casing.createdAt) or now
             local age = now - createdAt
-            local config = CAD.EvidenceTypes.GetType('casing')
+            local config = EvidenceTypes.GetType('casing')
             if not config or type(config.decay) ~= 'table' then
                 goto continueCasing
             end

@@ -1,5 +1,5 @@
-CAD = CAD or {}
-CAD.PhoneAddon = CAD.PhoneAddon or {}
+local PhoneLookup = {}
+
 
 local GCPHONE_RESOURCE = 'gcphone-next'
 local ALLOWLISTED_RESOURCE = 'cad-system'
@@ -23,7 +23,7 @@ local function safeString(value, maxLen)
     return trimmed
 end
 
-function CAD.PhoneLookup.GetPhoneRecordByNumber(phoneNumber)
+function PhoneLookup.GetPhoneRecordByNumber(phoneNumber)
     if not isGcPhoneAvailable() then
         return nil, 'gcphone_unavailable'
     end
@@ -41,7 +41,7 @@ function CAD.PhoneLookup.GetPhoneRecordByNumber(phoneNumber)
     return result.phone or {}, nil
 end
 
-function CAD.PhoneLookup.GetPhoneRecordByImei(imei)
+function PhoneLookup.GetPhoneRecordByImei(imei)
     if not isGcPhoneAvailable() then
         return nil, 'gcphone_unavailable'
     end
@@ -64,7 +64,7 @@ function CAD.PhoneLookup.GetPhoneRecordByImei(imei)
     return phoneData.phone or {}, nil
 end
 
-function CAD.PhoneLookup.MarkPhoneAsStolen(phoneNumber, imei, reason, reporter)
+function PhoneLookup.MarkPhoneAsStolen(phoneNumber, imei, reason, reporter)
     if not isGcPhoneAvailable() then
         return nil, 'gcphone_unavailable'
     end
@@ -98,7 +98,7 @@ function CAD.PhoneLookup.MarkPhoneAsStolen(phoneNumber, imei, reason, reporter)
     return result.phone or {}, nil
 end
 
-function CAD.PhoneLookup.ClearPhoneStolen(phoneNumber, imei)
+function PhoneLookup.ClearPhoneStolen(phoneNumber, imei)
     if not isGcPhoneAvailable() then
         return nil, 'gcphone_unavailable'
     end
@@ -129,7 +129,7 @@ function CAD.PhoneLookup.ClearPhoneStolen(phoneNumber, imei)
     return result.phone or {}, nil
 end
 
-function CAD.PhoneLookup.GetPhoneOwnerInfo(identifier)
+function PhoneLookup.GetPhoneOwnerInfo(identifier)
     if not isGcPhoneAvailable() then
         return nil, 'gcphone_unavailable'
     end

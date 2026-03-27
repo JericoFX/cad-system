@@ -1,14 +1,16 @@
+local Config = require 'modules.shared.config'
+local State = require 'modules.shared.state'
+local Utils = require 'modules.shared.utils'
+local Auth = require 'modules.server.auth'
+local Fn = require 'modules.server.functions'
+local EvidenceTypes = require 'shared.evidence_types'
 
-
-CAD = CAD or {}
-CAD.Forensic = CAD.Forensic or {}
-CAD.Forensic.Sync = {}
 
 local MAX_COORD_ABS = 100000.0
 
 local function isForensicsEnabled()
-    if CAD.IsFeatureEnabled then
-        return CAD.IsFeatureEnabled('Forensics')
+    if Config.IsFeatureEnabled then
+        return Config.IsFeatureEnabled('Forensics')
     end
 
     return true
@@ -67,7 +69,7 @@ local function parseCoords(raw)
 end
 
 local function normalizeBloodType(value)
-    local bloodType = CAD.Server.SanitizeString(value, 16):upper()
+    local bloodType = Fn.SanitizeString(value, 16):upper()
     if bloodType == '' then
         return 'UNKNOWN'
     end
@@ -125,7 +127,7 @@ RegisterNetEvent('cad:forensic:sync', function(evidenceType, ownerId, ...)
         return
     end
 
-    local officer = CAD.Auth.GetOfficerData(src)
+    local officer = Auth.GetOfficerData(src)
     if not officer then
         return
     end
@@ -135,13 +137,13 @@ RegisterNetEvent('cad:forensic:sync', function(evidenceType, ownerId, ...)
         return
     end
 
-    local evidenceConfig = CAD.EvidenceTypes.GetType(normalizedType)
+    local evidenceConfig = EvidenceTypes.GetType(normalizedType)
     if not evidenceConfig then
         return
     end
 
     local inActiveCrime = false
-    for _, call in pairs(CAD.State.Dispatch.Calls or {}) do
+    for _, call in pairs(State.Dispatch.Calls or {}) do
         if type(call) == 'table' and call.status == 'ACTIVE' then
             inActiveCrime = true
             break
@@ -205,8 +207,8 @@ RegisterNetEvent('cad:forensic:sync', function(evidenceType, ownerId, ...)
             type = 'fingerprint',
             entityNetId = entityNetId,
             entity = entityNetId,
-            bone = CAD.Server.SanitizeString(boneName, 64),
-            surface = CAD.Server.SanitizeString(surfaceType, 64),
+            bone = Fn.SanitizeString(boneName, 64),
+            surface = Fn.SanitizeString(surfaceType, 64),
             createdAt = os.time(),
             visibility = 1.0,
             quality = 100,
@@ -238,7 +240,7 @@ RegisterNetEvent('cad:forensic:sync', function(evidenceType, ownerId, ...)
     end
 end)
 
-lib.callback.register('cad:forensic:getEvidence', CAD.Auth.WithGuard('default', function()
+lib.callback.register('cad:forensic:getEvidence', Auth.WithGuard('default', function()
     local evidences = ensureEvidenceState()
     return {
         blood = evidences.blood or {},

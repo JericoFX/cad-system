@@ -1,27 +1,26 @@
 -- This is a way to not use stash from ox and use my own implementations, basically a table that handle the items... thats it
 
-CAD = CAD or {}
-CAD.VirtualContainer = CAD.VirtualContainer or {}
+local Config = require 'modules.shared.config'
+local State = require 'modules.shared.state'
+local Utils = require 'modules.shared.utils'
 
-CAD.State = CAD.State or {}
-CAD.State.Forensics = CAD.State.Forensics or {}
-CAD.State.Forensics.VirtualContainers = CAD.State.Forensics.VirtualContainers or {}
-CAD.State.Forensics.VirtualContainerLocks = CAD.State.Forensics.VirtualContainerLocks or {}
+local VirtualContainer = {}
 
-local containers = CAD.State.Forensics.VirtualContainers
-local containerLocks = CAD.State.Forensics.VirtualContainerLocks
+State.Forensics = State.Forensics or {}
+State.Forensics.VirtualContainers = State.Forensics.VirtualContainers or {}
+State.Forensics.VirtualContainerLocks = State.Forensics.VirtualContainerLocks or {}
+
+local containers = State.Forensics.VirtualContainers
+local containerLocks = State.Forensics.VirtualContainerLocks
 
 local function safeIso(ts)
-    if CAD.Server and CAD.Server.ToIso then
-        return CAD.Server.ToIso(ts)
-    end
-    return os.date('!%Y-%m-%dT%H:%M:%SZ', ts or os.time())
+    return Utils.ToIso(ts)
 end
 
 local function sanitizeKey(raw)
     local value = tostring(raw or '')
     value = value:gsub('[\r\n\t]+', '')
-    value = CAD.StringCompact(value)
+    value = Utils.Compact(value)
     if #value > 128 then
         value = value:sub(1, 128)
     end
@@ -29,7 +28,7 @@ local function sanitizeKey(raw)
 end
 
 local function clone(value)
-    return CAD.DeepCopy(value)
+    return lib.table.deepclone(value)
 end
 
 local function decodeJson(raw)
@@ -46,7 +45,7 @@ local function decodeJson(raw)
 end
 
 local function isPersistenceEnabled()
-    local cfg = CAD.Config and CAD.Config.Forensics and CAD.Config.Forensics.VirtualContainer or nil
+    local cfg = Config and Config.Forensics and Config.Forensics.VirtualContainer or nil
     if cfg and cfg.Persistence == false then
         return false
     end
@@ -157,7 +156,7 @@ local function upsertSlotInDatabase(containerKey, container, slotIndex, slotData
     end)
 
     if not ok then
-        CAD.Log('error', 'Failed to persist virtual slot %s[%s]: %s', tostring(containerKey), tostring(slotIndex), tostring(err))
+        Utils.Log('error', 'Failed to persist virtual slot %s[%s]: %s', tostring(containerKey), tostring(slotIndex), tostring(err))
         return false, 'db_write_failed'
     end
 
@@ -177,14 +176,14 @@ local function clearSlotInDatabase(containerKey, slotIndex)
     end)
 
     if not ok then
-        CAD.Log('error', 'Failed to clear virtual slot %s[%s]: %s', tostring(containerKey), tostring(slotIndex), tostring(err))
+        Utils.Log('error', 'Failed to clear virtual slot %s[%s]: %s', tostring(containerKey), tostring(slotIndex), tostring(err))
         return false, 'db_delete_failed'
     end
 
     return true
 end
 
-function CAD.VirtualContainer.WithLock(containerKey, handler)
+function VirtualContainer.WithLock(containerKey, handler)
     local key = sanitizeKey(containerKey)
     if key == '' then
         return false, 'invalid_container_key'
@@ -201,14 +200,14 @@ function CAD.VirtualContainer.WithLock(containerKey, handler)
     containerLocks[key] = nil
 
     if not ok then
-        CAD.Log('error', 'Virtual container lock handler failed (%s): %s', tostring(key), tostring(a))
+        Utils.Log('error', 'Virtual container lock handler failed (%s): %s', tostring(key), tostring(a))
         return false, 'internal_error'
     end
 
     return a, b, c
 end
 
-function CAD.VirtualContainer.Ensure(containerKey, options)
+function VirtualContainer.Ensure(containerKey, options)
     local container = ensureContainerRecord(containerKey, options)
     if not container then
         return nil, 'invalid_container_key'
@@ -216,7 +215,7 @@ function CAD.VirtualContainer.Ensure(containerKey, options)
     return container
 end
 
-function CAD.VirtualContainer.Get(containerKey)
+function VirtualContainer.Get(containerKey)
     local key = sanitizeKey(containerKey)
     if key == '' then
         return nil
@@ -224,8 +223,8 @@ function CAD.VirtualContainer.Get(containerKey)
     return containers[key]
 end
 
-function CAD.VirtualContainer.GetSlot(containerKey, slot)
-    local container = CAD.VirtualContainer.Get(containerKey)
+function VirtualContainer.GetSlot(containerKey, slot)
+    local container = VirtualContainer.Get(containerKey)
     if not container then
         return nil
     end
@@ -238,8 +237,8 @@ function CAD.VirtualContainer.GetSlot(containerKey, slot)
     return container.slots[slotIndex]
 end
 
-function CAD.VirtualContainer.GetFirstOccupied(containerKey)
-    local container = CAD.VirtualContainer.Get(containerKey)
+function VirtualContainer.GetFirstOccupied(containerKey)
+    local container = VirtualContainer.Get(containerKey)
     if not container then
         return nil, nil
     end
@@ -254,8 +253,8 @@ function CAD.VirtualContainer.GetFirstOccupied(containerKey)
     return nil, nil
 end
 
-function CAD.VirtualContainer.List(containerKey)
-    local container = CAD.VirtualContainer.Get(containerKey)
+function VirtualContainer.List(containerKey)
+    local container = VirtualContainer.Get(containerKey)
     if not container then
         return {}
     end
@@ -273,8 +272,8 @@ function CAD.VirtualContainer.List(containerKey)
     return output
 end
 
-function CAD.VirtualContainer.SetSlot(containerKey, slot, slotData)
-    local container = CAD.VirtualContainer.Get(containerKey)
+function VirtualContainer.SetSlot(containerKey, slot, slotData)
+    local container = VirtualContainer.Get(containerKey)
     if not container then
         return false, 'container_not_found'
     end
@@ -313,8 +312,8 @@ function CAD.VirtualContainer.SetSlot(containerKey, slot, slotData)
     return true
 end
 
-function CAD.VirtualContainer.ClearSlot(containerKey, slot)
-    local container = CAD.VirtualContainer.Get(containerKey)
+function VirtualContainer.ClearSlot(containerKey, slot)
+    local container = VirtualContainer.Get(containerKey)
     if not container then
         return false, 'container_not_found'
     end
@@ -343,7 +342,7 @@ function CAD.VirtualContainer.ClearSlot(containerKey, slot)
     return true
 end
 
-function CAD.VirtualContainer.LoadFromDatabase()
+function VirtualContainer.LoadFromDatabase()
     if not isPersistenceEnabled() then
         return 0
     end
@@ -353,7 +352,7 @@ function CAD.VirtualContainer.LoadFromDatabase()
     end)
 
     if not ok then
-        CAD.Log('error', 'Failed loading virtual containers from DB: %s', tostring(rows))
+        Utils.Log('error', 'Failed loading virtual containers from DB: %s', tostring(rows))
         return 0
     end
 
@@ -392,3 +391,6 @@ function CAD.VirtualContainer.LoadFromDatabase()
 
     return total
 end
+
+_G.CadActions = _G.CadActions or {}
+_G.CadActions.VirtualContainer = VirtualContainer

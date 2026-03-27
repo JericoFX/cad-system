@@ -1,5 +1,8 @@
-CAD = CAD or {}
-CAD.VehicleTablet = CAD.VehicleTablet or {}
+local Config = require 'modules.shared.config'
+local Utils = require 'modules.shared.utils'
+local Auth = require 'modules.server.auth'
+local Fn = require 'modules.server.functions'
+
 
 ---@class CadEntityNote
 ---@field id string
@@ -57,7 +60,7 @@ local function safeQuery(sql, params, context)
     end)
 
     if not ok then
-        CAD.Log('warn', 'Vehicle tablet query failed (%s): %s', tostring(context or sql), tostring(rows))
+        Utils.Log('warn', 'Vehicle tablet query failed (%s): %s', tostring(context or sql), tostring(rows))
         return {}
     end
 
@@ -70,7 +73,7 @@ local function safeInsert(sql, params, context)
     end)
 
     if not ok then
-        CAD.Log('warn', 'Vehicle tablet insert failed (%s): %s', tostring(context or sql), tostring(result))
+        Utils.Log('warn', 'Vehicle tablet insert failed (%s): %s', tostring(context or sql), tostring(result))
         return false
     end
 
@@ -78,7 +81,7 @@ local function safeInsert(sql, params, context)
 end
 
 local function isAllowedOfficer(source)
-    return CAD.Server.HasRole(source, ALLOWED_JOBS)
+    return Fn.HasRole(source, ALLOWED_JOBS)
 end
 
 local function normalizeEntityType(value)
@@ -103,7 +106,7 @@ local function boolFromAny(value)
 end
 
 local function stringOrFallback(value, fallback)
-    local text = CAD.Server.SanitizeString(value, 128)
+    local text = Fn.SanitizeString(value, 128)
     if text == '' then
         return fallback
     end
@@ -117,7 +120,7 @@ local function decodeVehicleModel(vehicleRaw)
         return nil, false
     end
 
-    local model = CAD.Server.SanitizeString(
+    local model = Fn.SanitizeString(
         decoded.modelName or decoded.model or decoded.vehicle or decoded.name,
         128
     )
@@ -136,7 +139,7 @@ local function decodeVehicleModel(vehicleRaw)
 end
 
 local function resolveDataSource()
-    local cfg = CAD.Config.Forensics and CAD.Config.Forensics.IdReader or {}
+    local cfg = Config.Forensics and Config.Forensics.IdReader or {}
     local tabletCfg = type(cfg.VehicleTablet) == 'table' and cfg.VehicleTablet or {}
     local data = type(tabletCfg.DataSource) == 'table' and tabletCfg.DataSource or {}
 
@@ -158,8 +161,8 @@ local function formatPersonFromRow(row, source)
     local charinfo = safeJsonDecode(charinfoRaw, {})
     local metadata = safeJsonDecode(metadataRaw, {})
 
-    local firstName = CAD.Server.SanitizeString(charinfo.firstname or charinfo.firstName, 64)
-    local lastName = CAD.Server.SanitizeString(charinfo.lastname or charinfo.lastName, 64)
+    local firstName = Fn.SanitizeString(charinfo.firstname or charinfo.firstName, 64)
+    local lastName = Fn.SanitizeString(charinfo.lastname or charinfo.lastName, 64)
     local genderRaw = charinfo.gender
     local gender = 'OTHER'
     if genderRaw == 0 or tostring(genderRaw) == '0' or tostring(genderRaw):lower() == 'male' then
@@ -168,7 +171,7 @@ local function formatPersonFromRow(row, source)
         gender = 'FEMALE'
     end
 
-    local bloodType = CAD.Server.SanitizeString(
+    local bloodType = Fn.SanitizeString(
         metadata.bloodtype or metadata.bloodType or charinfo.bloodtype,
         16
     )
@@ -177,15 +180,15 @@ local function formatPersonFromRow(row, source)
         citizenid = tostring(row[source.playersCitizenColumn] or ''),
         firstName = firstName ~= '' and firstName or 'UNKNOWN',
         lastName = lastName ~= '' and lastName or 'UNKNOWN',
-        dateOfBirth = CAD.Server.SanitizeString(charinfo.birthdate or charinfo.dateOfBirth, 32),
-        ssn = CAD.Server.SanitizeString(charinfo.ssn or row[source.playersCitizenColumn] or 'UNKNOWN', 64),
-        phone = CAD.Server.SanitizeString(charinfo.phone or charinfo.phone_number, 32),
-        address = CAD.Server.SanitizeString(charinfo.address or metadata.address, 128),
+        dateOfBirth = Fn.SanitizeString(charinfo.birthdate or charinfo.dateOfBirth, 32),
+        ssn = Fn.SanitizeString(charinfo.ssn or row[source.playersCitizenColumn] or 'UNKNOWN', 64),
+        phone = Fn.SanitizeString(charinfo.phone or charinfo.phone_number, 32),
+        address = Fn.SanitizeString(charinfo.address or metadata.address, 128),
         bloodType = bloodType ~= '' and bloodType or nil,
-        allergies = CAD.Server.SanitizeString(metadata.allergies, 120),
+        allergies = Fn.SanitizeString(metadata.allergies, 120),
         gender = gender,
-        createdAt = CAD.Server.ToIso(),
-        lastUpdated = CAD.Server.ToIso(),
+        createdAt = Utils.ToIso(),
+        lastUpdated = Utils.ToIso(),
         isDead = boolFromAny(metadata.isdead or metadata.isDead),
     }
 end
@@ -216,8 +219,8 @@ local function getVehicleByPlate(plate, source)
     end
 
     local rawModel, decodedStolen = decodeVehicleModel(row[source.vehiclesDataColumn])
-    local plateText = CAD.Server.SanitizeString(row[source.vehiclesPlateColumn], 32)
-    local ownerId = CAD.Server.SanitizeString(row[source.vehiclesOwnerColumn], 64)
+    local plateText = Fn.SanitizeString(row[source.vehiclesPlateColumn], 32)
+    local ownerId = Fn.SanitizeString(row[source.vehiclesOwnerColumn], 64)
     local isStolen = decodedStolen
 
     if row.stolen ~= nil then
@@ -227,16 +230,16 @@ local function getVehicleByPlate(plate, source)
     return {
         plate = plateText,
         model = rawModel or stringOrFallback(row.vehicle_name or row.model, 'UNKNOWN'),
-        make = CAD.Server.SanitizeString(row.make or row.brand, 64),
+        make = Fn.SanitizeString(row.make or row.brand, 64),
         year = tonumber(row.year) or tonumber(os.date('%Y')),
-        color = CAD.Server.SanitizeString(row.color, 32),
+        color = Fn.SanitizeString(row.color, 32),
         ownerId = ownerId,
-        vin = CAD.Server.SanitizeString(row.vin or row[source.vehiclesPlateColumn], 64),
+        vin = Fn.SanitizeString(row.vin or row[source.vehiclesPlateColumn], 64),
         registrationStatus = 'VALID',
         insuranceStatus = 'VALID',
         stolen = isStolen == true,
         flags = {},
-        createdAt = CAD.Server.ToIso(),
+        createdAt = Utils.ToIso(),
     }
 end
 
@@ -322,9 +325,9 @@ end
 ---@param payload table
 ---@return { stopId: string, createdAt: string }|nil
 local function insertStopLog(officer, payload)
-    local stopId = CAD.Server.GenerateId('STOP')
-    local createdAt = CAD.Server.ToIso()
-    local riskLevel = CAD.Server.SanitizeString(payload.riskLevel, 16)
+    local stopId = Utils.GenerateId('STOP')
+    local createdAt = Utils.ToIso()
+    local riskLevel = Fn.SanitizeString(payload.riskLevel, 16)
     if riskLevel == '' then
         riskLevel = 'NONE'
     end
@@ -369,12 +372,12 @@ local function insertStopLog(officer, payload)
     }
 end
 
-lib.callback.register('cad:lookup:searchPersons', CAD.Auth.WithGuard('default', function(source, payload)
+lib.callback.register('cad:lookup:searchPersons', Auth.WithGuard('default', function(source, payload)
     if not isAllowedOfficer(source) then
         return { ok = false, error = 'forbidden' }
     end
 
-    local query = CAD.Server.SanitizeString(payload and payload.query, 64)
+    local query = Fn.SanitizeString(payload and payload.query, 64)
     if query == '' then
         return { ok = true, persons = {} }
     end
@@ -398,12 +401,12 @@ lib.callback.register('cad:lookup:searchPersons', CAD.Auth.WithGuard('default', 
     return { ok = true, persons = persons }
 end))
 
-lib.callback.register('cad:lookup:searchVehicles', CAD.Auth.WithGuard('default', function(source, payload)
+lib.callback.register('cad:lookup:searchVehicles', Auth.WithGuard('default', function(source, payload)
     if not isAllowedOfficer(source) then
         return { ok = false, error = 'forbidden' }
     end
 
-    local query = CAD.Server.SanitizeString(payload and payload.query, 64)
+    local query = Fn.SanitizeString(payload and payload.query, 64)
     if query == '' then
         return { ok = true, vehicles = {} }
     end
@@ -434,13 +437,13 @@ lib.callback.register('cad:lookup:searchVehicles', CAD.Auth.WithGuard('default',
     return { ok = true, vehicles = vehicles }
 end))
 
-lib.callback.register('cad:entityNotes:list', CAD.Auth.WithGuard('default', function(source, payload)
+lib.callback.register('cad:entityNotes:list', Auth.WithGuard('default', function(source, payload)
     if not isAllowedOfficer(source) then
         return { ok = false, error = 'forbidden' }
     end
 
     local entityType = normalizeEntityType(payload and payload.entityType)
-    local entityId = CAD.Server.SanitizeString(payload and payload.entityId, 128)
+    local entityId = Fn.SanitizeString(payload and payload.entityId, 128)
     local limit = math.max(1, math.min(50, tonumber(payload and payload.limit) or 20))
 
     if not entityType or entityId == '' then
@@ -453,14 +456,14 @@ lib.callback.register('cad:entityNotes:list', CAD.Auth.WithGuard('default', func
     }
 end))
 
-lib.callback.register('cad:entityNotes:add', CAD.Auth.WithGuard('heavy', function(source, payload, officer)
+lib.callback.register('cad:entityNotes:add', Auth.WithGuard('heavy', function(source, payload, officer)
     if not isAllowedOfficer(source) then
         return { ok = false, error = 'forbidden' }
     end
 
     local entityType = normalizeEntityType(payload and payload.entityType)
-    local entityId = CAD.Server.SanitizeString(payload and payload.entityId, 128)
-    local content = CAD.Server.SanitizeString(payload and payload.content, 1200)
+    local entityId = Fn.SanitizeString(payload and payload.entityId, 128)
+    local content = Fn.SanitizeString(payload and payload.content, 1200)
     local important = payload and payload.important == true
 
     if not entityType or entityId == '' then
@@ -471,8 +474,8 @@ lib.callback.register('cad:entityNotes:add', CAD.Auth.WithGuard('heavy', functio
         return { ok = false, error = 'content_required' }
     end
 
-    local noteId = CAD.Server.GenerateId('NOTE')
-    local createdAt = CAD.Server.ToIso()
+    local noteId = Utils.GenerateId('NOTE')
+    local createdAt = Utils.ToIso()
 
     local ok = safeInsert([[
         INSERT INTO cad_entity_notes (
@@ -515,18 +518,18 @@ lib.callback.register('cad:entityNotes:add', CAD.Auth.WithGuard('heavy', functio
     }
 end))
 
-lib.callback.register('cad:vehicle:getRecentStops', CAD.Auth.WithGuard('default', function(source, payload)
+lib.callback.register('cad:vehicle:getRecentStops', Auth.WithGuard('default', function(source, payload)
     if not isAllowedOfficer(source) then
         return { ok = false, error = 'forbidden' }
     end
 
-    local officer = CAD.Auth.GetOfficerData(source)
+    local officer = Auth.GetOfficerData(source)
     if not officer then
         return { ok = false, error = 'officer_not_found' }
     end
 
     local limit = math.max(1, math.min(30, tonumber(payload and payload.limit) or 8))
-    local plate = CAD.Server.SanitizeString(payload and payload.plate, 32)
+    local plate = Fn.SanitizeString(payload and payload.plate, 32)
 
     local rows
     if plate ~= '' then
@@ -567,13 +570,13 @@ lib.callback.register('cad:vehicle:getRecentStops', CAD.Auth.WithGuard('default'
     return { ok = true, stops = stops }
 end))
 
-lib.callback.register('cad:vehicle:quickSummary', CAD.Auth.WithGuard('default', function(source, payload)
+lib.callback.register('cad:vehicle:quickSummary', Auth.WithGuard('default', function(source, payload)
     if not isAllowedOfficer(source) then
         return { ok = false, error = 'forbidden' }
     end
 
-    local plate = CAD.Server.SanitizeString(payload and payload.plate, 32):upper()
-    local fallbackModel = CAD.Server.SanitizeString(payload and payload.model, 128)
+    local plate = Fn.SanitizeString(payload and payload.plate, 32):upper()
+    local fallbackModel = Fn.SanitizeString(payload and payload.model, 128)
     if plate == '' then
         return { ok = false, error = 'plate_required' }
     end
@@ -592,7 +595,7 @@ lib.callback.register('cad:vehicle:quickSummary', CAD.Auth.WithGuard('default', 
         insuranceStatus = 'VALID',
         stolen = false,
         flags = {},
-        createdAt = CAD.Server.ToIso(),
+        createdAt = Utils.ToIso(),
     }
 
     if vehicle.ownerId ~= '' then
@@ -635,25 +638,25 @@ lib.callback.register('cad:vehicle:quickSummary', CAD.Auth.WithGuard('default', 
     }
 end))
 
-lib.callback.register('cad:vehicle:logStop', CAD.Auth.WithGuard('heavy', function(source, payload, officer)
+lib.callback.register('cad:vehicle:logStop', Auth.WithGuard('heavy', function(source, payload, officer)
     if not isAllowedOfficer(source) then
         return { ok = false, error = 'forbidden' }
     end
 
-    local plate = CAD.Server.SanitizeString(payload and payload.plate, 32):upper()
+    local plate = Fn.SanitizeString(payload and payload.plate, 32):upper()
     if plate == '' then
         return { ok = false, error = 'plate_required' }
     end
 
     local inserted = insertStopLog(officer, {
         plate = plate,
-        vehicleModel = CAD.Server.SanitizeString(payload and payload.model, 128),
-        ownerIdentifier = CAD.Server.SanitizeString(payload and payload.ownerId, 64),
-        ownerName = CAD.Server.SanitizeString(payload and payload.ownerName, 128),
-        riskLevel = CAD.Server.SanitizeString(payload and payload.riskLevel, 16),
+        vehicleModel = Fn.SanitizeString(payload and payload.model, 128),
+        ownerIdentifier = Fn.SanitizeString(payload and payload.ownerId, 64),
+        ownerName = Fn.SanitizeString(payload and payload.ownerName, 128),
+        riskLevel = Fn.SanitizeString(payload and payload.riskLevel, 16),
         riskTags = type(payload and payload.riskTags) == 'table' and payload.riskTags or {},
-        noteHint = CAD.Server.SanitizeString(payload and payload.noteHint, 255),
-        stopSource = CAD.Server.SanitizeString(payload and payload.stopSource, 32),
+        noteHint = Fn.SanitizeString(payload and payload.noteHint, 255),
+        stopSource = Fn.SanitizeString(payload and payload.stopSource, 32),
     })
 
     if not inserted then

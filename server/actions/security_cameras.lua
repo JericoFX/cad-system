@@ -1,36 +1,39 @@
-CAD = CAD or {}
-CAD.SecurityCameras = CAD.SecurityCameras or {}
+local Config = require 'modules.shared.config'
+local State = require 'modules.shared.state'
+local Utils = require 'modules.shared.utils'
+local Auth = require 'modules.server.auth'
+local Fn = require 'modules.server.functions'
 
-CAD.State.SecurityCameras = CAD.State.SecurityCameras or {
+State.SecurityCameras = State.SecurityCameras or {
     Cameras = {},
     LastNumber = 0,
 }
 
-local cameraState = CAD.State.SecurityCameras
+local cameraState = State.SecurityCameras
 cameraState.Cameras = cameraState.Cameras or {}
 cameraState.LastNumber = tonumber(cameraState.LastNumber) or 0
 
 local cameras = cameraState.Cameras
 
 local function clone(value)
-    return CAD.DeepCopy(value)
+    return lib.table.deepclone(value)
 end
 
 local function getConfig()
-    return CAD.Config.SecurityCameras or {}
+    return Config.SecurityCameras or {}
 end
 
 local function isDispatchFeatureEnabled()
-    if CAD.IsFeatureEnabled then
-        return CAD.IsFeatureEnabled('Dispatch')
+    if Config.IsFeatureEnabled then
+        return Config.IsFeatureEnabled('Dispatch')
     end
 
     return true
 end
 
 local function isSecurityCameraFeatureEnabled()
-    if CAD.IsFeatureEnabled then
-        return CAD.IsFeatureEnabled('SecurityCameras')
+    if Config.IsFeatureEnabled then
+        return Config.IsFeatureEnabled('SecurityCameras')
     end
 
     return true
@@ -92,7 +95,7 @@ local function getBroadcastJobs()
 end
 
 local function withCameraGuard(bucket, handler)
-    return CAD.Auth.WithGuard(bucket, function(source, payload, officer)
+    return Auth.WithGuard(bucket, function(source, payload, officer)
         if not isCameraSystemEnabled() then
             return {
                 ok = false,
@@ -235,7 +238,7 @@ local function saveCameraDb(camera)
     end)
 
     if not ok then
-        CAD.Log('error', 'Failed saving camera %s: %s', tostring(camera and camera.cameraId), tostring(err))
+        Utils.Log('error', 'Failed saving camera %s: %s', tostring(camera and camera.cameraId), tostring(err))
         return false, 'db_write_failed'
     end
 
@@ -250,7 +253,7 @@ local function deleteCameraDb(cameraId)
     end)
 
     if not ok then
-        CAD.Log('error', 'Failed deleting camera %s: %s', tostring(cameraId), tostring(err))
+        Utils.Log('error', 'Failed deleting camera %s: %s', tostring(cameraId), tostring(err))
         return false, 'db_write_failed'
     end
 
@@ -272,7 +275,7 @@ lib.callback.register('cad:cameras:list', withCameraGuard('default', function()
 end))
 
 lib.callback.register('cad:cameras:get', withCameraGuard('default', function(_, payload)
-    local cameraId = CAD.Server.SanitizeString(payload.cameraId, 64)
+    local cameraId = Fn.SanitizeString(payload.cameraId, 64)
     if cameraId == '' then
         return {
             ok = false,
@@ -319,19 +322,19 @@ lib.callback.register('cad:cameras:install', withCameraGuard('heavy', function(_
 
     local previousLastNumber = tonumber(cameraState.LastNumber) or 0
     local nextNumber = previousLastNumber + 1
-    local label = CAD.Server.SanitizeString(payload.label, 128)
+    local label = Fn.SanitizeString(payload.label, 128)
     if label == '' then
         label = ('Camera %04d'):format(nextNumber)
     end
 
-    local now = CAD.Server.ToIso()
+    local now = Utils.ToIso()
     local camera = {
-        cameraId = CAD.Server.GenerateId('CAM'),
+        cameraId = Utils.GenerateId('CAM'),
         cameraNumber = nextNumber,
         label = label,
-        street = CAD.Server.SanitizeString(payload.street, 128),
-        crossStreet = CAD.Server.SanitizeString(payload.crossStreet, 128),
-        zone = CAD.Server.SanitizeString(payload.zone, 128),
+        street = Fn.SanitizeString(payload.street, 128),
+        crossStreet = Fn.SanitizeString(payload.crossStreet, 128),
+        zone = Fn.SanitizeString(payload.zone, 128),
         coords = coords,
         rotation = {
             x = normalizeNumber(rotation.x, -89.9, 89.9, 0.0),
@@ -359,7 +362,7 @@ lib.callback.register('cad:cameras:install', withCameraGuard('heavy', function(_
 
     cameras[camera.cameraId] = camera
 
-    CAD.Server.BroadcastToJobs(
+    Fn.BroadcastToJobs(
         getBroadcastJobs(),
         'cameraCreated',
         {
@@ -374,7 +377,7 @@ lib.callback.register('cad:cameras:install', withCameraGuard('heavy', function(_
 end))
 
 lib.callback.register('cad:cameras:setStatus', withCameraGuard('heavy', function(_, payload)
-    local cameraId = CAD.Server.SanitizeString(payload.cameraId, 64)
+    local cameraId = Fn.SanitizeString(payload.cameraId, 64)
     if cameraId == '' then
         return {
             ok = false,
@@ -409,7 +412,7 @@ lib.callback.register('cad:cameras:setStatus', withCameraGuard('heavy', function
     local previousUpdatedAt = camera.updatedAt
 
     camera.status = status
-    camera.updatedAt = CAD.Server.ToIso()
+    camera.updatedAt = Utils.ToIso()
 
     local saved, saveErr = saveCameraDb(camera)
     if not saved then
@@ -421,7 +424,7 @@ lib.callback.register('cad:cameras:setStatus', withCameraGuard('heavy', function
         }
     end
 
-    CAD.Server.BroadcastToJobs(
+    Fn.BroadcastToJobs(
         getBroadcastJobs(),
         'cameraUpdated',
         {
@@ -436,7 +439,7 @@ lib.callback.register('cad:cameras:setStatus', withCameraGuard('heavy', function
 end))
 
 lib.callback.register('cad:cameras:remove', withCameraGuard('heavy', function(_, payload)
-    local cameraId = CAD.Server.SanitizeString(payload.cameraId, 64)
+    local cameraId = Fn.SanitizeString(payload.cameraId, 64)
     if cameraId == '' then
         return {
             ok = false,
@@ -462,7 +465,7 @@ lib.callback.register('cad:cameras:remove', withCameraGuard('heavy', function(_,
 
     cameras[cameraId] = nil
 
-    CAD.Server.BroadcastToJobs(
+    Fn.BroadcastToJobs(
         getBroadcastJobs(),
         'cameraRemoved',
         {
