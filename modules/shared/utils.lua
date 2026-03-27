@@ -48,4 +48,33 @@ function Utils.GetVersion()
     return Utils.Trim(raw)
 end
 
+---@param value string|nil
+---@return integer|nil
+function Utils.IsoToEpoch(value)
+    if type(value) ~= 'string' then
+        return nil
+    end
+
+    local year, month, day, hour, minute, second = string.match(value, '^(%d+)%-(%d+)%-(%d+)T(%d+):(%d+):(%d+)Z$')
+    if not year then
+        return nil
+    end
+
+    local localEpoch = os.time({
+        year = tonumber(year),
+        month = tonumber(month),
+        day = tonumber(day),
+        hour = tonumber(hour),
+        min = tonumber(minute),
+        sec = tonumber(second),
+    })
+
+    if not localEpoch then
+        return nil
+    end
+
+    local utcOffset = os.difftime(os.time(), os.time(os.date('!*t')))
+    return localEpoch + utcOffset
+end
+
 return Utils

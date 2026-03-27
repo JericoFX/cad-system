@@ -84,4 +84,37 @@ function ClientFn.IsValidCoords(coords)
         and coords.x ~= 0 and coords.y ~= 0
 end
 
+---@param value vector3|table|any
+---@return vector3|nil
+function ClientFn.AsVector3(value)
+    if type(value) == 'vector3' then
+        return value
+    end
+
+    if type(value) == 'table' then
+        local x = tonumber(value.x)
+        local y = tonumber(value.y)
+        local z = tonumber(value.z)
+        if x and y and z then
+            return vector3(x, y, z)
+        end
+    end
+
+    return nil
+end
+
+---@param hit boolean|number|any
+---@return boolean
+function ClientFn.NormalizeRaycastHit(hit)
+    if type(hit) == 'boolean' then
+        return hit
+    end
+
+    if type(hit) == 'number' then
+        return hit == 1
+    end
+
+    return false
+end
+
 return ClientFn

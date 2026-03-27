@@ -45,18 +45,6 @@ local function canUseCameraSystem()
     return true
 end
 
-local function normalizeRaycastHit(hit)
-    if type(hit) == 'boolean' then
-        return hit
-    end
-
-    if type(hit) == 'number' then
-        return hit == 1
-    end
-
-    return false
-end
-
 local function getInstallPoint()
     local config = getCameraConfig()
     local maxDistance = tonumber(config.MaxInstallDistance) or 12.0
@@ -69,7 +57,7 @@ local function getInstallPoint()
         Wait(0)
 
         local hit, _, endCoords, surfaceNormal = lib.raycast.fromCamera(511, 4, maxDistance)
-        local hasHit = normalizeRaycastHit(hit)
+        local hasHit = ClientFn.NormalizeRaycastHit(hit)
 
         if hasHit and endCoords and endCoords.x and endCoords.y and endCoords.z then
             DrawMarker(

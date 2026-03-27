@@ -1,3 +1,4 @@
+local ClientFn = require 'modules.client.functions'
 local Registry = require 'modules.shared.registry'
 
 local Photos = {}
@@ -34,21 +35,10 @@ local function notify(message, nType)
     })
 end
 
-local function normalizeRaycastHit(hit)
-    if type(hit) == 'boolean' then
-        return hit
-    end
-
-    if type(hit) == 'number' then
-        return hit == 1
-    end
-
-    return false
-end
 
 local function raycastFromCamera(distance)
     local hit, entity, hitCoords = lib.raycast.fromCamera(511, 4, distance)
-    if normalizeRaycastHit(hit) and hitCoords and hitCoords.x and hitCoords.y and hitCoords.z then
+    if ClientFn.NormalizeRaycastHit(hit) and hitCoords and hitCoords.x and hitCoords.y and hitCoords.z then
         return true, hitCoords, entity
     end
 

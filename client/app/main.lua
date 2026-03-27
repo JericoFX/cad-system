@@ -2,6 +2,7 @@
 
 local Config = require 'modules.shared.config'
 local Core = require 'modules.client.core'
+local ClientFn = require 'modules.client.functions'
 local Registry = require 'modules.shared.registry'
 
 local Client = {}
@@ -30,22 +31,6 @@ local cadTerminalPoweredOn = false
 ---@field generatedAt string
 ---@field cases table<string, table>
 
-local function asVector3(value)
-    if type(value) == 'vector3' then
-        return value
-    end
-
-    if type(value) == 'table' then
-        local x = tonumber(value.x)
-        local y = tonumber(value.y)
-        local z = tonumber(value.z)
-        if x and y and z then
-            return vector3(x, y, z)
-        end
-    end
-
-    return nil
-end
 
 local function isVirtualReaderEnabled()
     local readerCfg = Config.Forensics and Config.Forensics.IdReader or {}
@@ -114,16 +99,16 @@ local function getReaderCoords(point)
 
     local reader = type(point.idReader) == 'table' and point.idReader or nil
     if not reader then
-        return asVector3(point.coords)
+        return ClientFn.AsVector3(point.coords)
     end
 
-    local absolute = asVector3(reader.interactionCoords) or asVector3(reader.coords)
+    local absolute = ClientFn.AsVector3(reader.interactionCoords) or ClientFn.AsVector3(reader.coords)
     if absolute then
         return absolute
     end
 
-    local base = asVector3(point.coords)
-    local offset = asVector3(reader.offset)
+    local base = ClientFn.AsVector3(point.coords)
+    local offset = ClientFn.AsVector3(reader.offset)
     if base and offset then
         return base + offset
     end
@@ -144,16 +129,16 @@ local function getLockerCoords(point)
 
     local container = type(point.evidenceContainer) == 'table' and point.evidenceContainer or nil
     if not container then
-        return asVector3(point.coords)
+        return ClientFn.AsVector3(point.coords)
     end
 
-    local absolute = asVector3(container.interactionCoords) or asVector3(container.coords)
+    local absolute = ClientFn.AsVector3(container.interactionCoords) or ClientFn.AsVector3(container.coords)
     if absolute then
         return absolute
     end
 
-    local base = asVector3(point.coords)
-    local offset = asVector3(container.offset)
+    local base = ClientFn.AsVector3(point.coords)
+    local offset = ClientFn.AsVector3(container.offset)
     if base and offset then
         return base + offset
     end

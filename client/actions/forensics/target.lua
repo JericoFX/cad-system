@@ -1,4 +1,5 @@
 local EvidenceTypes = require 'shared.evidence_types'
+local ClientFn = require 'modules.client.functions'
 
 local ForensicBloodEvidence = {}
 local ForensicFingerprintsEvidence = {}
@@ -64,24 +65,6 @@ local function showProgress(duration, label)
     })
 end
 
-local function asVector3Coords(value)
-    if type(value) == 'vector3' then
-        return value
-    end
-
-    if type(value) ~= 'table' then
-        return nil
-    end
-
-    local x = tonumber(value.x)
-    local y = tonumber(value.y)
-    local z = tonumber(value.z)
-    if not x or not y or not z then
-        return nil
-    end
-
-    return vector3(x, y, z)
-end
 
 local function clampVisibility(value)
     local visibility = tonumber(value) or 1.0
@@ -257,7 +240,7 @@ local function syncBloodVisuals()
     local evidences = ForensicBloodEvidence or {}
 
     for bloodId, blood in pairs(evidences) do
-        local coords = asVector3Coords(blood.coords)
+        local coords = ClientFn.AsVector3(blood.coords)
         local visibility = clampVisibility(blood.visibility)
 
         if not coords or visibility <= 0.01 then
@@ -289,7 +272,7 @@ local function syncCasingVisuals()
     local evidences = ForensicCasingsEvidence or {}
 
     for casingId, casing in pairs(evidences) do
-        local coords = asVector3Coords(casing.coords)
+        local coords = ClientFn.AsVector3(casing.coords)
         local visibility = clampVisibility(casing.visibility)
 
         if not coords or visibility <= 0.01 then
@@ -351,7 +334,7 @@ local function createBloodTarget(bloodId, blood)
         return
     end
 
-    local coords = asVector3Coords(blood.coords)
+    local coords = ClientFn.AsVector3(blood.coords)
     if not coords or clampVisibility(blood.visibility) <= 0.01 then
         return
     end
@@ -462,7 +445,7 @@ local function createCasingTarget(casingId, casing)
         return
     end
 
-    local coords = asVector3Coords(casing.coords)
+    local coords = ClientFn.AsVector3(casing.coords)
     if not coords or clampVisibility(casing.visibility) <= 0.01 then
         return
     end
