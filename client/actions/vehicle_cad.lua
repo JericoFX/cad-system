@@ -1,5 +1,9 @@
-CAD = CAD or {}
-CAD.Vehicle = CAD.Vehicle or {}
+local Config = require 'modules.shared.config'
+local Utils = require 'modules.shared.utils'
+
+local function getAction(name) return _G.CadActions and _G.CadActions[name] end
+
+local Vehicle = {}
 
 ---@class CadVehicleQuickLock
 ---@field plate string
@@ -39,7 +43,7 @@ local quickDockEnabled = true
 local lastQuickLock = nil
 
 local function getVehicleTabletConfig()
-    local cfg = CAD.Config.Forensics and CAD.Config.Forensics.IdReader or {}
+    local cfg = Config.Forensics and Config.Forensics.IdReader or {}
     if type(cfg.VehicleTablet) == 'table' then
         return cfg.VehicleTablet
     end
@@ -62,7 +66,7 @@ local function isPoliceVehicle(vehicle)
         local models = vehicleCfg.PoliceModels or vehicleCfg.AllowedVehicleModels
         if type(models) == 'table' then
             for i = 1, #models do
-                local modelName = CAD.StringTrim(models[i]):lower()
+                local modelName = Utils.Trim(models[i]):lower()
                 if modelName ~= '' then
                     configuredPoliceModels[modelName] = true
                 end
@@ -71,7 +75,7 @@ local function isPoliceVehicle(vehicle)
     end
 
     local modelName = GetDisplayNameFromVehicleModel(model)
-    modelName = CAD.StringTrim(modelName):lower()
+    modelName = Utils.Trim(modelName):lower()
     if modelName == '' then
         return false
     end
@@ -90,7 +94,7 @@ local function getVehicleLabel(vehicle)
     if not label or label == 'NULL' then
         label = display
     end
-    return CAD.StringTrim(label)
+    return Utils.Trim(label)
 end
 
 local function getVehicleRole(vehicle)
@@ -154,7 +158,7 @@ local function sendVehicleContextNui()
     local plate = ''
     local model = ''
     if vehicle and vehicle ~= 0 then
-        plate = CAD.StringTrim(GetVehicleNumberPlateText(vehicle))
+        plate = Utils.Trim(GetVehicleNumberPlateText(vehicle))
         model = getVehicleLabel(vehicle)
     end
 
@@ -262,7 +266,7 @@ end
 
 ---@param payload { maxDistance?: number }|nil
 ---@return table
-function CAD.Vehicle.ScanFront(payload)
+function Vehicle.ScanFront(payload)
     if not canUseScanner() then
         return {
             ok = false,
@@ -288,7 +292,7 @@ function CAD.Vehicle.ScanFront(payload)
         }
     end
 
-    local plate = CAD.StringTrim(GetVehicleNumberPlateText(targetVehicle))
+    local plate = Utils.Trim(GetVehicleNumberPlateText(targetVehicle))
     local vehicleCoords = GetEntityCoords(targetVehicle)
     local pedCoords = GetEntityCoords(cache.ped or PlayerPedId())
     local distance = #(pedCoords - vehicleCoords)
@@ -314,8 +318,8 @@ function CAD.Vehicle.ScanFront(payload)
 end
 
 ---@return { ok: boolean, error?: string, quickLock?: CadVehicleQuickLock }
-function CAD.Vehicle.LockFrontQuick()
-    local scan = CAD.Vehicle.ScanFront({
+function Vehicle.LockFrontQuick()
+    local scan = Vehicle.ScanFront({
         maxDistance = 70,
     })
 
@@ -381,16 +385,17 @@ function CAD.Vehicle.LockFrontQuick()
     }
 end
 
-function CAD.Vehicle.PlayAlert(payload)
-    local alertType = CAD.StringTrim(payload and payload.type or 'wanted'):lower()
+function Vehicle.PlayAlert(payload)
+    local alertType = Utils.Trim(payload and payload.type or 'wanted'):lower()
 
-    if CAD.Sounds then
-        if alertType == 'wanted' and CAD.Sounds.EmergencyAlert then
-            CAD.Sounds.EmergencyAlert()
+    local SoundsAction = getAction('Sounds')
+    if SoundsAction then
+        if alertType == 'wanted' and SoundsAction.EmergencyAlert then
+            SoundsAction.EmergencyAlert()
             return { ok = true }
         end
-        if CAD.Sounds.DispatchIncoming then
-            CAD.Sounds.DispatchIncoming()
+        if SoundsAction.DispatchIncoming then
+            SoundsAction.DispatchIncoming()
             return { ok = true }
         end
     end
@@ -399,7 +404,7 @@ function CAD.Vehicle.PlayAlert(payload)
     return { ok = true }
 end
 
-function CAD.Vehicle.SetTabletOpen(open)
+function Vehicle.SetTabletOpen(open)
     if open == true and not isInPoliceVehicle then
         return {
             ok = false,
@@ -419,23 +424,23 @@ function CAD.Vehicle.SetTabletOpen(open)
     }
 end
 
-function CAD.Vehicle.OpenTablet(autoOpened)
+function Vehicle.OpenTablet(autoOpened)
     openVehicleCad(autoOpened == true)
 end
 
-function CAD.Vehicle.CloseTablet(forceClose)
+function Vehicle.CloseTablet(forceClose)
     closeVehicleCad(forceClose == true)
 end
 
-function CAD.Vehicle.IsTabletOpen()
+function Vehicle.IsTabletOpen()
     return tabletOpen == true
 end
 
-function CAD.Vehicle.IsPoliceVehicleContext()
+function Vehicle.IsPoliceVehicleContext()
     return isInPoliceVehicle == true
 end
 
-function CAD.Vehicle.GetContext()
+function Vehicle.GetContext()
     return {
         ok = true,
         isInPoliceVehicle = isInPoliceVehicle,
@@ -445,7 +450,7 @@ function CAD.Vehicle.GetContext()
     }
 end
 
-function CAD.Vehicle.GetReaderContext()
+function Vehicle.GetReaderContext()
     local vehicleReaderCfg = getVehicleTabletConfig()
     if vehicleReaderCfg.Enabled ~= true then
         return {
@@ -487,7 +492,7 @@ function CAD.Vehicle.GetReaderContext()
     }
 end
 
-function CAD.Vehicle.SetQuickDockEnabled(enabled)
+function Vehicle.SetQuickDockEnabled(enabled)
     quickDockEnabled = enabled == true
     sendVehicleContextNui()
     return {
@@ -516,7 +521,7 @@ local function runQuickLockKeybind()
         return
     end
 
-    local result = CAD.Vehicle.LockFrontQuick()
+    local result = Vehicle.LockFrontQuick()
     if not result or result.ok ~= true then
         lib.notify({
             title = 'Traffic Dock',
@@ -559,7 +564,7 @@ do
         lib.addKeybind({
             name = 'cad_vehicle_lock_front',
             description = 'Traffic dock: lock front vehicle',
-            defaultKey = CAD.StringTrim(cfg.QuickDockLockKey ~= nil and cfg.QuickDockLockKey or 'K'):upper(),
+            defaultKey = Utils.Trim(cfg.QuickDockLockKey ~= nil and cfg.QuickDockLockKey or 'K'):upper(),
             onPressed = function()
                 runQuickLockKeybind()
             end,
@@ -568,7 +573,7 @@ do
         lib.addKeybind({
             name = 'cad_vehicle_toggle_dock',
             description = 'Traffic dock: toggle quick panel',
-            defaultKey = CAD.StringTrim(cfg.QuickDockToggleKey ~= nil and cfg.QuickDockToggleKey or 'U'):upper(),
+            defaultKey = Utils.Trim(cfg.QuickDockToggleKey ~= nil and cfg.QuickDockToggleKey or 'U'):upper(),
             onPressed = function()
                 toggleQuickDock()
             end,
@@ -605,7 +610,7 @@ exports('searchVehicle', function(plate)
     SendNUIMessage({
         action = 'vehicle:prefillSearch',
         data = {
-            plate = CAD.StringTrim(plate),
+            plate = Utils.Trim(plate),
         },
     })
 end)
@@ -620,3 +625,6 @@ AddEventHandler('onResourceStop', function(resourceName)
         radarHidden = false
     end
 end)
+
+_G.CadActions = _G.CadActions or {}
+_G.CadActions.Vehicle = Vehicle

@@ -1,5 +1,4 @@
-CAD = CAD or {}
-CAD.ForensicClient = CAD.ForensicClient or {}
+local Config = require 'modules.shared.config'
 
 local cachedTraces = {}
 local textUiVisible = false
@@ -10,8 +9,8 @@ local function nearbyLab()
     if not ped or ped == 0 then return nil end
 
     local coords = GetEntityCoords(ped)
-    for i = 1, #CAD.Config.ForensicLabs.Locations do
-        local lab = CAD.Config.ForensicLabs.Locations[i]
+    for i = 1, #Config.ForensicLabs.Locations do
+        local lab = Config.ForensicLabs.Locations[i]
         if #(coords - lab.coords) <= lab.radius then
             return lab
         end
@@ -137,7 +136,7 @@ local function bagNearestTrace(trace)
 end
 
 RegisterCommand('forensiclab', function()
-    if CAD.IsFeatureEnabled and not CAD.IsFeatureEnabled('Forensics') then
+    if not Config.IsFeatureEnabled('Forensics') then
         lib.notify({ title = 'CAD', description = 'Forensics module is disabled', type = 'error' })
         return
     end
@@ -163,14 +162,14 @@ end, false)
 
 CreateThread(function()
     while true do
-        if CAD.IsFeatureEnabled and not CAD.IsFeatureEnabled('Forensics') then
+        if not Config.IsFeatureEnabled('Forensics') then
             closeTraceTextUi()
             Wait(1500)
         else
             refreshNearbyTraces(false)
             local traceCount = #cachedTraces
             local nearest = traceCount > 0 and getNearestTrace() or nil
-            local interactRadius = tonumber(CAD.Config.Forensics.WorldTraceInteractRadius) or 1.8
+            local interactRadius = tonumber(Config.Forensics.WorldTraceInteractRadius) or 1.8
 
             if nearest and nearest.distance and nearest.distance <= interactRadius then
                 if not textUiVisible then
@@ -198,7 +197,7 @@ CreateThread(function()
 end)
 
 RegisterCommand('forensictrace', function()
-    if CAD.Config.Debug ~= true then
+    if Config.Debug ~= true then
         lib.notify({ title = 'CAD', description = 'Debug disabled', type = 'error' })
         return
     end

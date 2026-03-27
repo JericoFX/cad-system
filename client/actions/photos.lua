@@ -1,5 +1,4 @@
-CAD = CAD or {}
-CAD.Photos = CAD.Photos or {}
+local Photos = {}
 
 local PHOTO_CONFIG = {
     animations = {
@@ -46,11 +45,9 @@ local function normalizeRaycastHit(hit)
 end
 
 local function raycastFromCamera(distance)
-    if CAD.Client and CAD.Client.RayCastGamePlayCamera then
-        local hit, hitCoords, entity = CAD.Client.RayCastGamePlayCamera(distance)
-        if normalizeRaycastHit(hit) and hitCoords and hitCoords.x and hitCoords.y and hitCoords.z then
-            return true, hitCoords, entity
-        end
+    local hit, entity, hitCoords = lib.raycast.fromCamera(511, 4, distance)
+    if normalizeRaycastHit(hit) and hitCoords and hitCoords.x and hitCoords.y and hitCoords.z then
+        return true, hitCoords, entity
     end
 
     return false, nil, nil
@@ -273,13 +270,8 @@ local function runCapture(job, fovData)
     notify(('Photo saved: %s'):format(metadata.photoId), 'success')
 end
 
-function CAD.Photos.CapturePolicePhoto()
+function Photos.CapturePolicePhoto()
     if state.isCapturing then
-        return
-    end
-
-    if CAD.Client and CAD.Client.IsOnDuty and not CAD.Client.IsOnDuty() then
-        notify('You must be on duty to use the evidence camera', 'error')
         return
     end
 
@@ -287,7 +279,7 @@ function CAD.Photos.CapturePolicePhoto()
     state.ped = getPed()
 
     TaskStartScenarioInPlace(state.ped, PHOTO_CONFIG.animations.policeCamera, 0, true)
-    local completed = CAD.Progress.Run({
+    local completed = lib.progressBar({
         duration = PHOTO_CONFIG.animations.duration,
         label = 'Focusing camera...',
         useWhileDead = false,
@@ -335,13 +327,8 @@ function CAD.Photos.CapturePolicePhoto()
     state.isCapturing = false
 end
 
-function CAD.Photos.CaptureNewsPhoto()
+function Photos.CaptureNewsPhoto()
     if state.isCapturing then
-        return
-    end
-
-    if CAD.Client and CAD.Client.IsOnDuty and not CAD.Client.IsOnDuty() then
-        notify('You must be on duty to use the press camera', 'error')
         return
     end
 
@@ -349,7 +336,7 @@ function CAD.Photos.CaptureNewsPhoto()
     state.ped = getPed()
 
     TaskStartScenarioInPlace(state.ped, PHOTO_CONFIG.animations.newsCamera, 0, true)
-    local completed = CAD.Progress.Run({
+    local completed = lib.progressBar({
         duration = PHOTO_CONFIG.animations.duration,
         label = 'Taking press photo...',
         useWhileDead = false,
@@ -385,7 +372,7 @@ function CAD.Photos.CaptureNewsPhoto()
 end
 
 exports('useNewsCamera', function(_, _)
-    CAD.Photos.CaptureNewsPhoto()
+    Photos.CaptureNewsPhoto()
     return nil
 end)
 
@@ -405,3 +392,6 @@ exports('viewPhotoItem', function(data, _)
     })
     return nil
 end)
+
+_G.CadActions = _G.CadActions or {}
+_G.CadActions.Photos = Photos

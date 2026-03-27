@@ -1,21 +1,16 @@
-CAD = CAD or {}
-CAD.Forensic = CAD.Forensic or {}
+local EvidenceTypes = require 'shared.evidence_types'
 
-CAD.Forensic.Blood = CAD.Forensic.Blood or {}
-CAD.Forensic.Fingerprints = CAD.Forensic.Fingerprints or {}
-CAD.Forensic.Casings = CAD.Forensic.Casings or {}
+local ForensicBloodEvidence = {}
+local ForensicFingerprintsEvidence = {}
+local ForensicCasingsEvidence = {}
 
-CAD.Forensic.Blood.Evidence = CAD.Forensic.Blood.Evidence or {}
-CAD.Forensic.Fingerprints.Evidence = CAD.Forensic.Fingerprints.Evidence or {}
-CAD.Forensic.Casings.Evidence = CAD.Forensic.Casings.Evidence or {}
-
-CAD.Forensic.Targets = CAD.Forensic.Targets or {
+local ForensicTargets = {
     blood = {},
     fingerprints = {},
     casings = {},
 }
 
-CAD.Forensic.Visuals = CAD.Forensic.Visuals or {
+local ForensicVisuals = {
     blood = {},
     casings = {},
 }
@@ -24,10 +19,6 @@ local CASING_MODEL = joaat('prop_cs_casing_01')
 local lastFingerprintTargetRefresh = 0
 
 local function deepCopy(value)
-    if CAD.DeepCopy then
-        return CAD.DeepCopy(value)
-    end
-
     if type(value) ~= 'table' then
         return value
     end
@@ -56,7 +47,7 @@ local function hasTool(toolName)
 end
 
 local function showProgress(duration, label)
-    return CAD.Progress.Run({
+    return lib.progressBar({
         duration = duration,
         label = label,
         useWhileDead = false,
@@ -141,16 +132,16 @@ local function getFingerprintCoords(entry)
     return GetEntityCoords(entity)
 end
 
-local function applySceneEvidenceState(state)
-    local evidences = type(state) == 'table' and state or {}
-    CAD.Forensic.Blood.Evidence = cloneEvidenceMap(evidences.blood)
-    CAD.Forensic.Fingerprints.Evidence = cloneEvidenceMap(evidences.fingerprints)
-    CAD.Forensic.Casings.Evidence = cloneEvidenceMap(evidences.casings)
+local function applySceneEvidenceState(evidenceState)
+    local evidences = type(evidenceState) == 'table' and evidenceState or {}
+    ForensicBloodEvidence = cloneEvidenceMap(evidences.blood)
+    ForensicFingerprintsEvidence = cloneEvidenceMap(evidences.fingerprints)
+    ForensicCasingsEvidence = cloneEvidenceMap(evidences.casings)
 end
 
 local function refreshSceneEvidenceFromStateBag()
-    local state = GlobalState and GlobalState.evidences or nil
-    applySceneEvidenceState(state)
+    local evidenceState = GlobalState and GlobalState.evidences or nil
+    applySceneEvidenceState(evidenceState)
 end
 
 local function removeTargetZone(zoneId)
@@ -186,13 +177,13 @@ local function coordsChanged(previousCoords, currentCoords, threshold)
 end
 
 local function clearAllTargets()
-    clearTargetMap(CAD.Forensic.Targets.blood)
-    clearTargetMap(CAD.Forensic.Targets.fingerprints)
-    clearTargetMap(CAD.Forensic.Targets.casings)
+    clearTargetMap(ForensicTargets.blood)
+    clearTargetMap(ForensicTargets.fingerprints)
+    clearTargetMap(ForensicTargets.casings)
 end
 
 local function createBloodDecal(coords, visibility)
-    local config = CAD.EvidenceTypes.GetType('blood')
+    local config = EvidenceTypes.GetType('blood')
     local decalType = config and config.visualization and tonumber(config.visualization.decalType) or 1010
     local alpha = math.max(40, math.floor(clampVisibility(visibility) * 220))
 
@@ -222,7 +213,7 @@ local function createBloodDecal(coords, visibility)
 end
 
 local function removeBloodVisual(bloodId)
-    local visual = CAD.Forensic.Visuals.blood[bloodId]
+    local visual = ForensicVisuals.blood[bloodId]
     if not visual then
         return
     end
@@ -231,7 +222,7 @@ local function removeBloodVisual(bloodId)
         RemoveDecal(visual.decal)
     end
 
-    CAD.Forensic.Visuals.blood[bloodId] = nil
+    ForensicVisuals.blood[bloodId] = nil
 end
 
 local function requestModel(model, timeoutMs)
@@ -250,7 +241,7 @@ local function requestModel(model, timeoutMs)
 end
 
 local function removeCasingVisual(casingId)
-    local visual = CAD.Forensic.Visuals.casings[casingId]
+    local visual = ForensicVisuals.casings[casingId]
     if not visual then
         return
     end
@@ -259,11 +250,11 @@ local function removeCasingVisual(casingId)
         DeleteEntity(visual.entity)
     end
 
-    CAD.Forensic.Visuals.casings[casingId] = nil
+    ForensicVisuals.casings[casingId] = nil
 end
 
 local function syncBloodVisuals()
-    local evidences = CAD.Forensic.Blood.Evidence or {}
+    local evidences = ForensicBloodEvidence or {}
 
     for bloodId, blood in pairs(evidences) do
         local coords = asVector3Coords(blood.coords)
@@ -275,10 +266,10 @@ local function syncBloodVisuals()
         end
 
         local bucket = math.floor(visibility * 10 + 0.5)
-        local visual = CAD.Forensic.Visuals.blood[bloodId]
+        local visual = ForensicVisuals.blood[bloodId]
         if not visual or visual.bucket ~= bucket then
             removeBloodVisual(bloodId)
-            CAD.Forensic.Visuals.blood[bloodId] = {
+            ForensicVisuals.blood[bloodId] = {
                 decal = createBloodDecal(coords, visibility),
                 bucket = bucket,
             }
@@ -287,7 +278,7 @@ local function syncBloodVisuals()
         ::continue::
     end
 
-    for bloodId in pairs(CAD.Forensic.Visuals.blood) do
+    for bloodId in pairs(ForensicVisuals.blood) do
         if not evidences[bloodId] then
             removeBloodVisual(bloodId)
         end
@@ -295,7 +286,7 @@ local function syncBloodVisuals()
 end
 
 local function syncCasingVisuals()
-    local evidences = CAD.Forensic.Casings.Evidence or {}
+    local evidences = ForensicCasingsEvidence or {}
 
     for casingId, casing in pairs(evidences) do
         local coords = asVector3Coords(casing.coords)
@@ -306,7 +297,7 @@ local function syncCasingVisuals()
             goto continue
         end
 
-        local visual = CAD.Forensic.Visuals.casings[casingId]
+        local visual = ForensicVisuals.casings[casingId]
         if not visual then
             if not requestModel(CASING_MODEL, 1800) then
                 goto continue
@@ -326,7 +317,7 @@ local function syncCasingVisuals()
                 entity = entity,
             }
 
-            CAD.Forensic.Visuals.casings[casingId] = visual
+            ForensicVisuals.casings[casingId] = visual
             SetModelAsNoLongerNeeded(CASING_MODEL)
         end
 
@@ -338,7 +329,7 @@ local function syncCasingVisuals()
         ::continue::
     end
 
-    for casingId in pairs(CAD.Forensic.Visuals.casings) do
+    for casingId in pairs(ForensicVisuals.casings) do
         if not evidences[casingId] then
             removeCasingVisual(casingId)
         end
@@ -346,11 +337,11 @@ local function syncCasingVisuals()
 end
 
 local function clearAllVisuals()
-    for bloodId in pairs(CAD.Forensic.Visuals.blood) do
+    for bloodId in pairs(ForensicVisuals.blood) do
         removeBloodVisual(bloodId)
     end
 
-    for casingId in pairs(CAD.Forensic.Visuals.casings) do
+    for casingId in pairs(ForensicVisuals.casings) do
         removeCasingVisual(casingId)
     end
 end
@@ -365,12 +356,12 @@ local function createBloodTarget(bloodId, blood)
         return
     end
 
-    local config = CAD.EvidenceTypes.GetType('blood')
+    local config = EvidenceTypes.GetType('blood')
     if not config then
         return
     end
 
-    CAD.Forensic.Targets.blood[bloodId] = {
+    ForensicTargets.blood[bloodId] = {
         zoneId = exports.ox_target:addSphereZone({
             coords = coords,
             radius = 1.0,
@@ -416,12 +407,12 @@ local function createFingerprintTarget(fpId, fingerprint, coords)
         return
     end
 
-    local config = CAD.EvidenceTypes.GetType('fingerprint')
+    local config = EvidenceTypes.GetType('fingerprint')
     if not config or not coords or clampVisibility(fingerprint.visibility) <= 0.01 then
         return
     end
 
-    CAD.Forensic.Targets.fingerprints[fpId] = {
+    ForensicTargets.fingerprints[fpId] = {
         zoneId = exports.ox_target:addBoxZone({
             coords = coords,
             size = vec3(0.5, 0.5, 0.5),
@@ -432,7 +423,7 @@ local function createFingerprintTarget(fpId, fingerprint, coords)
                     icon = 'fa-magnifying-glass',
                     label = 'Dust for Fingerprints',
                     canInteract = function()
-                        local current = CAD.Forensic.Fingerprints.Evidence[fpId]
+                        local current = ForensicFingerprintsEvidence[fpId]
                         return current ~= nil and current.revealed ~= true and hasTool(config.revealTool)
                     end,
                     onSelect = function()
@@ -448,7 +439,7 @@ local function createFingerprintTarget(fpId, fingerprint, coords)
                     icon = config.icon,
                     label = 'Lift Fingerprint',
                     canInteract = function()
-                        local current = CAD.Forensic.Fingerprints.Evidence[fpId]
+                        local current = ForensicFingerprintsEvidence[fpId]
                         return current ~= nil and current.revealed == true and hasTool(config.requiredTool)
                     end,
                     onSelect = function()
@@ -476,12 +467,12 @@ local function createCasingTarget(casingId, casing)
         return
     end
 
-    local config = CAD.EvidenceTypes.GetType('casing')
+    local config = EvidenceTypes.GetType('casing')
     if not config then
         return
     end
 
-    CAD.Forensic.Targets.casings[casingId] = {
+    ForensicTargets.casings[casingId] = {
         zoneId = exports.ox_target:addSphereZone({
             coords = coords,
             radius = 0.5,
@@ -508,56 +499,56 @@ local function createCasingTarget(casingId, casing)
 end
 
 local function rebuildBloodTargets()
-    clearTargetMap(CAD.Forensic.Targets.blood)
+    clearTargetMap(ForensicTargets.blood)
 
     if not isOxTargetReady() then
         return
     end
 
-    for bloodId, blood in pairs(CAD.Forensic.Blood.Evidence or {}) do
+    for bloodId, blood in pairs(ForensicBloodEvidence or {}) do
         createBloodTarget(bloodId, blood)
     end
 end
 
 local function rebuildCasingTargets()
-    clearTargetMap(CAD.Forensic.Targets.casings)
+    clearTargetMap(ForensicTargets.casings)
 
     if not isOxTargetReady() then
         return
     end
 
-    for casingId, casing in pairs(CAD.Forensic.Casings.Evidence or {}) do
+    for casingId, casing in pairs(ForensicCasingsEvidence or {}) do
         createCasingTarget(casingId, casing)
     end
 end
 
 local function refreshFingerprintTargets(force)
     if not isOxTargetReady() then
-        clearTargetMap(CAD.Forensic.Targets.fingerprints)
+        clearTargetMap(ForensicTargets.fingerprints)
         return
     end
 
-    for fpId, entry in pairs(CAD.Forensic.Targets.fingerprints) do
-        if not CAD.Forensic.Fingerprints.Evidence[fpId] then
+    for fpId, entry in pairs(ForensicTargets.fingerprints) do
+        if not ForensicFingerprintsEvidence[fpId] then
             removeTargetEntry(entry)
-            CAD.Forensic.Targets.fingerprints[fpId] = nil
+            ForensicTargets.fingerprints[fpId] = nil
         end
     end
 
-    for fpId, fingerprint in pairs(CAD.Forensic.Fingerprints.Evidence or {}) do
+    for fpId, fingerprint in pairs(ForensicFingerprintsEvidence or {}) do
         local coords = getFingerprintCoords(fingerprint)
         local visibility = clampVisibility(fingerprint.visibility)
-        local entry = CAD.Forensic.Targets.fingerprints[fpId]
+        local entry = ForensicTargets.fingerprints[fpId]
 
         if not coords or visibility <= 0.01 then
             if entry then
                 removeTargetEntry(entry)
-                CAD.Forensic.Targets.fingerprints[fpId] = nil
+                ForensicTargets.fingerprints[fpId] = nil
             end
         elseif force or not entry or coordsChanged(entry.coords, coords, 0.2) then
             if entry then
                 removeTargetEntry(entry)
-                CAD.Forensic.Targets.fingerprints[fpId] = nil
+                ForensicTargets.fingerprints[fpId] = nil
             end
 
             createFingerprintTarget(fpId, fingerprint, coords)
@@ -573,7 +564,7 @@ local function drawFingerprintMarkers()
 
     local drawn = false
     local pedCoords = GetEntityCoords(ped)
-    for _, fingerprint in pairs(CAD.Forensic.Fingerprints.Evidence or {}) do
+    for _, fingerprint in pairs(ForensicFingerprintsEvidence or {}) do
         if fingerprint.revealed == true and clampVisibility(fingerprint.visibility) > 0.01 then
             local coords = getFingerprintCoords(fingerprint)
             if coords then
@@ -651,7 +642,7 @@ end)
 
 CreateThread(function()
     while true do
-        if next(CAD.Forensic.Fingerprints.Evidence or {}) == nil then
+        if next(ForensicFingerprintsEvidence or {}) == nil then
             Wait(1000)
         else
             local now = GetGameTimer()
