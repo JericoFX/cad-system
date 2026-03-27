@@ -1,4 +1,4 @@
-CAD = CAD or {}
+local EvidenceTypes = {}
 
 local BLOOD_TYPES = {
     'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'
@@ -105,7 +105,7 @@ local function normalizeTypeName(value)
         return nil
     end
 
-    local compact = CAD.StringCompact and CAD.StringCompact(value) or value:gsub('%s+', '')
+    local compact = value:gsub('%s+', '')
     if compact == '' then
         return nil
     end
@@ -128,7 +128,7 @@ local function normalizeToolName(value)
         return nil
     end
 
-    local compact = CAD.StringCompact and CAD.StringCompact(value) or value:gsub('%s+', '')
+    local compact = value:gsub('%s+', '')
     if compact == '' then
         return nil
     end
@@ -136,10 +136,7 @@ local function normalizeToolName(value)
     return compact:lower()
 end
 
-CAD.EvidenceTypes = CAD.EvidenceTypes or {}
-CAD.Tools = CAD.Tools or TOOLS
-
-function CAD.EvidenceTypes.GetType(evidenceType)
+function EvidenceTypes.GetType(evidenceType)
     local key = normalizeTypeName(evidenceType)
     if not key then
         return nil
@@ -148,39 +145,53 @@ function CAD.EvidenceTypes.GetType(evidenceType)
     return EVIDENCE_TYPES[key]
 end
 
-function CAD.EvidenceTypes.GetAllTypes()
+function EvidenceTypes.GetAllTypes()
     return EVIDENCE_TYPES
 end
 
-function CAD.EvidenceTypes.GetTool(toolName)
+function EvidenceTypes.GetTool(toolName)
     local key = normalizeToolName(toolName)
     if not key then
         return nil
     end
 
-    return CAD.Tools[key]
+    return TOOLS[key]
 end
 
-function CAD.EvidenceTypes.GetRandomBloodType()
+function EvidenceTypes.GetRandomBloodType()
     return BLOOD_TYPES[math.random(1, #BLOOD_TYPES)]
 end
 
-function CAD.EvidenceTypes.ToolCanCollect(toolName, evidenceType)
-    local tool = CAD.EvidenceTypes.GetTool(toolName)
+function EvidenceTypes.ToolCanCollect(toolName, evidenceType)
+    local tool = EvidenceTypes.GetTool(toolName)
     local normalized = normalizeTypeName(evidenceType)
     if not tool or not normalized then
         return false
     end
 
-    return CAD.TableContains and CAD.TableContains(tool.collects or {}, normalized) or false
+    local collects = tool.collects or {}
+    for _, v in ipairs(collects) do
+        if v == normalized then
+            return true
+        end
+    end
+    return false
 end
 
-function CAD.EvidenceTypes.ToolCanReveal(toolName, evidenceType)
-    local tool = CAD.EvidenceTypes.GetTool(toolName)
+function EvidenceTypes.ToolCanReveal(toolName, evidenceType)
+    local tool = EvidenceTypes.GetTool(toolName)
     local normalized = normalizeTypeName(evidenceType)
     if not tool or not normalized then
         return false
     end
 
-    return CAD.TableContains and CAD.TableContains(tool.reveals or {}, normalized) or false
+    local reveals = tool.reveals or {}
+    for _, v in ipairs(reveals) do
+        if v == normalized then
+            return true
+        end
+    end
+    return false
 end
+
+return EvidenceTypes

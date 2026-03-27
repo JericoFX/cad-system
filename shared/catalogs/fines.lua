@@ -1,9 +1,4 @@
-
-
-CAD = CAD or {}
-CAD.Catalogs = CAD.Catalogs or {}
-
-CAD.Catalogs.Fines = {
+local FineCatalog = {
     {
         code = 'T001',
         category = 'traffic',
@@ -48,10 +43,8 @@ CAD.Catalogs.Fines = {
     },
 }
 
-local function clone(value)
-    return CAD.DeepCopy(value)
+function FineCatalog.Get()
+    return lib.table.deepclone(FineCatalog)
 end
 
-function CAD.GetFineCatalog()
-    return clone(CAD.Catalogs.Fines)
-end
+return FineCatalog
