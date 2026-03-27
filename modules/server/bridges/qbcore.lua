@@ -3,11 +3,17 @@ local Utils = require 'modules.shared.utils'
 
 local QB = {}
 
+local cachedQBObject = nil
+
 function QB.GetObject()
+    if cachedQBObject then return cachedQBObject end
     local ok, obj = pcall(function()
         return exports['qb-core']:GetCoreObject()
     end)
-    if ok and obj then return obj end
+    if ok and obj then
+        cachedQBObject = obj
+        return obj
+    end
     return nil
 end
 

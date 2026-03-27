@@ -1,5 +1,6 @@
 local ClientFn = require 'modules.client.functions'
 local Registry = require 'modules.shared.registry'
+local Utils = require 'modules.shared.utils'
 
 local Photos = {}
 
@@ -195,8 +196,14 @@ local function requestScreenshotUrl(captureConfig)
         )
     end
 
+    local timeout = GetGameTimer() + 30000
     while result == nil do
-        Wait(0)
+        if GetGameTimer() > timeout then
+            Utils.Log('error', 'Screenshot upload timed out after 30s')
+            result = false
+            break
+        end
+        Wait(100)
     end
 
     if result.ok ~= true then
