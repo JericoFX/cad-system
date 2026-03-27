@@ -21,7 +21,8 @@ end
 
 function Utils.GenerateId(prefix)
     local base = (prefix or 'ID'):upper()
-    return ('%s_%s_%04d'):format(base, os.date('%Y%m%d%H%M%S'), math.random(0, 9999))
+    -- pattern: 8 alphanumeric chars + 4 digits for uniqueness
+    return ('%s_%s_%s'):format(base, os.date('%Y%m%d%H%M%S'), string.random('........'))
 end
 
 function Utils.ToIso(ts)

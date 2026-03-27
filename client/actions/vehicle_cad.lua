@@ -373,7 +373,7 @@ function Vehicle.LockFrontQuick()
     end
 
     lib.notify({
-        title = 'Traffic Dock',
+        title = 'CAD',
         description = ('LOCK %s - %s%s'):format(lastQuickLock.plate, lastQuickLock.riskLevel, tags),
         type = lastQuickLock.riskLevel == 'HIGH' and 'error' or 'inform',
     })
@@ -509,7 +509,7 @@ local function toggleQuickDock()
     sendVehicleContextNui()
 
     lib.notify({
-        title = 'Traffic Dock',
+        title = 'CAD',
         description = quickDockEnabled and 'Quick dock enabled' or 'Quick dock hidden',
         type = 'inform',
     })
@@ -523,7 +523,7 @@ local function runQuickLockKeybind()
     local result = Vehicle.LockFrontQuick()
     if not result or result.ok ~= true then
         lib.notify({
-            title = 'Traffic Dock',
+            title = 'CAD',
             description = ('Front lock failed: %s'):format(result and result.error or 'unknown_error'),
             type = 'error',
         })

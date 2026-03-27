@@ -81,7 +81,31 @@ local items = {
         client = {
             export = 'cad-system.useSecurityCamera'
         }
-    }
+    },
+
+    ['cad_evidence_item'] = {
+        label = 'Evidence Record',
+        weight = 0,
+        stack = false,
+        close = true,
+        description = 'CAD evidence record with linked case metadata',
+    },
+
+    ['cad_ticket'] = {
+        label = 'Citation',
+        weight = 0,
+        stack = false,
+        close = true,
+        description = 'Traffic citation or fine record',
+    },
+
+    ['cad_blood_sample'] = {
+        label = 'Blood Evidence Sample',
+        weight = 50,
+        stack = false,
+        close = true,
+        description = 'Collected blood sample for forensic analysis',
+    },
 }
 
 return items

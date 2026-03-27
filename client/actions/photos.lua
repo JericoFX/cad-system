@@ -30,7 +30,7 @@ end
 
 local function notify(message, nType)
     lib.notify({
-        title = 'CAD Photos',
+        title = 'CAD',
         description = message,
         type = nType or 'inform',
     })

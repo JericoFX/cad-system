@@ -319,6 +319,26 @@ function Database.EnsureSchema()
     ]])
 
     -- =========================================================================
+    -- SECONDARY INDEXES (query performance)
+    -- =========================================================================
+
+    executeOptional([[
+        ALTER TABLE cad_cases ADD INDEX idx_cases_assigned (assigned_to, status)
+    ]], 'idx_cases_assigned')
+
+    executeOptional([[
+        ALTER TABLE cad_evidence ADD INDEX idx_evidence_type_case (evidence_type, case_id)
+    ]], 'idx_evidence_type_case')
+
+    executeOptional([[
+        ALTER TABLE cad_dispatch_calls ADD INDEX idx_calls_priority (priority, status)
+    ]], 'idx_calls_priority')
+
+    executeOptional([[
+        ALTER TABLE cad_fines ADD INDEX idx_fines_issued (issued_at, status)
+    ]], 'idx_fines_issued')
+
+    -- =========================================================================
     -- FOREIGN KEY CONSTRAINTS (cascade child rows on case deletion)
     -- =========================================================================
 
