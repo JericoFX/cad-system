@@ -39,7 +39,7 @@ local function safeQuery(sql, params, context)
     return rows or {}
 end
 
-local function bootstrapFromDatabase()
+local function bootstrapCases()
     local caseRows = safeQuery('SELECT case_id, case_type, title, description, status, priority, created_by, assigned_to, linked_call_id, person_id, person_name, created_at, updated_at FROM cad_cases', {}, 'cad_cases')
     for i = 1, #caseRows do
         local row = caseRows[i]
@@ -96,6 +96,10 @@ local function bootstrapFromDatabase()
         end
     end
 
+    return caseRows
+end
+
+local function bootstrapDispatchCalls()
     local callRows = {}
     if Config.IsFeatureEnabled == nil or Config.IsFeatureEnabled('Dispatch') then
         callRows = safeQuery('SELECT * FROM cad_dispatch_calls WHERE status <> ?', { 'CLOSED' }, 'cad_dispatch_calls')
@@ -115,7 +119,10 @@ local function bootstrapFromDatabase()
             }
         end
     end
+    return callRows
+end
 
+local function bootstrapFines()
     local fineRows = safeQuery('SELECT * FROM cad_fines WHERE status = ?', { 'PENDING' }, 'cad_fines')
     for i = 1, #fineRows do
         local row = fineRows[i]
@@ -138,7 +145,10 @@ local function bootstrapFromDatabase()
             isBail = tonumber(row.is_bail) == 1,
         }
     end
+    return fineRows
+end
 
+local function bootstrapEMS()
     local bloodRows = {}
     if Config.IsFeatureEnabled == nil or Config.IsFeatureEnabled('EMS') then
         bloodRows = safeQuery('SELECT * FROM cad_ems_blood_requests', {}, 'cad_ems_blood_requests')
@@ -177,7 +187,10 @@ local function bootstrapFromDatabase()
             }
         end
     end
+    return bloodRows
+end
 
+local function bootstrapJailTransfers()
     local jailRows = safeQuery('SELECT transfer_id, citizen_id, person_name, case_id, jail_months, reason, facility, notes, created_by, created_by_name, created_at FROM cad_jail_transfers ORDER BY created_at DESC LIMIT 500', {}, 'cad_jail_transfers')
     for i = 1, #jailRows do
         local row = jailRows[i]
@@ -195,7 +208,10 @@ local function bootstrapFromDatabase()
             createdAt = row.created_at,
         }
     end
+    return jailRows
+end
 
+local function bootstrapCameras()
     State.SecurityCameras = State.SecurityCameras or {
         Cameras = {},
         LastNumber = 0,
@@ -232,6 +248,10 @@ local function bootstrapFromDatabase()
         end
     end
 
+    return cameraRows
+end
+
+local function bootstrapExtensions()
     local TopologyAction = Registry.Get("Topology")
     if TopologyAction and TopologyAction.LoadFromDatabase then
         TopologyAction.LoadFromDatabase()
@@ -242,6 +262,18 @@ local function bootstrapFromDatabase()
     if VirtualContainerAction and VirtualContainerAction.LoadFromDatabase then
         virtualSlots = tonumber(VirtualContainerAction.LoadFromDatabase()) or 0
     end
+
+    return virtualSlots
+end
+
+local function bootstrapFromDatabase()
+    local caseRows = bootstrapCases()
+    local callRows = bootstrapDispatchCalls()
+    local fineRows = bootstrapFines()
+    local bloodRows = bootstrapEMS()
+    local jailRows = bootstrapJailTransfers()
+    local cameraRows = bootstrapCameras()
+    local virtualSlots = bootstrapExtensions()
 
     Utils.Log(
         'success',

@@ -179,73 +179,122 @@ wrapNui('cad:vehicle:playAlert', function(payload)
     }
 end)
 
-wrapNui('cad:lookup:searchPersons', bridge('cad:lookup:searchPersons'))
-wrapNui('cad:lookup:searchVehicles', bridge('cad:lookup:searchVehicles'))
-wrapNui('cad:phone:lookupByNumber', bridge('cad:phone:lookupByNumber'))
-wrapNui('cad:phone:lookupByImei', bridge('cad:phone:lookupByImei'))
-wrapNui('cad:phone:setStolenPlaceholder', bridge('cad:phone:setStolenPlaceholder'))
-wrapNui('cad:entityNotes:list', bridge('cad:entityNotes:list'))
-wrapNui('cad:entityNotes:add', bridge('cad:entityNotes:add'))
-wrapNui('cad:vehicle:quickSummary', bridge('cad:vehicle:quickSummary'))
-wrapNui('cad:vehicle:logStop', bridge('cad:vehicle:logStop'))
-wrapNui('cad:vehicle:getRecentStops', bridge('cad:vehicle:getRecentStops'))
+local bridgedCallbacks = {
+    -- lookup
+    'cad:lookup:searchPersons',
+    'cad:lookup:searchVehicles',
+    -- phone
+    'cad:phone:lookupByNumber',
+    'cad:phone:lookupByImei',
+    'cad:phone:setStolenPlaceholder',
+    -- entity notes
+    'cad:entityNotes:list',
+    'cad:entityNotes:add',
+    -- vehicle
+    'cad:vehicle:quickSummary',
+    'cad:vehicle:logStop',
+    'cad:vehicle:getRecentStops',
+    -- cases
+    'cad:createCase',
+    'cad:getCase',
+    'cad:searchCases',
+    'cad:updateCase',
+    'cad:closeCase',
+    'cad:case:printReport',
+    -- evidence
+    'cad:addEvidenceToStaging',
+    'cad:getStagingEvidence',
+    'cad:removeFromStaging',
+    'cad:attachEvidence',
+    'cad:getCaseEvidence',
+    'cad:evidence:container:list',
+    'cad:evidence:container:store',
+    'cad:evidence:container:pull',
+    -- photos
+    'cad:photos:getCaptureConfig',
+    'cad:photos:capturePolicePhoto',
+    'cad:photos:captureNewsPhoto',
+    'cad:photos:getInventoryPhotos',
+    'cad:photos:getStagingPhotos',
+    'cad:photos:getReleasedPhotos',
+    'cad:photos:releaseToPress',
+    'cad:photos:submitToPolice',
+    'cad:photos:getReviewQueue',
+    'cad:photos:reviewSubmission',
+    'cad:photos:attachToCase',
+    'cad:photos:getPhoto',
+    'cad:photos:updateDescription',
+    'cad:photos:deletePhoto',
+    -- news
+    'cad:news:getArticles',
+    'cad:news:published',
+    'cad:news:updated',
+    'cad:news:expired',
+    'cad:news:deleted',
+    -- dispatch
+    'cad:registerDispatchUnit',
+    'cad:getDispatchUnits',
+    'cad:updateUnitStatus',
+    'cad:createDispatchCall',
+    'cad:getDispatchCalls',
+    'cad:assignUnitToCall',
+    'cad:unassignUnitFromCall',
+    'cad:closeDispatchCall',
+    'cad:closeCall',
+    'cad:getNearestUnit',
+    'cad:setOfficerStatus',
+    'cad:getOfficerStatus',
+    -- cameras
+    'cad:cameras:getNextNumber',
+    'cad:cameras:list',
+    'cad:cameras:get',
+    'cad:cameras:setStatus',
+    'cad:cameras:remove',
+    -- jail
+    'cad:police:getJailTransfers',
+    'cad:police:logJailTransfer',
+    -- fines
+    'cad:getFineCatalog',
+    'cad:createFine',
+    'cad:getFines',
+    'cad:payFine',
+    -- ems
+    'cad:ems:getUnits',
+    'cad:ems:getAlerts',
+    'cad:ems:createAlert',
+    'cad:ems:updateUnit',
+    'cad:ems:critical_patient',
+    'cad:ems:low_stock',
+    'cad:ems:handoff_complete',
+    'cad:ems:createBloodRequest',
+    'cad:ems:getBloodRequests',
+    'cad:ems:updateBloodRequest',
+    -- forensics
+    'cad:forensic:checkInLab',
+    'cad:forensic:getPendingEvidence',
+    'cad:forensic:analyzeEvidence',
+    'cad:forensic:completeAnalysis',
+    'cad:forensic:getAnalysisResults',
+    'cad:forensic:compareEvidence',
+    'cad:forensic:collectEvidence',
+    -- id reader
+    'cad:idreader:read',
+    'cad:idreader:listDocuments',
+    'cad:idreader:insert',
+    'cad:idreader:eject',
+    'cad:idreader:getContainer',
+    -- callsign
+    'cad:getCallsign',
+    'cad:setCallsign',
+}
 
-wrapNui('cad:createCase', bridge('cad:createCase'))
-wrapNui('cad:getCase', bridge('cad:getCase'))
-wrapNui('cad:searchCases', bridge('cad:searchCases'))
-wrapNui('cad:updateCase', bridge('cad:updateCase'))
-wrapNui('cad:closeCase', bridge('cad:closeCase'))
-wrapNui('cad:case:printReport', bridge('cad:case:printReport'))
+for _, name in ipairs(bridgedCallbacks) do
+    wrapNui(name, bridge(name))
+end
 
-wrapNui('cad:addEvidenceToStaging', bridge('cad:addEvidenceToStaging'))
-wrapNui('cad:getStagingEvidence', bridge('cad:getStagingEvidence'))
-wrapNui('cad:removeFromStaging', bridge('cad:removeFromStaging'))
-wrapNui('cad:attachEvidence', bridge('cad:attachEvidence'))
-wrapNui('cad:getCaseEvidence', bridge('cad:getCaseEvidence'))
-wrapNui('cad:evidence:container:list', bridge('cad:evidence:container:list'))
-wrapNui('cad:evidence:container:store', bridge('cad:evidence:container:store'))
-wrapNui('cad:evidence:container:pull', bridge('cad:evidence:container:pull'))
-
-wrapNui('cad:photos:getCaptureConfig', bridge('cad:photos:getCaptureConfig'))
-wrapNui('cad:photos:capturePolicePhoto', bridge('cad:photos:capturePolicePhoto'))
-wrapNui('cad:photos:captureNewsPhoto', bridge('cad:photos:captureNewsPhoto'))
-wrapNui('cad:photos:getInventoryPhotos', bridge('cad:photos:getInventoryPhotos'))
-wrapNui('cad:photos:getStagingPhotos', bridge('cad:photos:getStagingPhotos'))
-wrapNui('cad:photos:getReleasedPhotos', bridge('cad:photos:getReleasedPhotos'))
-wrapNui('cad:photos:releaseToPress', bridge('cad:photos:releaseToPress'))
-wrapNui('cad:photos:submitToPolice', bridge('cad:photos:submitToPolice'))
-wrapNui('cad:photos:getReviewQueue', bridge('cad:photos:getReviewQueue'))
-wrapNui('cad:photos:reviewSubmission', bridge('cad:photos:reviewSubmission'))
-wrapNui('cad:photos:attachToCase', bridge('cad:photos:attachToCase'))
-wrapNui('cad:photos:getPhoto', bridge('cad:photos:getPhoto'))
-wrapNui('cad:photos:updateDescription', bridge('cad:photos:updateDescription'))
-wrapNui('cad:photos:deletePhoto', bridge('cad:photos:deletePhoto'))
-
-wrapNui('cad:news:getArticles', bridge('cad:news:getArticles'))
-wrapNui('cad:news:published', bridge('cad:news:published'))
-wrapNui('cad:news:updated', bridge('cad:news:updated'))
-wrapNui('cad:news:expired', bridge('cad:news:expired'))
-wrapNui('cad:news:deleted', bridge('cad:news:deleted'))
-
-wrapNui('cad:registerDispatchUnit', bridge('cad:registerDispatchUnit'))
-wrapNui('cad:getDispatchUnits', bridge('cad:getDispatchUnits'))
-wrapNui('cad:updateUnitStatus', bridge('cad:updateUnitStatus'))
+-- NUI name differs from server event name; kept as individual registration
 wrapNui('cad:dispatch:createCall', bridge('cad:createDispatchCall'))
-wrapNui('cad:createDispatchCall', bridge('cad:createDispatchCall'))
-wrapNui('cad:getDispatchCalls', bridge('cad:getDispatchCalls'))
-wrapNui('cad:assignUnitToCall', bridge('cad:assignUnitToCall'))
-wrapNui('cad:unassignUnitFromCall', bridge('cad:unassignUnitFromCall'))
-wrapNui('cad:closeDispatchCall', bridge('cad:closeDispatchCall'))
-wrapNui('cad:closeCall', bridge('cad:closeCall'))
-wrapNui('cad:getNearestUnit', bridge('cad:getNearestUnit'))
-wrapNui('cad:setOfficerStatus', bridge('cad:setOfficerStatus'))
-wrapNui('cad:getOfficerStatus', bridge('cad:getOfficerStatus'))
 
-wrapNui('cad:cameras:getNextNumber', bridge('cad:cameras:getNextNumber'))
-wrapNui('cad:cameras:list', bridge('cad:cameras:list'))
-wrapNui('cad:cameras:get', bridge('cad:cameras:get'))
-wrapNui('cad:cameras:setStatus', bridge('cad:cameras:setStatus'))
-wrapNui('cad:cameras:remove', bridge('cad:cameras:remove'))
 wrapNui('cad:cameras:watch', function(payload)
     local SecurityCameraAction = Registry.Get('SecurityCamera')
     if SecurityCameraAction and SecurityCameraAction.StartWatch then
@@ -267,39 +316,6 @@ wrapNui('cad:cameras:stopWatch', function()
         ok = true,
     }
 end)
-
-wrapNui('cad:police:getJailTransfers', bridge('cad:police:getJailTransfers'))
-wrapNui('cad:police:logJailTransfer', bridge('cad:police:logJailTransfer'))
-
-wrapNui('cad:getFineCatalog', bridge('cad:getFineCatalog'))
-wrapNui('cad:createFine', bridge('cad:createFine'))
-wrapNui('cad:getFines', bridge('cad:getFines'))
-wrapNui('cad:payFine', bridge('cad:payFine'))
-
-wrapNui('cad:ems:getUnits', bridge('cad:ems:getUnits'))
-wrapNui('cad:ems:getAlerts', bridge('cad:ems:getAlerts'))
-wrapNui('cad:ems:createAlert', bridge('cad:ems:createAlert'))
-wrapNui('cad:ems:updateUnit', bridge('cad:ems:updateUnit'))
-wrapNui('cad:ems:critical_patient', bridge('cad:ems:critical_patient'))
-wrapNui('cad:ems:low_stock', bridge('cad:ems:low_stock'))
-wrapNui('cad:ems:handoff_complete', bridge('cad:ems:handoff_complete'))
-wrapNui('cad:ems:createBloodRequest', bridge('cad:ems:createBloodRequest'))
-wrapNui('cad:ems:getBloodRequests', bridge('cad:ems:getBloodRequests'))
-wrapNui('cad:ems:updateBloodRequest', bridge('cad:ems:updateBloodRequest'))
-
-wrapNui('cad:forensic:checkInLab', bridge('cad:forensic:checkInLab'))
-wrapNui('cad:forensic:getPendingEvidence', bridge('cad:forensic:getPendingEvidence'))
-wrapNui('cad:forensic:analyzeEvidence', bridge('cad:forensic:analyzeEvidence'))
-wrapNui('cad:forensic:completeAnalysis', bridge('cad:forensic:completeAnalysis'))
-wrapNui('cad:forensic:getAnalysisResults', bridge('cad:forensic:getAnalysisResults'))
-wrapNui('cad:forensic:compareEvidence', bridge('cad:forensic:compareEvidence'))
-wrapNui('cad:forensic:collectEvidence', bridge('cad:forensic:collectEvidence'))
-
-wrapNui('cad:idreader:read', bridge('cad:idreader:read'))
-wrapNui('cad:idreader:listDocuments', bridge('cad:idreader:listDocuments'))
-wrapNui('cad:idreader:insert', bridge('cad:idreader:insert'))
-wrapNui('cad:idreader:eject', bridge('cad:idreader:eject'))
-wrapNui('cad:idreader:getContainer', bridge('cad:idreader:getContainer'))
 
 wrapNui('showNotification', function(data)
     lib.notify({
@@ -339,6 +355,3 @@ wrapNui('getCurrentPosition', function()
         street = GetStreetNameFromHashKey(streetHash),
     }
 end)
-
-wrapNui('cad:getCallsign', bridge('cad:getCallsign'))
-wrapNui('cad:setCallsign', bridge('cad:setCallsign'))
