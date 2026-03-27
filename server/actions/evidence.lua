@@ -62,7 +62,7 @@ local TERMINAL_MAX_DISTANCE = 10.0
 
 local function isPlayerNearTerminal(source, terminal)
     if not terminal.coords then
-        return true
+        return false
     end
 
     local ped = GetPlayerPed(source)

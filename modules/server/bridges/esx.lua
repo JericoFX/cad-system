@@ -54,6 +54,7 @@ function ESX.ResolveIdentity(source, fallbackIdentifier, getCallsignFn)
 end
 
 function ESX.SaveCallsign(source, callsign)
+    -- ESX has no built-in callsign metadata; persisted via cad_officers table by Officers module
     return true
 end
 

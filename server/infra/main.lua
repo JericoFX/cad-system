@@ -202,7 +202,7 @@ local function bootstrapFromDatabase()
         LastNumber = 0,
     }
     State.SecurityCameras.Cameras = State.SecurityCameras.Cameras or {}
-    State.SecurityCameras.LastNumber = 0
+    State.SecurityCameras.LastNumber = State.SecurityCameras.LastNumber or 0
 
     local cameraRows = {}
     if Config.IsFeatureEnabled == nil or Config.IsFeatureEnabled('SecurityCameras') then
