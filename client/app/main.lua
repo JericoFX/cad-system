@@ -1,9 +1,12 @@
--- Some day i will finish the anotations
-
 local Config = require 'modules.shared.config'
 local Core = require 'modules.client.core'
 local ClientFn = require 'modules.client.functions'
 local Registry = require 'modules.shared.registry'
+
+---@class ClientModule
+---@field SetUIState fun(open: boolean): nil
+---@field ToggleUI fun(): nil
+---@field GetComputerContext fun(): { ok: boolean, terminalId?: string, label?: string, hasContainer?: boolean, container?: table, hasReader?: boolean, reader?: table, error?: string }
 
 local Client = {}
 
@@ -32,16 +35,21 @@ local cadTerminalPoweredOn = false
 ---@field cases table<string, table>
 
 
+---@return boolean
 local function isVirtualReaderEnabled()
     local readerCfg = Config.Forensics and Config.Forensics.IdReader or {}
     return readerCfg.Enabled == true and readerCfg.UseVirtualContainer == true
 end
 
+---@return boolean
 local function isVirtualEvidenceEnabled()
     local evidenceCfg = Config.Evidence or {}
     return evidenceCfg.UseVirtualContainer ~= false
 end
 
+---@param point any
+---@param index number
+---@return table|nil
 local function normalizeTerminal(point, index)
     if type(point) ~= 'table' then
         return nil
@@ -63,10 +71,14 @@ local function normalizeTerminal(point, index)
     }
 end
 
+---@param point table
+---@param index number
+---@return nil
 local function setActiveTerminal(point, index)
     activeTerminalContext = normalizeTerminal(point, index)
 end
 
+---@return table|nil
 local function getNearestTerminal()
     local ped = cache.ped
     if not ped or ped == 0 then
@@ -92,6 +104,8 @@ local function getNearestTerminal()
     return nearest
 end
 
+---@param point table
+---@return vector3|nil
 local function getReaderCoords(point)
     if type(point) ~= 'table' then
         return nil
@@ -116,12 +130,16 @@ local function getReaderCoords(point)
     return base
 end
 
+---@param point table
+---@return number
 local function getReaderDistance(point)
     local reader = type(point.idReader) == 'table' and point.idReader or {}
     local globalCfg = Config.Forensics and Config.Forensics.IdReader or {}
     return tonumber(reader.interactionDistance) or tonumber(globalCfg.InteractionDistance) or 1.6
 end
 
+---@param point table
+---@return vector3|nil
 local function getLockerCoords(point)
     if type(point) ~= 'table' then
         return nil
@@ -146,11 +164,14 @@ local function getLockerCoords(point)
     return base
 end
 
+---@param point table
+---@return number
 local function getLockerDistance(point)
     local container = type(point.evidenceContainer) == 'table' and point.evidenceContainer or {}
     return tonumber(container.interactionDistance) or tonumber(container.radius) or 1.6
 end
 
+---@return nil
 local function playCardSwipeAnimation()
     local readerCfg = Config.Forensics and Config.Forensics.IdReader or {}
     local cardModelName = tostring(readerCfg.CardModel or 'prop_cs_swipe_card')
@@ -205,6 +226,8 @@ local function playCardSwipeAnimation()
     end
 end
 
+---@param terminalId string
+---@return nil
 local function performReaderRead(terminalId)
     local response = lib.callback.await('cad:idreader:read', false, {
         terminalId = terminalId,
@@ -240,6 +263,9 @@ local function performReaderRead(terminalId)
     })
 end
 
+---@param terminalId string
+---@param expectedSlot number
+---@return nil
 local function performReaderInsert(terminalId, expectedSlot)
     local listResponse = lib.callback.await('cad:idreader:listDocuments', false, {
         terminalId = terminalId,
@@ -318,6 +344,8 @@ local function performReaderInsert(terminalId, expectedSlot)
     })
 end
 
+---@param terminalId string
+---@return nil
 local function performReaderEject(terminalId)
     playCardSwipeAnimation()
 
@@ -341,6 +369,9 @@ local function performReaderEject(terminalId)
     })
 end
 
+---@param point table
+---@param index number
+---@return nil
 local function openReaderActionMenu(point, index)
     if readerActionBusy or not canUseCad then
         return
@@ -387,6 +418,8 @@ local function openReaderActionMenu(point, index)
     readerActionBusy = false
 end
 
+---@param terminalId string
+---@return table|nil
 local function performLockerRefresh(terminalId)
     local response = lib.callback.await('cad:evidence:container:list', false, {
         terminalId = terminalId,
@@ -411,6 +444,8 @@ local function performLockerRefresh(terminalId)
     return response
 end
 
+---@param terminalId string
+---@return nil
 local function performLockerStore(terminalId)
     local staging = lib.callback.await('cad:getStagingEvidence', false)
     local items = type(staging) == 'table' and staging or {}
@@ -476,6 +511,8 @@ local function performLockerStore(terminalId)
     })
 end
 
+---@param terminalId string
+---@return nil
 local function performLockerPull(terminalId)
     local listResponse = lib.callback.await('cad:evidence:container:list', false, {
         terminalId = terminalId,
@@ -544,6 +581,9 @@ local function performLockerPull(terminalId)
     })
 end
 
+---@param point table
+---@param index number
+---@return nil
 local function openLockerActionMenu(point, index)
     if lockerActionBusy or not canUseCad then
         return
@@ -589,11 +629,13 @@ local function openLockerActionMenu(point, index)
     lockerActionBusy = false
 end
 
+---@return nil
 local function refreshAccess()
     local data = lib.callback.await('cad:getPlayerData', false, {})
     canUseCad = data ~= nil
 end
 
+---@return nil
 local function setupAccessZones()
     local points = Config.UI.AccessPoints or {}
 
@@ -651,6 +693,7 @@ local function setupAccessZones()
     end
 end
 
+---@return nil
 local function setupReaderZones()
     if not isVirtualReaderEnabled() then
         return
@@ -742,6 +785,7 @@ local function setupReaderZones()
     end
 end
 
+---@return nil
 local function setupLockerZones()
     if not isVirtualEvidenceEnabled() then
         return
@@ -833,6 +877,7 @@ local function setupLockerZones()
     end
 end
 
+---@return nil
 local function setupFrameworkBridge()
     Core.RegisterAccessEvents(refreshAccess)
 end
@@ -894,6 +939,8 @@ local function pushCasesPublicStateToUi(payload, force)
     })
 end
 
+---@param open boolean
+---@return nil
 function Client.SetUIState(open)
     if open == true then
         local nearest = getNearestTerminal()
@@ -904,7 +951,6 @@ function Client.SetUIState(open)
 
     uiOpen = open == true
 
-    -- Reinicia el foco antes de abrir para evitar entradas fantasma en NUI.
     SetNuiFocus(false, false)
     SetNuiFocusKeepInput(false)
 
@@ -965,6 +1011,7 @@ if type(AddStateBagChangeHandler) == 'function' then
     end)
 end
 
+---@return { ok: boolean, terminalId?: string, label?: string, hasContainer?: boolean, container?: table, hasReader?: boolean, reader?: table, error?: string }
 function Client.GetComputerContext()
     if not activeTerminalContext then
         local nearest = getNearestTerminal()
@@ -991,6 +1038,7 @@ function Client.GetComputerContext()
     }
 end
 
+---@return nil
 function Client.ToggleUI()
     local VehicleAction = Registry.Get('Vehicle')
     if VehicleAction and VehicleAction.IsPoliceVehicleContext and VehicleAction.OpenTablet then

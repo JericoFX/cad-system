@@ -1,12 +1,15 @@
 local State = require 'modules.shared.state'
 local EvidenceTypes = require 'shared.evidence_types'
 
+---@type number
 local lastEmitAt = 0
 
+---@return number
 local function getPed()
     return cache.ped or PlayerPedId()
 end
 
+---@return boolean
 local function isCrimeContext()
     local calls = State.Dispatch.Calls or {}
     for _, call in pairs(calls) do
@@ -17,6 +20,8 @@ local function isCrimeContext()
     return false
 end
 
+---@param shooterPed number
+---@return nil
 local function emitCasingEvidence(shooterPed)
     local now = GetGameTimer()
     if now - lastEmitAt < 250 then

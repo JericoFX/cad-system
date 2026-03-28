@@ -1,4 +1,3 @@
-// Hooks barrel export
 export { useNui, useCadEvents, useDispatchEvents, useCaseEvents, useEvidenceEvents, useEmsEvents, useForensicsEvents, usePhotoEvents, useFineEvents, usePoliceEvents, useNotificationEvents, useOfflineSync, initNuiSystem } from './useNui';
 export { useAsyncAction } from './useAsyncAction';
 export { useSearch } from './useSearch';

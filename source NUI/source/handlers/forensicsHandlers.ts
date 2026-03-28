@@ -1,10 +1,5 @@
-/**
- * Forensics Handlers
- * Handles forensics events from Lua
- */
-
 import { onNuiMessage } from '~/utils/nuiRouter';
-import type { 
+import type {
   ForensicsAnalysisStartedData,
   ForensicsAnalysisCompletedData,
   ForensicsEvidenceComparedData,
@@ -28,10 +23,7 @@ function resolveCaseIdByEvidence(
 }
 
 export function initForensicsHandlers(): void {
-  // Analysis started
   onNuiMessage<ForensicsAnalysisStartedData>('forensics:analysisStarted', async (data) => {
-    console.log('[NUI] Forensics analysis started:', data.analysis?.analysisId);
-    
     const { notificationActions } = await import('~/stores/notificationStore');
     const { cadActions, cadState } = await import('~/stores/cadStore');
     const analysis = data.analysis || {};
@@ -39,8 +31,7 @@ export function initForensicsHandlers(): void {
     const caseId =
       (typeof analysis.caseId === 'string' && analysis.caseId) ||
       resolveCaseIdByEvidence(evidenceId, cadState.cases);
-    
-    // Add custody event
+
     if (caseId && evidenceId) {
       cadActions.addCustodyEvent(
         caseId,
@@ -57,25 +48,21 @@ export function initForensicsHandlers(): void {
         }
       );
     }
-    
+
     notificationActions.notifySystem(
       'Analysis Started',
       `Analysis ${analysis.analysisId || 'N/A'} has begun`,
       'info'
     );
   });
-  
-  // Analysis completed
+
   onNuiMessage<ForensicsAnalysisCompletedData>('forensics:analysisCompleted', async (data) => {
-    console.log('[NUI] Forensics analysis completed:', data.analysisId);
-    
     const { notificationActions } = await import('~/stores/notificationStore');
     const { cadActions, cadState } = await import('~/stores/cadStore');
     const caseId =
       (typeof data.caseId === 'string' && data.caseId) ||
       resolveCaseIdByEvidence(data.evidenceId, cadState.cases);
-    
-    // Add custody completion event
+
     if (caseId) {
       cadActions.addCustodyEvent(
         caseId,
@@ -92,57 +79,47 @@ export function initForensicsHandlers(): void {
         }
       );
     }
-    
+
     notificationActions.notifySystem(
       'Analysis Complete',
       `Evidence ${data.evidenceId} analysis completed`,
       'success'
     );
   });
-  
-  // Evidence compared
+
   onNuiMessage<ForensicsEvidenceComparedData>('forensics:evidenceCompared', async (data) => {
-    console.log('[NUI] Evidence compared:', data.evidenceId || data.evidenceA);
-    
     const { notificationActions } = await import('~/stores/notificationStore');
-    
+
     const confidenceRaw = data.matchResults?.confidence ?? data.confidence ?? 0;
     const confidenceNormalized = confidenceRaw > 1 ? confidenceRaw / 100 : confidenceRaw;
     const confidence = Math.round(confidenceNormalized * 100);
     const matchStatus = (data.matchResults?.match ?? data.match ?? false) ? 'MATCH' : 'NO MATCH';
-    
+
     notificationActions.notifySystem(
       'Evidence Comparison',
       `${matchStatus} (${confidence}% confidence)`,
       (data.matchResults?.match ?? data.match ?? false) ? 'success' : 'info'
     );
   });
-  
-  // World trace found
+
   onNuiMessage<ForensicsWorldTraceFoundData>('forensics:worldTraceFound', async (data) => {
-    console.log('[NUI] World trace found:', data.trace.traceId);
-    
     const { notificationActions } = await import('~/stores/notificationStore');
     const traceType = data.trace.type || data.trace.evidenceType || 'Unknown';
-    
+
     notificationActions.notifySystem(
       'Trace Found',
       `${traceType} trace detected at scene`,
       'info'
     );
   });
-  
-  // Trace bagged
+
   onNuiMessage<ForensicsTraceBaggedData>('forensics:traceBagged', async (data) => {
-    console.log('[NUI] Trace bagged:', data.traceId);
-    
     const { cadActions } = await import('~/stores/cadStore');
     const { notificationActions } = await import('~/stores/notificationStore');
 
     if (data.staging && data.staging.stagingId) {
       cadActions.addStagingEvidence(data.staging);
     } else {
-      // Backward compatibility with older payloads.
       cadActions.addStagingEvidence({
         stagingId: `FORENSIC_${data.traceId}`,
         evidenceType: 'forensic_trace',
@@ -155,13 +132,11 @@ export function initForensicsHandlers(): void {
         createdAt: data.baggedAt,
       });
     }
-    
+
     notificationActions.notifySystem(
       'Trace Collected',
       `Trace ${data.traceId} has been bagged as evidence`,
       'success'
     );
   });
-  
-  console.log('[NUI Handlers] Forensics handlers registered');
 }

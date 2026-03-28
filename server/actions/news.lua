@@ -27,10 +27,13 @@ local VALID_CATEGORIES = {
     OFFICIAL = true,
 }
 
+---@return boolean
 local function newsFeatureEnabled()
     return Config.IsFeatureEnabled('News')
 end
 
+---@param job any
+---@return boolean
 local function isNewsJob(job)
     local normalized = tostring(job or ''):lower()
     if normalized == '' then
@@ -44,6 +47,9 @@ local function isNewsJob(job)
     return Config.Security.AllowedJobs[normalized] == true or Config.Security.AdminJobs[normalized] == true
 end
 
+---@param source number
+---@param write boolean
+---@return table|nil, string|nil
 local function getNewsIdentity(source, write)
     local identity = Fn.GetPlayerIdentity(source)
     if not identity then
@@ -69,6 +75,8 @@ local function getNewsIdentity(source, write)
     return identity, nil
 end
 
+---@param value any
+---@return integer
 local function clampPriority(value)
     local priority = math.floor(tonumber(value) or 3)
     if priority < 1 then
@@ -80,6 +88,8 @@ local function clampPriority(value)
     return priority
 end
 
+---@param value any
+---@return string
 local function sanitizeStatus(value)
     local status = Fn.SanitizeString(value, 32):upper()
     if VALID_STATUS[status] then
@@ -88,6 +98,8 @@ local function sanitizeStatus(value)
     return 'DRAFT'
 end
 
+---@param value any
+---@return string
 local function sanitizeCategory(value)
     local category = Fn.SanitizeString(value, 32):upper()
     if VALID_CATEGORIES[category] then
@@ -96,6 +108,10 @@ local function sanitizeCategory(value)
     return 'COMMUNITY'
 end
 
+---@param payload any
+---@param identity table
+---@param existingArticle table|nil
+---@return table|nil, string|nil
 local function sanitizeArticle(payload, identity, existingArticle)
     if type(payload) ~= 'table' then
         return nil, 'invalid_article_payload'
@@ -170,6 +186,8 @@ local function sanitizeArticle(payload, identity, existingArticle)
     return snapshot, nil
 end
 
+---@param article table
+---@return boolean, string|nil
 local function persistArticle(article)
     local ok, err = pcall(function()
         MySQL.insert.await([[
@@ -195,6 +213,8 @@ local function persistArticle(article)
     return true, nil
 end
 
+---@param articleId string
+---@return boolean, string|nil
 local function removePersistedArticle(articleId)
     local ok, err = pcall(function()
         MySQL.query.await('DELETE FROM cad_news_articles WHERE article_id = ?', { articleId })
@@ -208,6 +228,7 @@ local function removePersistedArticle(articleId)
     return true, nil
 end
 
+---@return nil
 local function loadArticlesFromDatabase()
     if loadedFromDatabase then
         return
@@ -242,6 +263,7 @@ local function loadArticlesFromDatabase()
     Utils.Log('info', 'News loaded: %s article(s)', tostring(#rows))
 end
 
+---@return table[]
 local function listArticles()
     local output = {}
     for _, article in pairs(State.News.Articles) do
@@ -255,6 +277,9 @@ local function listArticles()
     return output
 end
 
+---@param source number
+---@param payload any
+---@return table
 local function upsertNewsArticle(source, payload)
     if not newsFeatureEnabled() then
         return { ok = false, error = 'news_disabled' }
@@ -295,6 +320,7 @@ local function upsertNewsArticle(source, payload)
     }
 end
 
+---@return table[]
 local function listPublishedArticles()
     local output = {}
     for _, article in pairs(State.News.Articles) do
@@ -310,6 +336,8 @@ local function listPublishedArticles()
     return output
 end
 
+---@param article table|nil
+---@return nil
 local function createBreakingDispatchAlert(article)
     if not article or article.category ~= 'BREAKING' then
         return

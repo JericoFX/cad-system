@@ -1,7 +1,7 @@
 
 import { createCommand } from '../commandBuilder';
 
-export function registerEMSDashboardCommand() {
+export function registerEMSDashboardCommand(): void {
   createCommand({
     name: 'ems',
     aliases: ['emergency', 'ems-dashboard'],

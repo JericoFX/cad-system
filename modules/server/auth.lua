@@ -1,22 +1,29 @@
--- modules/server/auth.lua
-
 local Config = require 'modules.shared.config'
 local Utils = require 'modules.shared.utils'
 
 local Auth = {}
 
+---@type table<integer, table>
 local officerCache = {}
+---@type table<integer, table<string, table>>
 local rateLimits = {}
 
+---@type integer
 local CACHE_TTL_SECONDS = 15
+---@type integer
 local RATE_BUCKET_TTL_SECONDS = 120
 
+---@param bucket string
+---@return integer
 local function getRateLimitConfig(bucket)
     local security = Config.Security or {}
     local perMinute = security.RateLimitPerMinute or {}
     return tonumber(perMinute[bucket] or perMinute.default) or 60
 end
 
+---@param source integer
+---@param bucket string
+---@return table
 local function getBucket(source, bucket)
     rateLimits[source] = rateLimits[source] or {}
     rateLimits[source][bucket] = rateLimits[source][bucket] or {
@@ -26,6 +33,8 @@ local function getBucket(source, bucket)
     return rateLimits[source][bucket]
 end
 
+---@param source integer
+---@return table|nil
 function Auth.GetOfficerData(source)
     local src = tonumber(source)
     if not src or src <= 0 then return nil end
@@ -35,7 +44,6 @@ function Auth.GetOfficerData(source)
         return cached
     end
 
-    -- Lazy require to avoid circular dependency at load time
     local Fn = require 'modules.server.functions'
     local identity = Fn.GetPlayerIdentity(src)
     if not identity then
@@ -64,10 +72,14 @@ function Auth.GetOfficerData(source)
     return officerCache[src]
 end
 
+---@param source integer
+---@return table|nil
 function Auth.GetOfficer(source)
     return Auth.GetOfficerData(source)
 end
 
+---@param source integer
+---@return boolean, table
 function Auth.RequireOfficer(source)
     local officer = Auth.GetOfficerData(source)
     if not officer then
@@ -76,6 +88,9 @@ function Auth.RequireOfficer(source)
     return true, officer
 end
 
+---@param source integer
+---@param bucket string|nil
+---@return boolean, table|nil
 function Auth.CheckRate(source, bucket)
     local key = bucket or 'default'
     local state = getBucket(source, key)
@@ -95,6 +110,9 @@ function Auth.CheckRate(source, bucket)
     return true
 end
 
+---@param bucket string
+---@param handler function
+---@return function
 function Auth.WithGuard(bucket, handler)
     return function(source, payload)
         local allowed, officerOrError = Auth.RequireOfficer(source)
@@ -113,6 +131,7 @@ function Auth.WithGuard(bucket, handler)
     end
 end
 
+---@param source integer
 function Auth.ClearPlayer(source)
     officerCache[source] = nil
     rateLimits[source] = nil

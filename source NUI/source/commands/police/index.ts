@@ -5,7 +5,7 @@ import { registerImpoundCommand } from './impound';
 import { registerPoliceDashboardCommand } from './dashboard';
 import { registerBOLOCommands } from './bolo';
 
-export function registerPoliceCommands() {
+export function registerPoliceCommands(): void {
   registerPoliceDashboardCommand();
   registerArrestCommand();
   registerWarrantCommand();

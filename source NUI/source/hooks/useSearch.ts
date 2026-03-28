@@ -54,9 +54,9 @@ export function useSearch<TResult>(
 
       if (options.autoSelect) {
         const selected = options.autoSelect(items, q);
-        setSelectedItem(selected ?? null);
+        setSelectedItem(() => selected ?? null);
       } else if (items.length > 0) {
-        setSelectedItem(items[0]);
+        setSelectedItem(() => items[0]);
       } else {
         setSelectedItem(null);
       }

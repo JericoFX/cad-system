@@ -1,10 +1,5 @@
-/**
- * Evidence Handlers
- * Handles evidence events from Lua
- */
-
 import { onNuiMessage } from '~/utils/nuiRouter';
-import type { 
+import type {
   EvidenceStagedData,
   EvidenceAnalyzedData,
   EvidenceCollectedData,
@@ -28,37 +23,28 @@ export function initEvidenceHandlers(): void {
     return null;
   };
 
-  // Evidence staged
   onNuiMessage<EvidenceStagedData>('evidence:staged', async (data) => {
-    console.log('[NUI] Evidence staged:', data.stagingId);
-    
     const { cadActions } = await import('~/stores/cadStore');
     const { notificationActions } = await import('~/stores/notificationStore');
-    
-    // Add to staging
+
     cadActions.addStagingEvidence({
       stagingId: data.stagingId,
       evidenceType: data.evidenceType,
       data: data.data,
       createdAt: data.createdAt,
     });
-    
-    // Notification
+
     notificationActions.notifySystem(
       'Evidence Staged',
       `New ${data.evidenceType} evidence staged`,
       'info'
     );
   });
-  
-  // Evidence analyzed
+
   onNuiMessage<EvidenceAnalyzedData>('evidence:analyzed', async (data) => {
-    console.log('[NUI] Evidence analyzed:', data.evidenceId);
-    
     const { cadActions } = await import('~/stores/cadStore');
     const { notificationActions } = await import('~/stores/notificationStore');
-    
-    // Add custody event for analysis
+
     cadActions.addCustodyEvent(data.caseId, data.evidenceId, {
       eventId: `ANALYSIS_${Date.now()}`,
       evidenceId: data.evidenceId,
@@ -69,23 +55,19 @@ export function initEvidenceHandlers(): void {
       timestamp: data.analyzedAt,
       recordedBy: data.analyst,
     });
-    
+
     notificationActions.notifySystem(
       'Analysis Complete',
       `Evidence ${data.evidenceId} analysis completed`,
       'success'
     );
   });
-  
-  // Evidence collected
+
   onNuiMessage<EvidenceCollectedData>('evidence:collected', async (data) => {
-    console.log('[NUI] Evidence collected:', data.evidenceId);
-    
     const { cadActions } = await import('~/stores/cadStore');
     const attachedBy = data.attachedBy || data.collectedBy;
     const attachedAt = data.attachedAt || data.collectedAt;
-    
-    // Add evidence with custody chain
+
     const normalizedCustodyChain: CustodyEvent[] = Array.isArray(data.custodyChain)
       ? data.custodyChain
           .filter((entry): entry is Record<string, unknown> => Boolean(entry && typeof entry === 'object'))
@@ -121,14 +103,11 @@ export function initEvidenceHandlers(): void {
       currentLocation: 'Evidence Storage',
       currentCustodian: attachedBy || 'SYSTEM',
     };
-    
+
     cadActions.addCaseEvidence(data.caseId, evidenceWithCustody);
   });
-  
-  // Evidence transferred
+
   onNuiMessage<EvidenceTransferredData>('evidence:transferred', async (data) => {
-    console.log('[NUI] Evidence transferred:', data.evidenceId);
-    
     const { cadActions, cadState } = await import('~/stores/cadStore');
     const caseId =
       (typeof data.caseId === 'string' && data.caseId) ||
@@ -136,8 +115,7 @@ export function initEvidenceHandlers(): void {
     if (!caseId) {
       return;
     }
-    
-    // Add custody transfer event
+
     cadActions.transferEvidence(
       caseId,
       data.evidenceId,
@@ -146,6 +124,4 @@ export function initEvidenceHandlers(): void {
       `Transferred to ${data.location}`
     );
   });
-  
-  console.log('[NUI Handlers] Evidence handlers registered');
 }

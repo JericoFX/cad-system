@@ -62,7 +62,7 @@ const initialState: TerminalState = {
   vehicleOverlayOwned: false,
 };
 
-export const [terminalState, setTerminalState] = createStore(initialState);
+export const [terminalState, setTerminalState] = createStore<TerminalState>(initialState);
 
 export const terminalActions = {
   addLine: (content: string, type: TerminalLine['type'] = 'output', id?: string) => {
@@ -127,7 +127,6 @@ export const terminalActions = {
     setTerminalState('modalData', data ?? null);
     setTerminalState('activeModal', modal);
     
-    // Emit hacker command when modal opens
     if (modal) {
       hackerActions.onModalOpen(modal);
       hackerEffects.burst(2);

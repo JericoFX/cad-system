@@ -5,15 +5,15 @@ import { codeCatalogActions, codeCatalogState } from '~/stores/codeCatalogStore'
 
 let didRegister = false;
 
-function getStatusCodes() {
+function getStatusCodes(): Record<string, { label: string; color: string }> {
   return codeCatalogState.statusCodes;
 }
 
-function getTenCodes() {
+function getTenCodes(): Record<string, string> {
   return codeCatalogState.tenCodes;
 }
 
-function listStatusHints() {
+function listStatusHints(): void {
   const entries = Object.entries(getStatusCodes());
   if (entries.length === 0) {
     terminalActions.addLine('No status codes available', 'system');
@@ -26,7 +26,7 @@ function listStatusHints() {
   });
 }
 
-function listStatusCodes() {
+function listStatusCodes(): void {
   const entries = Object.entries(getStatusCodes());
   if (entries.length === 0) {
     terminalActions.addLine('No status codes configured', 'system');
@@ -59,7 +59,7 @@ function filterTenCodes(category: string): Array<[string, string]> {
   }
 }
 
-function registerSingleStatusCodeCommand(code: string, label: string, color: string) {
+function registerSingleStatusCodeCommand(code: string, label: string, color: string): void {
   registry.register({
     name: code,
     description: `Set status: ${label}`,
@@ -80,7 +80,7 @@ function registerSingleStatusCodeCommand(code: string, label: string, color: str
   });
 }
 
-export function registerStatusCommands() {
+export function registerStatusCommands(): void {
   if (didRegister) {
     return;
   }

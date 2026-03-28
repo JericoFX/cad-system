@@ -1,29 +1,18 @@
-/**
- * Police Handlers
- * Handles police-specific events from Lua
- */
-
 import { onNuiMessage } from '~/utils/nuiRouter';
-import type { 
+import type {
   PoliceJailTransferLoggedData
 } from '~/types/nuiMessages';
 
 export function initPoliceHandlers(): void {
-  // Jail transfer logged
   onNuiMessage<PoliceJailTransferLoggedData>('police:jailTransferLogged', async (data) => {
-    console.log('[NUI] Jail transfer logged:', data.transfer.transferId);
-    
     const { notificationActions } = await import('~/stores/notificationStore');
-    
-    // Add jail transfer record (would need to add to cadStore)
-    // For now, just notify
+
     notificationActions.notifySystem(
       'Jail Transfer',
       `${data.transfer.personName} transferred to ${data.transfer.facility}`,
       'info'
     );
-    
-    // Create activity log entry
+
     const { auditActions } = await import('~/stores/auditStore');
     auditActions.logCommand(
       'jail-transfer',
@@ -32,6 +21,4 @@ export function initPoliceHandlers(): void {
       `Transfer logged: ${data.transfer.transferId}`
     );
   });
-  
-  console.log('[NUI Handlers] Police handlers registered');
 }

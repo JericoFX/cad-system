@@ -1,34 +1,46 @@
--- modules/shared/utils.lua
-
 local Utils = {}
 
+---@param value any
+---@return string
 function Utils.Trim(value)
     local text = tostring(value or '')
     return text:match('^%s*(.-)%s*$') or ''
 end
 
+---@param value any
+---@return string
 function Utils.Compact(value)
     return Utils.Trim(value):gsub('%s+', '')
 end
 
+---@param value any
+---@return string
 function Utils.UpperTrim(value)
     return string.upper(Utils.Trim(value))
 end
 
+---@param value any
+---@return boolean
 function Utils.IsBlank(value)
     return Utils.Trim(value) == ''
 end
 
+---@param prefix string|nil
+---@return string
 function Utils.GenerateId(prefix)
     local base = (prefix or 'ID'):upper()
-    -- pattern: 8 alphanumeric chars + 4 digits for uniqueness
     return ('%s_%s_%s'):format(base, os.date('%Y%m%d%H%M%S'), string.random('........'))
 end
 
+---@param ts integer|nil
+---@return string
 function Utils.ToIso(ts)
     return os.date('!%Y-%m-%dT%H:%M:%SZ', ts or os.time())
 end
 
+---@param level string
+---@param message string
+---@param ... any
 function Utils.Log(level, message, ...)
     local formatted = string.format(message or '', ...)
     local Config = require 'modules.shared.config'
@@ -43,6 +55,7 @@ function Utils.Log(level, message, ...)
     print(('%s[CAD:%s]^7 %s'):format(color, string.upper(level or 'info'), formatted))
 end
 
+---@return string
 function Utils.GetVersion()
     local raw = LoadResourceFile(GetCurrentResourceName(), 'version.txt')
     if not raw then return 'unknown' end

@@ -1,10 +1,10 @@
-import { 
-  Component, 
-  createSignal, 
-  createMemo, 
+import {
+  type Component,
+  createSignal,
+  createMemo,
   onMount,
-  For, 
-  Show, 
+  For,
+  Show,
   mergeProps,
   splitProps
 } from 'solid-js';
@@ -14,6 +14,14 @@ import { DosSelect } from '../DosSelect';
 import type { Fine, Person, Vehicle } from '~/stores/cadStore';
 import { fetchNui } from '~/utils/fetchNui';
 import { Button, Input, Modal } from '~/components/ui';
+
+interface FineCatalogItem {
+  code: string;
+  description: string;
+  amount: number;
+  jailTime: number;
+  category?: string;
+}
 
 interface FineManagerProps {
   initialTargetId?: string;
@@ -31,17 +39,17 @@ export const FineManager: Component<FineManagerProps> = (props) => {
   const [targetType, setTargetType] = createSignal<'PERSON' | 'VEHICLE'>(local.initialTargetType);
   const [targetId, setTargetId] = createSignal(local.initialTargetId);
   const [selectedCategory, setSelectedCategory] = createSignal('traffic');
-  const [selectedFine, setSelectedFine] = createSignal<any>(null);
+  const [selectedFine, setSelectedFine] = createSignal<FineCatalogItem | null>(null);
   const [isSubmitting, setIsSubmitting] = createSignal(false);
   const [searchQuery, setSearchQuery] = createSignal('');
   const [isSearching, setIsSearching] = createSignal(false);
 
-  const [finesCatalog, setFinesCatalog] = createSignal<Record<string, Array<{ code: string; description: string; amount: number; jailTime: number; category?: string }>>>({});
-  
-  const loadFines = async () => {
+  const [finesCatalog, setFinesCatalog] = createSignal<Record<string, FineCatalogItem[]>>({});
+
+  const loadFines = async (): Promise<void> => {
     try {
-      const remoteCatalog = await fetchNui<Array<{ code: string; description: string; amount: number; jailTime: number; category?: string }>>('cad:getFineCatalog');
-      const grouped: Record<string, Array<{ code: string; description: string; amount: number; jailTime: number; category?: string }>> = {
+      const remoteCatalog = await fetchNui<FineCatalogItem[]>('cad:getFineCatalog');
+      const grouped: Record<string, FineCatalogItem[]> = {
         traffic: [],
         criminal: [],
         weapons: [],
@@ -161,10 +169,10 @@ export const FineManager: Component<FineManagerProps> = (props) => {
         targetName: targetType() === 'PERSON' 
           ? `${(targetInfo() as Person).firstName} ${(targetInfo() as Person).lastName}`
           : `${(targetInfo() as Vehicle).plate} - ${(targetInfo() as Vehicle).model}`,
-        fineCode: selectedFine().code,
-        description: selectedFine().description,
-        amount: selectedFine().amount,
-        jailTime: selectedFine().jailTime,
+        fineCode: selectedFine()!.code,
+        description: selectedFine()!.description,
+        amount: selectedFine()!.amount,
+        jailTime: selectedFine()!.jailTime,
         isBail: false,
       });
 
@@ -360,11 +368,11 @@ export const FineManager: Component<FineManagerProps> = (props) => {
             <div class="fine-preview">
               <div class="form-label">[RESUMEN DE MULTA]</div>
               <div class="preview-box">
-                <div><strong>Código:</strong> {selectedFine().code}</div>
-                <div><strong>Descripción:</strong> {selectedFine().description}</div>
-                <div><strong>Monto:</strong> ${selectedFine().amount}</div>
-                <Show when={selectedFine().jailTime > 0}>
-                  <div><strong>Tiempo de cárcel:</strong> {selectedFine().jailTime} minutos</div>
+                <div><strong>Código:</strong> {selectedFine()!.code}</div>
+                <div><strong>Descripción:</strong> {selectedFine()!.description}</div>
+                <div><strong>Monto:</strong> ${selectedFine()!.amount}</div>
+                <Show when={selectedFine()!.jailTime > 0}>
+                  <div><strong>Tiempo de cárcel:</strong> {selectedFine()!.jailTime} minutos</div>
                 </Show>
               </div>
             </div>

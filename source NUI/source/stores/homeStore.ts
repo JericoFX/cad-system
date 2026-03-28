@@ -85,10 +85,6 @@ const initialState: HomeState = {
 export const [homeState, setHomeState] = createStore<HomeState>(initialState);
 
 export const homeActions = {
-  /**
-   * Initialize home screen with user role
-   * Called when CAD is opened (appStore.show)
-   */
   init: () => {
     const role = (userState.currentUser?.role as UserRole) || 'police';
     setHomeState({
@@ -97,10 +93,6 @@ export const homeActions = {
     });
   },
 
-  /**
-   * Reset home screen when CAD is closed
-   * Called when CAD is hidden (appStore.hide)
-   */
   reset: () => {
     setHomeState({
       activeRole: null,

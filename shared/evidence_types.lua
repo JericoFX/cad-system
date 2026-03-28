@@ -1,9 +1,11 @@
 local EvidenceTypes = {}
 
+---@type string[]
 local BLOOD_TYPES = {
     'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'
 }
 
+---@type table<string, table>
 local EVIDENCE_TYPES = {
     blood = {
         id = 'blood',
@@ -66,6 +68,7 @@ local EVIDENCE_TYPES = {
     },
 }
 
+---@type table<string, string>
 local TYPE_ALIASES = {
     BLOOD = 'blood',
     FINGERPRINT = 'fingerprint',
@@ -74,6 +77,7 @@ local TYPE_ALIASES = {
     CASINGS = 'casing',
 }
 
+---@type table<string, table>
 local TOOLS = {
     forensic_kit = {
         label = 'Forensic Kit',
@@ -100,6 +104,8 @@ local TOOLS = {
     },
 }
 
+---@param value any
+---@return string|nil
 local function normalizeTypeName(value)
     if type(value) ~= 'string' then
         return nil
@@ -123,6 +129,8 @@ local function normalizeTypeName(value)
     return nil
 end
 
+---@param value any
+---@return string|nil
 local function normalizeToolName(value)
     if type(value) ~= 'string' then
         return nil
@@ -136,6 +144,8 @@ local function normalizeToolName(value)
     return compact:lower()
 end
 
+---@param evidenceType string
+---@return table|nil
 function EvidenceTypes.GetType(evidenceType)
     local key = normalizeTypeName(evidenceType)
     if not key then
@@ -145,10 +155,13 @@ function EvidenceTypes.GetType(evidenceType)
     return EVIDENCE_TYPES[key]
 end
 
+---@return table<string, table>
 function EvidenceTypes.GetAllTypes()
     return EVIDENCE_TYPES
 end
 
+---@param toolName string
+---@return table|nil
 function EvidenceTypes.GetTool(toolName)
     local key = normalizeToolName(toolName)
     if not key then
@@ -158,10 +171,14 @@ function EvidenceTypes.GetTool(toolName)
     return TOOLS[key]
 end
 
+---@return string
 function EvidenceTypes.GetRandomBloodType()
     return BLOOD_TYPES[math.random(1, #BLOOD_TYPES)]
 end
 
+---@param toolName string
+---@param evidenceType string
+---@return boolean
 function EvidenceTypes.ToolCanCollect(toolName, evidenceType)
     local tool = EvidenceTypes.GetTool(toolName)
     local normalized = normalizeTypeName(evidenceType)
@@ -178,6 +195,9 @@ function EvidenceTypes.ToolCanCollect(toolName, evidenceType)
     return false
 end
 
+---@param toolName string
+---@param evidenceType string
+---@return boolean
 function EvidenceTypes.ToolCanReveal(toolName, evidenceType)
     local tool = EvidenceTypes.GetTool(toolName)
     local normalized = normalizeTypeName(evidenceType)

@@ -28,7 +28,7 @@ export function BootScreen() {
     return `[${progressLabel()}] ${bar} ${percent}%`;
   });
 
-  const handleKeyDown = (event: KeyboardEvent) => {
+  const handleKeyDown = (event: KeyboardEvent): void => {
     if (event.key === 'Enter' || event.key === ' ') {
       appActions.requestBootSkip();
     }

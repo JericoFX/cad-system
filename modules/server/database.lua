@@ -1,9 +1,8 @@
--- modules/server/database.lua
-
 local Utils = require 'modules.shared.utils'
 
 local Database = {}
 
+---@param query string
 local function execute(query)
     local ok, err = pcall(function()
         MySQL.query.await(query)
@@ -13,6 +12,9 @@ local function execute(query)
     end
 end
 
+---@param query string
+---@param context string|nil
+---@return boolean
 local function executeOptional(query, context)
     local ok, err = pcall(function()
         MySQL.query.await(query)
@@ -26,6 +28,7 @@ local function executeOptional(query, context)
     return true
 end
 
+---@return nil
 function Database.EnsureSchema()
     execute([[
         CREATE TABLE IF NOT EXISTS cad_cases (
@@ -318,10 +321,6 @@ function Database.EnsureSchema()
         )
     ]])
 
-    -- =========================================================================
-    -- SECONDARY INDEXES (query performance)
-    -- =========================================================================
-
     executeOptional([[
         ALTER TABLE cad_cases ADD INDEX idx_cases_assigned (assigned_to, status)
     ]], 'idx_cases_assigned')
@@ -338,10 +337,6 @@ function Database.EnsureSchema()
         ALTER TABLE cad_fines ADD INDEX idx_fines_issued (issued_at, status)
     ]], 'idx_fines_issued')
 
-    -- =========================================================================
-    -- FOREIGN KEY CONSTRAINTS (cascade child rows on case deletion)
-    -- =========================================================================
-
     executeOptional([[
         ALTER TABLE cad_case_notes
             ADD CONSTRAINT fk_case_notes_case
@@ -355,14 +350,6 @@ function Database.EnsureSchema()
             FOREIGN KEY (case_id) REFERENCES cad_cases(case_id)
             ON DELETE CASCADE
     ]], 'fk_case_tasks_case')
-
-    -- NOTE: cad_evidence intentionally has NO FK on case_id because evidence
-    -- can be staged with case_id = '' (empty string) before being linked to a case.
-    -- The ev_cleanup_stale_evidence event handles orphaned rows instead.
-
-    -- =========================================================================
-    -- CHECK CONSTRAINTS (bounds validation as safety net behind Lua checks)
-    -- =========================================================================
 
     executeOptional([[
         ALTER TABLE cad_cases
@@ -393,10 +380,6 @@ function Database.EnsureSchema()
             ADD CONSTRAINT chk_cameras_fov
             CHECK (fov > 0 AND fov <= 120)
     ]], 'chk_cameras_fov')
-
-    -- =========================================================================
-    -- AUTO-TIMESTAMP TRIGGERS (updated_at set automatically on UPDATE)
-    -- =========================================================================
 
     executeOptional([[
         CREATE TRIGGER IF NOT EXISTS tr_cases_updated_at
@@ -433,10 +416,6 @@ function Database.EnsureSchema()
         SET NEW.updated_at = DATE_FORMAT(NOW(), '%Y-%m-%dT%H:%i:%s.000Z')
     ]], 'tr_virtual_slots_updated_at')
 
-    -- =========================================================================
-    -- SCHEDULED EVENTS
-    -- =========================================================================
-
     executeOptional([[SET GLOBAL event_scheduler = ON]], 'event_scheduler')
 
     executeOptional([[
@@ -457,8 +436,6 @@ function Database.EnsureSchema()
             AND STR_TO_DATE(created_at, '%Y-%m-%dT%H:%i:%s') < DATE_SUB(NOW(), INTERVAL 10 DAY)
     ]], 'ev_cleanup_closed_calls')
 
-    -- FK CASCADE on notes/tasks/evidence means we only need to delete from cad_cases;
-    -- child rows are removed automatically by the database engine
     executeOptional([[
         CREATE EVENT IF NOT EXISTS ev_cleanup_closed_cases
         ON SCHEDULE EVERY 24 HOUR
@@ -495,8 +472,6 @@ function Database.EnsureSchema()
             AND STR_TO_DATE(COALESCE(analysis_completed_at, handled_at, requested_at), '%Y-%m-%dT%H:%i:%s') < DATE_SUB(NOW(), INTERVAL 14 DAY)
     ]], 'ev_cleanup_completed_blood_requests')
 
-    -- Expire PUBLISHED news articles whose payload contains an expired expiresAt
-    -- This is a safety backup for the client-side expiration timers
     executeOptional([[
         CREATE EVENT IF NOT EXISTS ev_expire_news_articles
         ON SCHEDULE EVERY 15 MINUTE
@@ -512,7 +487,6 @@ function Database.EnsureSchema()
             ) < NOW()
     ]], 'ev_expire_news_articles')
 
-    -- Cleanup archived/expired news articles older than 30 days
     executeOptional([[
         CREATE EVENT IF NOT EXISTS ev_cleanup_old_news
         ON SCHEDULE EVERY 24 HOUR
@@ -522,7 +496,6 @@ function Database.EnsureSchema()
             AND STR_TO_DATE(updated_at, '%Y-%m-%dT%H:%i:%s') < DATE_SUB(NOW(), INTERVAL 30 DAY)
     ]], 'ev_cleanup_old_news')
 
-    -- Cleanup old medical records (keep 1 year)
     executeOptional([[
         CREATE EVENT IF NOT EXISTS ev_cleanup_old_medical_records
         ON SCHEDULE EVERY 24 HOUR
@@ -531,7 +504,6 @@ function Database.EnsureSchema()
             WHERE STR_TO_DATE(created_at, '%Y-%m-%dT%H:%i:%s') < DATE_SUB(NOW(), INTERVAL 365 DAY)
     ]], 'ev_cleanup_old_medical_records')
 
-    -- Cleanup old vehicle stops older than 30 days
     executeOptional([[
         CREATE EVENT IF NOT EXISTS ev_cleanup_old_vehicle_stops
         ON SCHEDULE EVERY 24 HOUR
@@ -540,7 +512,6 @@ function Database.EnsureSchema()
             WHERE STR_TO_DATE(created_at, '%Y-%m-%dT%H:%i:%s') < DATE_SUB(NOW(), INTERVAL 30 DAY)
     ]], 'ev_cleanup_old_vehicle_stops')
 
-    -- Cleanup old entity notes older than 90 days (keep important ones)
     executeOptional([[
         CREATE EVENT IF NOT EXISTS ev_cleanup_old_entity_notes
         ON SCHEDULE EVERY 24 HOUR
@@ -550,8 +521,6 @@ function Database.EnsureSchema()
             AND STR_TO_DATE(created_at, '%Y-%m-%dT%H:%i:%s') < DATE_SUB(NOW(), INTERVAL 90 DAY)
     ]], 'ev_cleanup_old_entity_notes')
 
-    -- Safety backup: auto-mark overdue blood analyses as completed in DB
-    -- Lua cron handles notifications/evidence; this prevents permanently stuck rows
     executeOptional([[
         CREATE EVENT IF NOT EXISTS ev_blood_analysis_timeout
         ON SCHEDULE EVERY 5 MINUTE

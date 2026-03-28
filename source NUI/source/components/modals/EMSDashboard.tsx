@@ -1,7 +1,7 @@
 import { createSignal, createMemo, createEffect, For, Show, onMount, onCleanup } from 'solid-js';
 import { terminalActions } from '~/stores/terminalStore';
 import { cadState } from '~/stores/cadStore';
-import { emsState, emsActions, Patient, PatientCondition, type SimplePrescription } from '~/stores/emsStore';
+import { emsState, emsActions, Patient, PatientCondition } from '~/stores/emsStore';
 import { notificationActions } from '~/stores/notificationStore';
 import { fetchNui } from '~/utils/fetchNui';
 import { Button, Input, Modal, Tabs, Textarea } from '~/components/ui';
@@ -54,7 +54,6 @@ export function EMSDashboard() {
     bloodRequests().some((request) => request.status === 'IN_PROGRESS')
   );
 
-  // Discharge flow state
   const [showDischargeModal, setShowDischargeModal] = createSignal(false);
   const [dischargeDisposition, setDischargeDisposition] = createSignal<'HOME' | 'HOSPITAL' | 'POLICE' | 'MORGUE'>('HOME');
   const [dischargeNotes, setDischargeNotes] = createSignal('');
@@ -437,7 +436,6 @@ export function EMSDashboard() {
     terminalActions.addLine(`Treatment started for: ${patient.name}`, 'output');
   };
 
-  // Discharge flow with prescriptions
   const openDischargeModal = (patient: Patient) => {
     emsActions.clearDischargePrescriptions();
     setDischargeNotes('');
@@ -469,10 +467,8 @@ export function EMSDashboard() {
     const notes = dischargeNotes().trim();
     const prescriptions = [...emsState.dischargePrescriptions];
 
-    // Discharge the patient
     emsActions.dischargePatient(patient.patientId, dischargeDisposition(), notes);
 
-    // Create medical record if citizenId is available
     if (citizenId) {
       const patientWithCitizenId = { ...patient, citizenId };
       const created = await emsActions.createMedicalRecord(patientWithCitizenId, prescriptions, notes);
@@ -556,7 +552,7 @@ export function EMSDashboard() {
 
   return (
     <Modal.Root onClose={closeModal} useContentWrapper={false}>
-      <div class="modal-content ems-dashboard" onClick={(e: any) => e.stopPropagation()}>
+      <div class="modal-content ems-dashboard" onClick={(e: MouseEvent) => e.stopPropagation()}>
         <Modal.Header>
           <Modal.Title>=== EMS DASHBOARD ===</Modal.Title>
           <Modal.Close />
@@ -619,7 +615,7 @@ export function EMSDashboard() {
                 type="text"
                 class="dos-input search-input"
                 value={patientSearchQuery()}
-                onInput={(e: any) => setPatientSearchQuery(e.currentTarget.value)}
+                onInput={(e: InputEvent & { currentTarget: HTMLInputElement }) => setPatientSearchQuery(e.currentTarget.value)}
                 placeholder="Search patients by name, ID, or complaint..."
               />
               <Button.Root
@@ -702,7 +698,7 @@ export function EMSDashboard() {
                     style={{ flex: 1 }}
                     placeholder="Enter full name..."
                     value={patientForm().name}
-                    onInput={(e: any) => setPatientForm({ ...patientForm(), name: e.currentTarget.value })}
+                    onInput={(e: InputEvent & { currentTarget: HTMLInputElement }) => setPatientForm({ ...patientForm(), name: e.currentTarget.value })}
                   />
                   <Button.Root
                     class="btn"
@@ -721,7 +717,7 @@ export function EMSDashboard() {
                   class="dos-input"
                   placeholder="Citizen ID (auto-filled from ID reader)"
                   value={patientForm().citizenId}
-                  onInput={(e: any) => setPatientForm({ ...patientForm(), citizenId: e.currentTarget.value })}
+                  onInput={(e: InputEvent & { currentTarget: HTMLInputElement }) => setPatientForm({ ...patientForm(), citizenId: e.currentTarget.value })}
                 />
               </div>
 
@@ -756,7 +752,7 @@ export function EMSDashboard() {
                   class="dos-input"
                   placeholder="Main reason for visit (e.g., chest pain, trauma)..."
                   value={patientForm().chiefComplaint}
-                  onInput={(e: any) => setPatientForm({ ...patientForm(), chiefComplaint: e.currentTarget.value })}
+                  onInput={(e: InputEvent & { currentTarget: HTMLInputElement }) => setPatientForm({ ...patientForm(), chiefComplaint: e.currentTarget.value })}
                 />
               </div>
 
@@ -767,7 +763,7 @@ export function EMSDashboard() {
                   class="dos-input"
                   placeholder="e.g., chest pain, dizziness, nausea"
                   value={patientForm().symptoms}
-                  onInput={(e: any) => setPatientForm({ ...patientForm(), symptoms: e.currentTarget.value })}
+                  onInput={(e: InputEvent & { currentTarget: HTMLInputElement }) => setPatientForm({ ...patientForm(), symptoms: e.currentTarget.value })}
                 />
               </div>
 
@@ -779,28 +775,28 @@ export function EMSDashboard() {
                     class="dos-input"
                     placeholder="BP (e.g., 120/80)"
                     value={patientForm().bp}
-                    onInput={(e: any) => setPatientForm({ ...patientForm(), bp: e.currentTarget.value })}
+                    onInput={(e: InputEvent & { currentTarget: HTMLInputElement }) => setPatientForm({ ...patientForm(), bp: e.currentTarget.value })}
                   />
                   <Input.Root
                     type="text"
                     class="dos-input"
                     placeholder="HR (e.g., 75)"
                     value={patientForm().hr}
-                    onInput={(e: any) => setPatientForm({ ...patientForm(), hr: e.currentTarget.value })}
+                    onInput={(e: InputEvent & { currentTarget: HTMLInputElement }) => setPatientForm({ ...patientForm(), hr: e.currentTarget.value })}
                   />
                   <Input.Root
                     type="text"
                     class="dos-input"
                     placeholder="Temp (e.g., 98.6)"
                     value={patientForm().temp}
-                    onInput={(e: any) => setPatientForm({ ...patientForm(), temp: e.currentTarget.value })}
+                    onInput={(e: InputEvent & { currentTarget: HTMLInputElement }) => setPatientForm({ ...patientForm(), temp: e.currentTarget.value })}
                   />
                   <Input.Root
                     type="text"
                     class="dos-input"
                     placeholder="O2% (e.g., 98)"
                     value={patientForm().o2}
-                    onInput={(e: any) => setPatientForm({ ...patientForm(), o2: e.currentTarget.value })}
+                    onInput={(e: InputEvent & { currentTarget: HTMLInputElement }) => setPatientForm({ ...patientForm(), o2: e.currentTarget.value })}
                   />
                 </div>
               </div>
@@ -812,7 +808,7 @@ export function EMSDashboard() {
                   class="dos-input"
                   placeholder="e.g., penicillin, latex"
                   value={patientForm().allergies}
-                  onInput={(e: any) => setPatientForm({ ...patientForm(), allergies: e.currentTarget.value })}
+                  onInput={(e: InputEvent & { currentTarget: HTMLInputElement }) => setPatientForm({ ...patientForm(), allergies: e.currentTarget.value })}
                 />
               </div>
 
@@ -823,7 +819,7 @@ export function EMSDashboard() {
                   class="dos-input"
                   placeholder="List current medications..."
                   value={patientForm().medications}
-                  onInput={(e: any) => setPatientForm({ ...patientForm(), medications: e.currentTarget.value })}
+                  onInput={(e: InputEvent & { currentTarget: HTMLInputElement }) => setPatientForm({ ...patientForm(), medications: e.currentTarget.value })}
                 />
               </div>
 
@@ -1029,7 +1025,6 @@ export function EMSDashboard() {
           </Modal.Root>
         </Show>
 
-        {/* Discharge Modal with Prescriptions */}
         <Show when={showDischargeModal() && selectedPatient()}>
           <Modal.Root onClose={() => setShowDischargeModal(false)} useContentWrapper={false}>
             <div class="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -1134,7 +1129,7 @@ export function EMSDashboard() {
 
         <Show when={selectedPatient() && activeTab() !== 'admit' && !showDischargeModal()}>
           <div class="patient-detail-overlay" onClick={() => setSelectedPatient(null)}>
-            <div class="patient-detail-panel" onClick={(e: any) => e.stopPropagation()}>
+            <div class="patient-detail-panel" onClick={(e: MouseEvent) => e.stopPropagation()}>
               <div class="patient-detail-header">
                 <div>
                   <h3 style={{ margin: 0 }}>{selectedPatient()!.name}</h3>
@@ -1241,7 +1236,6 @@ export function EMSDashboard() {
                   </For>
                 </div>
 
-                {/* Medical History from DB */}
                 <Show when={selectedPatient()!.citizenId}>
                   <div class="detail-section">
                     <h4>[PERSISTENT MEDICAL HISTORY]</h4>

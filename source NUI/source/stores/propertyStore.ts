@@ -30,7 +30,7 @@ export interface PropertyState {
   properties: Record<string, Property>;
   searchResults: Property[];
   selectedProperty: string | null;
-  nearbyRadius: number; // metros
+  nearbyRadius: number;
 }
 
 const initialState: PropertyState = {

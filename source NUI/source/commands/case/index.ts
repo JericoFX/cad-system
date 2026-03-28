@@ -3,7 +3,7 @@ import { createCommandWithSubcommands, requireCaseLoaded } from '../commandBuild
 import { cadActions, cadState, type Case } from '~/stores/cadStore';
 import { hackerActions } from '~/stores/hackerStore';
 
-export function registerCaseCommands() {
+export function registerCaseCommands(): void {
   createCommandWithSubcommands({
     name: 'case',
     aliases: ['c'],
@@ -47,14 +47,14 @@ export function registerCaseCommands() {
           terminal.print(`Priority: ${priority}`, 'info');
 
           const confirmed = await terminal.confirm('Create this case?');
-          
+
           if (!confirmed) {
             terminal.print('Case creation cancelled', 'warning');
             return;
           }
 
           const stopLoading = terminal.showLoading('Creating case');
-          
+
           try {
             const result = await fivem.fetch('cad:createCase', {
               caseType,
@@ -68,22 +68,21 @@ export function registerCaseCommands() {
               const caseData = result as Case;
               cadActions.addCase(caseData);
               cadActions.setCurrentCase(caseData);
-              
-              // Emit hacker command for case creation
+
               hackerActions.onCaseCreate(
                 caseData.caseId,
                 caseData.title,
                 caseData.caseType,
                 caseData.priority
               );
-              
+
               terminal.print(`\n✓ Case created and selected: ${caseData.caseId}`, 'success');
               terminal.printCard(caseData.caseId, {
                 Title: caseData.title,
                 Type: caseData.caseType,
                 Priority: caseData.priority.toString(),
               });
-              
+
               terminal.newLine();
               terminal.print('Case is now ACTIVE - you can:', 'system');
               terminal.print('  addnote <type> <content> - Add a note', 'info');
@@ -105,7 +104,7 @@ export function registerCaseCommands() {
         description: 'View case details',
         handler: async ({ rawArgs, terminal }) => {
           const caseId = rawArgs[1] || requireCaseLoaded({ rawArgs, terminal, fivem: {} as any, user: {} as any, args: {}, flags: {} } as any);
-          
+
           if (!caseId) return;
 
           const targetCase = cadState.cases[caseId];
@@ -139,7 +138,7 @@ export function registerCaseCommands() {
         description: 'List and select a case',
         handler: async ({ terminal }) => {
           const cases = Object.values(cadState.cases);
-          
+
           if (cases.length === 0) {
             terminal.print('No cases available', 'error');
             terminal.print('Create one: case create <type> <title>', 'system');
@@ -171,7 +170,7 @@ export function registerCaseCommands() {
         description: 'Search cases by ID, title, or person',
         handler: async ({ args, terminal }) => {
           const query = args.query;
-          
+
           if (!query) {
             terminal.print('Usage: case search <query>', 'error');
             return;
@@ -214,7 +213,7 @@ export function registerCaseCommands() {
           }
 
           const notes = targetCase.notes || [];
-          
+
           if (notes.length === 0) {
             terminal.print(`No notes for case ${caseId}`, 'system');
             terminal.print('Add one: addnote <type> <content>', 'info');
@@ -248,7 +247,7 @@ export function registerCaseCommands() {
           }
 
           const evidence = targetCase.evidence || [];
-          
+
           if (evidence.length === 0) {
             terminal.print(`No evidence for case ${caseId}`, 'system');
             terminal.print('Add one: addevidence [url]', 'info');
@@ -272,22 +271,22 @@ export function registerCaseCommands() {
         description: 'Close a case',
         handler: async ({ rawArgs, terminal, fivem }) => {
           const caseId = rawArgs[1];
-          
+
           if (!caseId) {
             terminal.print('Usage: case close <case_id>', 'error');
             return;
           }
 
           const stopLoading = terminal.showLoading('Closing case');
-          
+
           try {
             const result = await fivem.fetch('cad:closeCase', caseId);
             stopLoading();
-            
+
             if (result) {
               cadActions.updateCase(caseId, { status: 'CLOSED' });
               terminal.print(`✓ Case ${caseId} closed`, 'success');
-              
+
               if (cadState.currentCase?.caseId === caseId) {
                 cadActions.setCurrentCase(null);
                 terminal.print('Current case cleared', 'system');

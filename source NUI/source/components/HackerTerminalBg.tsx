@@ -1,4 +1,3 @@
-// Dont have a fucking idea of that this does but is nice
 import { createEffect, createSignal, onCleanup } from 'solid-js';
 import { hackerState, type HackerLine } from '~/stores/hackerStore';
 
@@ -10,8 +9,8 @@ type HackerTerminalBgProps = {
   class?: string;
 };
 
-function mulberry32(seed: number) {
-  return function () {
+function mulberry32(seed: number): () => number {
+  return function (): number {
     let t = (seed += 0x6d2b79f5);
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
@@ -19,11 +18,11 @@ function mulberry32(seed: number) {
   };
 }
 
-function pad2(n: number) {
+function pad2(n: number): string {
   return n < 10 ? `0${n}` : `${n}`;
 }
 
-function timestamp(rng: () => number) {
+function timestamp(rng: () => number): string {
   const h = pad2((rng() * 24) | 0);
   const m = pad2((rng() * 60) | 0);
   const s = pad2((rng() * 60) | 0);
@@ -31,27 +30,27 @@ function timestamp(rng: () => number) {
   return `${h}:${m}:${s}.${ms}`;
 }
 
-function pick<T>(rng: () => number, arr: T[]) {
+function pick<T>(rng: () => number, arr: T[]): T {
   return arr[(rng() * arr.length) | 0];
 }
 
-function hex(rng: () => number, n: number) {
+function hex(rng: () => number, n: number): string {
   const chars = '0123456789abcdef';
   let s = '';
   for (let i = 0; i < n; i++) s += chars[(rng() * 16) | 0];
   return s;
 }
 
-function ip(rng: () => number) {
+function ip(rng: () => number): string {
   const o = () => (rng() * 256) | 0;
   return `${o()}.${o()}.${o()}.${o()}`;
 }
 
-function port(rng: () => number) {
+function port(rng: () => number): string {
   return (1024 + ((rng() * (65535 - 1024)) | 0)).toString();
 }
 
-function makeLineFactory(seed: number) {
+function makeLineFactory(seed: number): () => string {
   const rng = mulberry32(seed);
 
   const verbs = [
@@ -145,12 +144,17 @@ function makeLineFactory(seed: number) {
   return () => `[${timestamp(rng)}] ${formats[(rng() * formats.length) | 0]()}`;
 }
 
-function createRingBuffer(capacity: number) {
+interface RingBuffer {
+  push: (value: string) => void;
+  toArray: () => string[];
+}
+
+function createRingBuffer(capacity: number): RingBuffer {
   const arr = new Array<string>(capacity);
   let head = 0;
   let size = 0;
 
-  function push(value: string) {
+  function push(value: string): void {
     arr[(head + size) % capacity] = value;
     if (size < capacity) {
       size++;
@@ -159,7 +163,7 @@ function createRingBuffer(capacity: number) {
     }
   }
 
-  function toArray() {
+  function toArray(): string[] {
     const out = new Array<string>(size);
     for (let i = 0; i < size; i++) out[i] = arr[(head + i) % capacity];
     return out;
@@ -193,23 +197,23 @@ export default function HackerTerminalBg(props: HackerTerminalBgProps) {
   let ring = createRingBuffer(maxLines());
   let nextLine = makeLineFactory(seed());
 
-  function tick() {
+  function tick(): void {
     ring.push(nextLine());
     updateLines();
   }
 
-  function updateLines() {
+  function updateLines(): void {
     const autoLines = ring.toArray();
     const userLines = storeLines();
     setLines([...userLines, ...autoLines].slice(-maxLines()));
   }
 
-  function start() {
+  function start(): void {
     stop();
     timer = window.setInterval(tick, intervalMs());
   }
 
-  function stop() {
+  function stop(): void {
     if (timer !== undefined) {
       window.clearInterval(timer);
       timer = undefined;

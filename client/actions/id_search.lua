@@ -1,7 +1,5 @@
--- PARA EL JERICO DEL FUTURO, ESTO ES SOLO PARA QUE OX_INVENTORY SEPA USAR LAS COSAS
-
+---@param data { metadata: { citizenid: string, firstname: string|nil, lastname: string|nil } }
 exports('useIdCard', function(data)
-    -- Posiblemente necesite usar los datos de QB osea el GetPlayerData()
     local citizenId = data.metadata.citizenid
     local firstname = data.metadata.firstname
     local lastname = data.metadata.lastname
@@ -30,6 +28,7 @@ exports('useIdCard', function(data)
     })
 end)
 
+---@param data { metadata: { citizenid: string, firstname: string, lastname: string } }
 exports('useDriverLicense', function(data)
     local citizenId = data.metadata.citizenid
 

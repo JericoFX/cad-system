@@ -1,76 +1,59 @@
-// Sound effects for CAD system
-// Uses GTA V native sounds via Lua bridge
-
 import { fetchNui } from './fetchNui';
 
-// Play sound via Lua native
 const playNativeSound = async (type: string): Promise<void> => {
   try {
     await fetchNui('playSound', { type });
   } catch (e) {
-    // Silently fail - sounds are optional
     console.warn('[Sounds] Failed to play sound:', type);
   }
 };
 
-// PTT press sound
-export const playPTTStart = () => {
+export const playPTTStart = (): void => {
   playNativeSound('PTT_START');
 };
 
-// PTT release sound
-export const playPTTEnd = () => {
+export const playPTTEnd = (): void => {
   playNativeSound('PTT_END');
 };
 
-// Dispatch incoming call sound
-export const playDispatchIncoming = () => {
+export const playDispatchIncoming = (): void => {
   playNativeSound('DISPATCH_INCOMING');
 };
 
-// Emergency alert sound
-export const playEmergencyAlert = () => {
+export const playEmergencyAlert = (): void => {
   playNativeSound('EMERGENCY_ALERT');
 };
 
-// Success sound
-export const playSuccess = () => {
+export const playSuccess = (): void => {
   playNativeSound('SUCCESS');
 };
 
-// Error sound
-export const playError = () => {
+export const playError = (): void => {
   playNativeSound('ERROR');
 };
 
-// UI click sound
-export const playClick = () => {
+export const playClick = (): void => {
   playNativeSound('CLICK');
 };
 
-// Back/cancel sound
-export const playBack = () => {
+export const playBack = (): void => {
   playNativeSound('BACK');
 };
 
-export const playBootStart = () => {
+export const playBootStart = (): void => {
   playNativeSound('BOOT_START');
 };
 
-export const playBootStep = () => {
+export const playBootStep = (): void => {
   playNativeSound('BOOT_STEP');
 };
 
-export const playBootReady = () => {
+export const playBootReady = (): void => {
   playNativeSound('BOOT_READY');
 };
 
-// Initialize (no-op for native sounds, they work immediately)
-export const initSounds = () => {
-  // Native sounds don't need initialization
-};
+export const initSounds = (): void => {};
 
-// Check if sounds are supported
 export const isAudioSupported = (): boolean => {
-  return true; // Native sounds are always supported in FiveM
+  return true;
 };

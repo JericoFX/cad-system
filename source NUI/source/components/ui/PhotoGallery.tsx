@@ -29,11 +29,10 @@ function PhotoGallery(props: PhotoGalleryProps) {
   const displayedPhotos = () => local.photos.slice(0, local.maxPhotos);
   const remainingCount = () => Math.max(0, local.photos.length - local.maxPhotos);
 
-  const handlePhotoClick = (index: number) => {
+  const handlePhotoClick = (index: number): void => {
     if (local.onPhotoClick) {
       local.onPhotoClick(index);
     } else {
-      // Default behavior: open in image viewer
       viewerActions.openImages(local.photos, 'Photo Gallery');
     }
   };

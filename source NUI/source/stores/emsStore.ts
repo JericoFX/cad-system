@@ -7,23 +7,23 @@ import { cadActions } from './cadStore';
 export type PatientCondition = 'CRITICAL' | 'SERIOUS' | 'STABLE' | 'DECEASED';
 
 export type PatientStatus =
-  | 'TRIAGE'      // Initial assessment
-  | 'ADMITTED'    // Waiting for treatment
-  | 'IN_TREATMENT' // Currently being treated
-  | 'STABLE'      // Condition stabilized
-  | 'DISCHARGED'  // Released
-  | 'TRANSFERRED' // Handoff to case/police
-  | 'DECEASED';   // Death
+  | 'TRIAGE'
+  | 'ADMITTED'
+  | 'IN_TREATMENT'
+  | 'STABLE'
+  | 'DISCHARGED'
+  | 'TRANSFERRED'
+  | 'DECEASED';
 
 export type TriagePriority = 1 | 2 | 3 | 4;
 
 export interface PatientVitals {
-  bp: string;        // Blood pressure (e.g., "120/80")
-  hr: number;        // Heart rate
-  temp: number;      // Temperature in °F
-  o2: number;        // O2 saturation %
-  rr?: number;       // Respiratory rate
-  pain?: number;     // Pain scale 0-10
+  bp: string;
+  hr: number;
+  temp: number;
+  o2: number;
+  rr?: number;
+  pain?: number;
 }
 
 export interface PatientTreatment {
@@ -47,7 +47,7 @@ export interface Patient {
 
   condition: PatientCondition;
   triagePriority: TriagePriority;
-  chiefComplaint: string;        // Main symptom/reason
+  chiefComplaint: string;
   symptoms: string[];
   allergies: string[];
   currentMedications: string[];
@@ -70,12 +70,12 @@ export interface Patient {
 
   treatments: PatientTreatment[];
 
-  caseId?: string;              // Linked CAD case
-  callId?: string;              // Linked dispatch call
+  caseId?: string;
+  callId?: string;
 
   dischargeNotes?: string;
   dischargeDisposition?: 'HOME' | 'HOSPITAL' | 'POLICE' | 'MORGUE';
-  handoffToCase?: boolean;      // Handoff report sent to case
+  handoffToCase?: boolean;
 }
 
 export interface SimplePrescription {
@@ -103,8 +103,8 @@ export interface EMSUnit {
   unitType: 'AMBULANCE' | 'FIRE' | 'RESCUE' | 'SUPERVISOR';
   status: 'AVAILABLE' | 'EN_ROUTE' | 'ON_SCENE' | 'TRANSPORTING' | 'AT_HOSPITAL' | 'BUSY';
   currentCall?: string;
-  crew: string[];               // Officer IDs
-  currentPatient?: string;      // Patient ID if transporting
+  crew: string[];
+  currentPatient?: string;
 }
 
 export interface EMSState {
@@ -441,7 +441,6 @@ Time: ${new Date().toLocaleString()}`;
     setEmsState('sortBy', sortBy);
   },
 
-  // Prescription management for discharge flow
   addDischargePrescription(prescription: SimplePrescription) {
     setEmsState('dischargePrescriptions', prev => [...prev, prescription]);
   },
@@ -454,7 +453,6 @@ Time: ${new Date().toLocaleString()}`;
     setEmsState('dischargePrescriptions', []);
   },
 
-  // Medical history
   async fetchMedicalHistory(citizenId: string) {
     try {
       const response = await fetchNui<{

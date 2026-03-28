@@ -32,21 +32,21 @@ export const DosSelect: Component<DosSelectProps> = (props) => {
   let selectRef: HTMLDivElement | undefined;
   let triggerRef: HTMLDivElement | undefined;
 
-  const selectedOption = () =>
+  const selectedOption = (): SelectOption | undefined =>
     props.options.find((o) => o.value === props.value);
 
-  const handleSelect = (value: string) => {
+  const handleSelect = (value: string): void => {
     props.onChange(value);
     setIsOpen(false);
   };
 
-  const handleClickOutside = (e: MouseEvent) => {
+  const handleClickOutside = (e: MouseEvent): void => {
     if (selectRef && !selectRef.contains(e.target as Node)) {
       setIsOpen(false);
     }
   };
 
-  const updatePosition = () => {
+  const updatePosition = (): void => {
     if (triggerRef) {
       const rect = triggerRef.getBoundingClientRect();
       setDropdownPos({
@@ -57,7 +57,7 @@ export const DosSelect: Component<DosSelectProps> = (props) => {
     }
   };
 
-  const handleToggle = (e: MouseEvent) => {
+  const handleToggle = (e: MouseEvent): void => {
     e.stopPropagation();
     if (!props.disabled) {
       if (!isOpen()) {

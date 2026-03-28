@@ -1,5 +1,3 @@
--- modules/shared/config.lua
-
 local mediaService = string.lower(tostring(GetConvar('CAD_MEDIA_SERVICE', 'fivemanage')))
 if mediaService == '' then
     mediaService = 'fivemanage'
@@ -357,8 +355,7 @@ local Config = {
     },
 }
 
--- Profile application
-
+---@param overrides table
 local function applyFeatureFlags(overrides)
     if type(overrides) ~= 'table' then return end
     Config.Features = Config.Features or {}
@@ -408,8 +405,8 @@ end
 
 applyProfile()
 
--- Feature flag helpers
-
+---@param featureName string
+---@return table
 local function getFeatureTable(featureName)
     local features = Config.Features
     if type(features) ~= 'table' then return {} end
@@ -418,12 +415,16 @@ local function getFeatureTable(featureName)
     return features[name] or {}
 end
 
+---@param featureName string
+---@return boolean
 function Config.IsFeatureEnabled(featureName)
     local feature = getFeatureTable(featureName)
     if feature.Enabled == nil then return true end
     return feature.Enabled == true
 end
 
+---@param featureName string
+---@return boolean
 function Config.IsFeatureVisibleInUI(featureName)
     local feature = getFeatureTable(featureName)
     if feature.ShowInUI == nil then return Config.IsFeatureEnabled(featureName) end

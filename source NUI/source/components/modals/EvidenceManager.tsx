@@ -399,7 +399,6 @@ export function EvidenceManager() {
       
       const url = data.url;
       
-      // Helper functions for URL detection by extension only << stack overflow :)
       const isImageUrl = (url: string): boolean => {
         const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
         const lower = url.toLowerCase();

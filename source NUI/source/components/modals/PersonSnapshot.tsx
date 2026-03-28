@@ -1,7 +1,7 @@
 import { createSignal, Show, For, createMemo } from 'solid-js';
 import { terminalActions, terminalState } from '~/stores/terminalStore';
 import { cadState, cadActions } from '~/stores/cadStore';
-import { emsState, emsActions, type MedicalRecord } from '~/stores/emsStore';
+import { emsState, emsActions } from '~/stores/emsStore';
 import { Button, Modal, Tabs } from '~/components/ui';
 
 export function PersonSnapshot() {

@@ -65,7 +65,7 @@ export interface DispatchUnit {
   unitId: string;
   badge: string;
   name: string;
-  status: 'AVAILABLE' | 'BUSY' | 'OFF_DUTY';
+  status: 'AVAILABLE' | 'BUSY' | 'OFF_DUTY' | 'ENROUTE';
   type: string;
   location?: { x: number; y: number; z: number };
   currentCall?: string;
@@ -177,7 +177,7 @@ export interface Vehicle {
 export interface Fine {
   fineId: string;
   targetType: 'PERSON' | 'VEHICLE';
-  targetId: string; // citizenid or plate
+  targetId: string;
   targetName: string;
   fineCode: string;
   description: string;
@@ -249,7 +249,7 @@ export interface Warrant {
 export interface BOLO {
   boloId: string;
   type: 'PERSON' | 'VEHICLE';
-  identifier: string; // citizenid or plate
+  identifier: string;
   reason: string;
   issuedBy: string;
   issuedByName: string;
@@ -315,7 +315,7 @@ const initialState: CADState = {
   error: null,
 };
 
-export const [cadState, setCADState] = createStore(initialState);
+export const [cadState, setCADState] = createStore<CADState>(initialState);
 
 const normalizeCaseRecord = (caseData: Case): Case => ({
   ...caseData,
@@ -451,7 +451,7 @@ export const cadActions = {
   setPersons: (persons: Record<string, Person>) => setCADState('persons', persons),
   addPerson: (person: Person) => setCADState('persons', person.citizenid, { ...person, notes: person.notes || [] }),
   updatePerson: (citizenid: string, data: Partial<Person>) => {
-    updateEntity(setCADState, 'persons', citizenid, data);
+    updateEntity(setCADState as any, 'persons', citizenid, data);
   },
   addPersonNote: (citizenid: string, note: EntityNote) => {
     addToArray(setCADState, 'persons', citizenid, 'notes', note);
@@ -460,7 +460,7 @@ export const cadActions = {
   setVehicles: (vehicles: Record<string, Vehicle>) => setCADState('vehicles', vehicles),
   addVehicle: (vehicle: Vehicle) => setCADState('vehicles', vehicle.plate, { ...vehicle, notes: vehicle.notes || [] }),
   updateVehicle: (plate: string, data: Partial<Vehicle>) => {
-    updateEntity(setCADState, 'vehicles', plate, data);
+    updateEntity(setCADState as any, 'vehicles', plate, data);
   },
   addPersonPhoto: (citizenid: string, photoUrl: string) => {
     setCADState('persons', citizenid, (prev) => {

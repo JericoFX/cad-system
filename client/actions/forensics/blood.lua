@@ -1,8 +1,13 @@
 local State = require 'modules.shared.state'
 local EvidenceTypes = require 'shared.evidence_types'
 
+---@type number
 local lastEmitAt = 0
 
+---@param x number
+---@param y number
+---@param fallbackZ number
+---@return number
 local function getGroundZ(x, y, fallbackZ)
     for i = 0, 1000, 10 do
         local ok, groundZ = GetGroundZFor_3dCoord(x, y, i + 0.0, false)
@@ -14,6 +19,8 @@ local function getGroundZ(x, y, fallbackZ)
     return fallbackZ
 end
 
+---@param ped number
+---@return number
 local function getPlayerServerIdFromPed(ped)
     local playerIndex = NetworkGetPlayerIndexFromPed(ped)
     if not playerIndex or playerIndex == -1 then
@@ -24,6 +31,8 @@ local function getPlayerServerIdFromPed(ped)
     return source and source > 0 and source or 0
 end
 
+---@param victimPed number
+---@return boolean
 local function isCrimeContext(victimPed)
     local victimSource = getPlayerServerIdFromPed(victimPed)
     local calls = State.Dispatch.Calls or {}
@@ -45,6 +54,8 @@ local function isCrimeContext(victimPed)
     return false
 end
 
+---@param victimPed number
+---@return nil
 local function emitBloodEvidence(victimPed)
     local now = GetGameTimer()
     if now - lastEmitAt < 1000 then

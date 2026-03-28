@@ -9,11 +9,14 @@ local Evidence = {}
 
 local staging = State.Evidence.Staging
 
+---@return boolean
 local function evidenceVirtualEnabled()
     local cfg = Config.Evidence or {}
     return cfg.UseVirtualContainer ~= false and Registry.Get('VirtualContainer') ~= nil
 end
 
+---@param terminalId string
+---@return table|nil
 local function getTerminalById(terminalId)
     local points = Config.UI.AccessPoints or {}
     for i = 1, #points do
@@ -26,6 +29,9 @@ local function getTerminalById(terminalId)
     return nil
 end
 
+---@param officer table
+---@param terminal table
+---@return boolean
 local function hasTerminalAccess(officer, terminal)
     if not terminal.jobs or #terminal.jobs == 0 then
         return true
@@ -44,6 +50,8 @@ local function hasTerminalAccess(officer, terminal)
     return false
 end
 
+---@param terminal table
+---@return table|nil
 local function normalizeContainerConfig(terminal)
     local container = terminal.evidenceContainer
     if type(container) ~= 'table' or container.enabled ~= true then
@@ -61,6 +69,9 @@ end
 
 local TERMINAL_MAX_DISTANCE = 10.0
 
+---@param source number
+---@param terminal table
+---@return boolean
 local function isPlayerNearTerminal(source, terminal)
     if not terminal.coords then
         return false
@@ -82,6 +93,9 @@ local function isPlayerNearTerminal(source, terminal)
     return dist <= maxDist
 end
 
+---@param payload table|nil
+---@param officer table
+---@return string|nil, table|nil, table|nil, table|nil
 local function resolveContainerContext(payload, officer)
     local terminalId = Fn.SanitizeString(payload and payload.terminalId, 64)
     if terminalId == '' then
@@ -124,10 +138,15 @@ local function resolveContainerContext(payload, officer)
     return terminalId, terminal, containerConfig, nil
 end
 
+---@param terminalId string
+---@return string
 local function getContainerKey(terminalId)
     return ('terminal:%s:evidence'):format(terminalId)
 end
 
+---@param terminalId string
+---@param containerConfig table
+---@return table|nil, string|nil
 local function ensureVirtualEvidenceContainer(terminalId, containerConfig)
     local containerKey = getContainerKey(terminalId)
     local VCAction = Registry.Get('VirtualContainer')
@@ -146,6 +165,8 @@ local function ensureVirtualEvidenceContainer(terminalId, containerConfig)
     return container
 end
 
+---@param container table
+---@return integer|nil
 local function findFreeContainerSlot(container)
     for i = 1, container.slotCount do
         if not container.slots[i] then
@@ -156,6 +177,9 @@ local function findFreeContainerSlot(container)
     return nil
 end
 
+---@param container table
+---@param requestedSlot any
+---@return integer|nil, table|nil
 local function getContainerSlot(container, requestedSlot)
     local target = math.floor(tonumber(requestedSlot) or 0)
     if target > 0 then
@@ -174,11 +198,16 @@ local function getContainerSlot(container, requestedSlot)
     return nil, nil
 end
 
+---@param source number
+---@return table
 local function getOfficerStaging(source)
     staging[source] = staging[source] or {}
     return staging[source]
 end
 
+---@param caseId string
+---@param evidence table
+---@return boolean, string|nil
 local function appendCaseEvidence(caseId, evidence)
     local caseObj = State.Cases[caseId]
     if not caseObj then

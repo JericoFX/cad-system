@@ -6,17 +6,17 @@ import { registry } from '~/commands/registry';
 export function CommandSuggestions() {
   let containerRef: HTMLDivElement | undefined;
 
-  const runCommand = (command: string) => {
+  const runCommand = (command: string): void => {
     suggestionsActions.hide();
     registry.execute(command);
   };
 
-  const dismiss = (e: Event) => {
+  const dismiss = (e: Event): void => {
     e.stopPropagation();
     suggestionsActions.hide();
   };
 
-  const handleKeyDown = (e: KeyboardEvent) => {
+  const handleKeyDown = (e: KeyboardEvent): void => {
     if (e.key === 'Escape' && suggestionsState.isVisible) {
       e.preventDefault();
       suggestionsActions.hide();

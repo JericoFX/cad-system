@@ -89,7 +89,6 @@ export function NewsPhotoImporter(props: NewsPhotoImporterProps) {
   };
 
   onMount(async () => {
-    // TO ME: FROM ME: ALWAYS LOAD IMPORTANT THING ON "ONMOUNT"
     await Promise.all([
       photoActions.fetchInventoryPhotos(),
       photoActions.fetchReleasedPhotos(),
@@ -196,7 +195,6 @@ export function NewsPhotoImporter(props: NewsPhotoImporterProps) {
       if (newSet.has(photoId)) {
         newSet.delete(photoId);
       } else {
-        // Chequea el limite por favor, siempre lo mismo!
         const max = props.maxPhotos || 10;
         if (newSet.size >= max) {
           terminalActions.addLine(`Maximum ${max} photos allowed`, 'error');
@@ -254,7 +252,6 @@ export function NewsPhotoImporter(props: NewsPhotoImporterProps) {
           transition: 'all 0.2s'
         }}
       >
-        {/* Thumbnail */}
         <div style={{
           width: '120px',
           height: '90px',
@@ -277,7 +274,6 @@ export function NewsPhotoImporter(props: NewsPhotoImporterProps) {
           />
         </div>
 
-        {/* Info */}
         <div style={{ flex: 1, 'font-size': '13px' }}>
           <div style={{ 
             'margin-bottom': '5px',
@@ -363,7 +359,6 @@ export function NewsPhotoImporter(props: NewsPhotoImporterProps) {
         </div>
 
         <div class="modal-body" style={{ padding: '20px', display: 'flex', 'flex-direction': 'column' }}>
-          {/* Search */}
           <div style={{ 'margin-bottom': '15px' }}>
             <Input.Root
               type="text"
@@ -375,7 +370,6 @@ export function NewsPhotoImporter(props: NewsPhotoImporterProps) {
             />
           </div>
 
-          {/* Tabs */}
           <Tabs.Root
             value={activeTab()}
             onValueChange={(value) => setActiveTab(value as 'inventory' | 'released' | 'locker')}
@@ -389,8 +383,7 @@ export function NewsPhotoImporter(props: NewsPhotoImporterProps) {
             </Tabs.List>
           </Tabs.Root>
 
-          {/* Photo List */}
-          <div style={{ 
+          <div style={{
             flex: 1,
             overflow: 'auto',
             'min-height': '300px',
@@ -473,8 +466,7 @@ export function NewsPhotoImporter(props: NewsPhotoImporterProps) {
             </Show>
           </div>
 
-          {/* Selection Info */}
-          <div style={{ 
+          <div style={{
             'margin-top': '15px',
             padding: '10px',
             'background-color': 'rgba(0, 255, 255, 0.1)',
@@ -495,8 +487,7 @@ export function NewsPhotoImporter(props: NewsPhotoImporterProps) {
             </Button.Root>
           </div>
 
-          {/* Actions */}
-          <div class="modal-footer" style={{ 
+          <div class="modal-footer" style={{
             'margin-top': '20px',
             display: 'flex', 
             'justify-content': 'space-between',

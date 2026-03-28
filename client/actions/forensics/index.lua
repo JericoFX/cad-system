@@ -1,9 +1,19 @@
 local Config = require 'modules.shared.config'
 
+---@class WorldTrace
+---@field traceId string
+---@field evidenceType string
+---@field coords { x: number, y: number, z: number }
+---@field distance number|nil
+
+---@type WorldTrace[]
 local cachedTraces = {}
+---@type boolean
 local textUiVisible = false
+---@type number
 local lastTraceRefresh = 0
 
+---@return table|nil
 local function nearbyLab()
     local ped = cache.ped or PlayerPedId()
     if not ped or ped == 0 then return nil end
@@ -18,6 +28,7 @@ local function nearbyLab()
     return nil
 end
 
+---@return nil
 local function closeTraceTextUi()
     if textUiVisible then
         lib.hideTextUI()
@@ -25,6 +36,8 @@ local function closeTraceTextUi()
     end
 end
 
+---@param force boolean
+---@return nil
 local function refreshNearbyTraces(force)
     local now = GetGameTimer()
     if not force and now - lastTraceRefresh < 1300 then
@@ -40,6 +53,7 @@ local function refreshNearbyTraces(force)
     end
 end
 
+---@return WorldTrace|nil
 local function getNearestTrace()
     local ped = cache.ped or PlayerPedId()
     if not ped or ped == 0 then
@@ -69,6 +83,8 @@ local function getNearestTrace()
     return nearest
 end
 
+---@param trace WorldTrace
+---@return nil
 local function bagNearestTrace(trace)
     local defaultType = tostring(trace.evidenceType or 'DNA'):upper()
     local input = lib.inputDialog('Bag Evidence', {

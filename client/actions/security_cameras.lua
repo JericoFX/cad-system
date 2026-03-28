@@ -2,18 +2,32 @@ local Config = require 'modules.shared.config'
 local ClientFn = require 'modules.client.functions'
 local Registry = require 'modules.shared.registry'
 
+---@class SecurityCameraModule
+---@field StartWatch fun(payload: table): { ok: boolean, camera?: table, error?: string }
+---@field StopWatch fun(): { ok: boolean }
+
+---@class SecurityCameraState
+---@field installing boolean
+---@field watchCam number|nil
+---@field watchCameraId string|nil
+
 local SecurityCamera = {}
 
+---@type SecurityCameraState
 local state = {
     installing = false,
     watchCam = nil,
     watchCameraId = nil,
 }
 
+---@return table
 local function getCameraConfig()
     return Config.SecurityCameras or {}
 end
 
+---@param message string
+---@param nType string|nil
+---@return nil
 local function notify(message, nType)
     lib.notify({
         title = 'CAD',
@@ -22,6 +36,7 @@ local function notify(message, nType)
     })
 end
 
+---@return boolean, string|nil
 local function canUseCameraSystem()
     local response = lib.callback.await('cad:getPlayerData', false, {})
     if not response then
@@ -45,6 +60,7 @@ local function canUseCameraSystem()
     return true
 end
 
+---@return { coords: { x: number, y: number, z: number }, surfaceNormal: { x: number, y: number, z: number }|nil }|nil
 local function getInstallPoint()
     local config = getCameraConfig()
     local maxDistance = tonumber(config.MaxInstallDistance) or 12.0
@@ -111,6 +127,8 @@ local function getInstallPoint()
     end
 end
 
+---@param surfaceNormal { x: number, y: number, z: number }|nil
+---@return number
 local function computeInitialYaw(surfaceNormal)
     if type(surfaceNormal) == 'table' and surfaceNormal.x and surfaceNormal.y then
         return GetHeadingFromVector_2d(-surfaceNormal.x, -surfaceNormal.y)
@@ -120,6 +138,8 @@ local function computeInitialYaw(surfaceNormal)
     return tonumber(camRot.z) or 0.0
 end
 
+---@param hitData { coords: { x: number, y: number, z: number }, surfaceNormal: { x: number, y: number, z: number }|nil }
+---@return { rotation: { x: number, y: number, z: number }, fov: number }|nil
 local function adjustCameraPlacement(hitData)
     local config = getCameraConfig()
     local minFov = tonumber(config.MinFov) or 20.0
@@ -283,6 +303,8 @@ local function adjustCameraPlacement(hitData)
     }
 end
 
+---@param coords { x: number, y: number, z: number }
+---@return { street: string, crossStreet: string, zone: string, display: string }
 local function buildAddress(coords)
     local streetHash, crossingHash = GetStreetNameAtCoord(coords.x, coords.y, coords.z)
     local street = streetHash and GetStreetNameFromHashKey(streetHash) or ''
@@ -319,6 +341,7 @@ local function buildAddress(coords)
     }
 end
 
+---@return number|nil
 local function getCameraNumberPreview()
     local result = lib.callback.await('cad:cameras:getNextNumber', false, {})
     if not result or result.ok ~= true then
@@ -412,6 +435,7 @@ local function installSecurityCamera()
     )
 end
 
+---@return nil
 local function stopWatchInternal()
     if state.watchCam and state.watchCam ~= 0 then
         RenderScriptCams(false, true, 250, true, false)
@@ -429,6 +453,8 @@ local function stopWatchInternal()
     })
 end
 
+---@param camera table
+---@return boolean, string|nil
 local function startWatchInternal(camera)
     if not camera or type(camera) ~= 'table' then
         return false, 'camera_not_found'
@@ -472,6 +498,8 @@ local function startWatchInternal(camera)
     return true
 end
 
+---@param payload { cameraId: string }|nil
+---@return { ok: boolean, camera?: table, error?: string }
 function SecurityCamera.StartWatch(payload)
     local cameraId = payload and tostring(payload.cameraId or '') or ''
     if cameraId == '' then
@@ -514,6 +542,7 @@ function SecurityCamera.StartWatch(payload)
     }
 end
 
+---@return { ok: boolean }
 function SecurityCamera.StopWatch()
     stopWatchInternal()
     return {

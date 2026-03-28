@@ -1,5 +1,3 @@
-// PREPARE FOR THE IMPORT SEA!!!
-
 import { Show, createMemo, onMount, onCleanup } from 'solid-js';
 import { Terminal } from './components/Terminal';
 import HackerTerminalBg from './components/HackerTerminalBg';
@@ -52,7 +50,6 @@ export function App() {
     return classes.join(' ');
   });
 
-  // Handle Escape key to close CAD or active modal << bring this from my old computermdt
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       if (
@@ -74,7 +71,6 @@ export function App() {
 
       appActions.hide();
 
-      // this cause me a lot of "why the fuck the mouse is in my screen yet!"
       fetch('https://cad-system/closeUI', {
         method: 'POST',
         body: '{}',
@@ -99,7 +95,6 @@ export function App() {
           </Show>
 
           <Show when={!isVehicleOverlayMode()}>
-            {/* This was taken from a friend, if him used IA i dont know, but it work*/}
             <HackerTerminalBg maxLines={250} intervalMs={500} seed={20260215} />
           </Show>
 

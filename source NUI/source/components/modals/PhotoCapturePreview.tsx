@@ -131,8 +131,7 @@ export function PhotoCapturePreview(props: PhotoCapturePreviewProps) {
         </div>
 
         <div class="modal-body" style={{ padding: '20px' }}>
-          {/* Photo Display */}
-          <div 
+          <div
             class="photo-preview-container" 
             style={{ 
               'margin-bottom': '20px',
@@ -162,8 +161,7 @@ export function PhotoCapturePreview(props: PhotoCapturePreviewProps) {
             </Show>
           </div>
 
-          {/* Photo Info */}
-          <div 
+          <div
             class="photo-info-panel" 
             style={{ 
               'background-color': 'rgba(0,0,0,0.3)',
@@ -205,7 +203,6 @@ export function PhotoCapturePreview(props: PhotoCapturePreviewProps) {
             </div>
           </div>
 
-          {/* Description Input */}
           <div class="form-group" style={{ 'margin-bottom': '20px' }}>
             <label style={{ 
               display: 'block', 
@@ -229,7 +226,6 @@ export function PhotoCapturePreview(props: PhotoCapturePreviewProps) {
             />
           </div>
 
-          {/* Actions */}
           <div class="modal-footer" style={{ 
             display: 'flex', 
             'justify-content': 'flex-end',

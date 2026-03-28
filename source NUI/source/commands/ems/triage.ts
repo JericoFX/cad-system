@@ -2,7 +2,7 @@
 import { createCommand } from '../commandBuilder';
 import { userActions } from '~/stores/userStore';
 
-export function registerTriageCommand() {
+export function registerTriageCommand(): void {
   createCommand({
     name: 'triage',
     description: 'Patient triage and intake',

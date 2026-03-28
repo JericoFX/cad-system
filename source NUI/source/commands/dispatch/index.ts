@@ -46,7 +46,7 @@ const mockCalls: DispatchCall[] = [
   }
 ];
 
-export function registerDispatchCommands() {
+export function registerDispatchCommands(): void {
   createCommandWithSubcommands({
     name: 'dispatch',
     description: 'Dispatch system - GUI map or CLI mode',

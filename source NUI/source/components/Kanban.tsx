@@ -17,7 +17,7 @@ export const Kanban: Component<KanbanProps> = (props) => {
       .sort((a, b) => (a.priority || 0) - (b.priority || 0));
   };
 
-  const handleDragStart = (e: DragEvent, itemId: string) => {
+  const handleDragStart = (e: DragEvent, itemId: string): void => {
     setDraggingItem(itemId);
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = 'move';
@@ -25,24 +25,24 @@ export const Kanban: Component<KanbanProps> = (props) => {
     }
   };
 
-  const handleDragOverColumn = (e: DragEvent, columnId: string) => {
+  const handleDragOverColumn = (e: DragEvent, columnId: string): void => {
     e.preventDefault();
     e.stopPropagation();
     setDragOverColumn(columnId);
   };
 
-  const handleDragOverItem = (e: DragEvent, itemId: string) => {
+  const handleDragOverItem = (e: DragEvent, itemId: string): void => {
     e.preventDefault();
     e.stopPropagation();
     setDragOverItem(itemId);
   };
 
-  const handleDragLeave = () => {
+  const handleDragLeave = (): void => {
     setDragOverColumn(null);
     setDragOverItem(null);
   };
 
-  const handleDropOnColumn = (e: DragEvent, targetColumnId: string) => {
+  const handleDropOnColumn = (e: DragEvent, targetColumnId: string): void => {
     e.preventDefault();
     e.stopPropagation();
     
@@ -62,7 +62,7 @@ export const Kanban: Component<KanbanProps> = (props) => {
     setDragOverItem(null);
   };
 
-  const handleDropOnItem = (e: DragEvent, targetItemId: string) => {
+  const handleDropOnItem = (e: DragEvent, targetItemId: string): void => {
     e.preventDefault();
     e.stopPropagation();
     

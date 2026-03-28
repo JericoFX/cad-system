@@ -44,10 +44,12 @@ local DISPATCH_PUBLIC_MAX_CALLS = math.max(10, tonumber(dispatchPublicCfg.MaxCal
 local dirty = false
 local rev = 0
 
+---@return nil
 local function markDirty()
     dirty = true
 end
 
+---@return boolean
 local function isDispatchEnabled()
     return Config.Dispatch.Enabled ~= false and Config.IsFeatureEnabled('Dispatch')
 end
@@ -72,6 +74,8 @@ local function isUnitStale(unit)
     return (os.time() - updatedEpoch) > staleSeconds
 end
 
+---@param status any
+---@return 'AVAILABLE'|'BUSY'|'OFF_DUTY'
 local function normalizeUnitStatus(status)
     local val = tostring(status or 'AVAILABLE'):upper()
     if val == 'OFF_DUTY' or val == 'BUSY' or val == 'AVAILABLE' then
@@ -111,6 +115,7 @@ local function shouldPublishCall(call)
     return (os.time() - closedEpoch) <= ttlSeconds
 end
 
+---@return nil
 local function publishIfDirty()
     if not dirty then return end
     dirty = false
@@ -214,6 +219,8 @@ local function removeSourceUnit(source, persistCalls)
     syncEmsUnit(unitId, nil)
 end
 
+---@param officer table|nil
+---@return boolean
 local function canUseDispatchControl(officer)
     if not officer then
         return false
@@ -235,6 +242,9 @@ local function canUseDispatchControl(officer)
     return false
 end
 
+---@param bucket string
+---@param handler function
+---@return function
 local function withDispatchGuard(bucket, handler)
     return Auth.WithGuard(bucket, function(source, payload, officer)
         if not isDispatchEnabled() then
@@ -255,6 +265,8 @@ local function withDispatchGuard(bucket, handler)
     end)
 end
 
+---@param call DispatchCallRecord
+---@return boolean, string|nil
 saveCallDb = function(call)
     local ok, err = pcall(function()
         MySQL.insert.await([[
@@ -293,11 +305,11 @@ saveCallDb = function(call)
     return true
 end
 
+---@param unit DispatchUnitRecord
+---@return boolean
 local function unitIsResponding(unit)
     return unit.status == 'BUSY'
 end
-
--- Callbacks
 
 lib.callback.register('cad:registerDispatchUnit', withDispatchGuard('default', function(source, payload, officer)
     local existingUnitId = sourceToUnit[source]
@@ -539,6 +551,9 @@ lib.callback.register('cad:unassignUnitFromCall', withDispatchGuard('heavy', fun
     return call
 end))
 
+---@param call DispatchCallRecord
+---@param payload table
+---@return DispatchCallRecord|nil, string|nil
 local function closeCallInternal(call, payload)
     local previousCallStatus = call.status
     local previousResolution = call.resolution
@@ -700,11 +715,11 @@ lib.callback.register('cad:getNearestUnit', withDispatchGuard('default', functio
     return nearest
 end))
 
--- Rate-limited net events
-
 local positionUpdateLimits = {}
 local statusChangeLimits = {}
 
+---@param now number
+---@return nil
 local function cleanupDispatchRateLimits(now)
     local timestamp = tonumber(now) or os.time()
 
@@ -819,8 +834,6 @@ AddEventHandler('playerDropped', function()
     removeSourceUnit(source, true)
     markDirty()
 end)
-
--- Background thread: publish + stale cleanup
 
 CreateThread(function()
     Wait(500)

@@ -1,12 +1,13 @@
--- modules/server/officers.lua
-
 local Utils = require 'modules.shared.utils'
 local Core = require 'modules.server.core'
 
 local Officers = {}
 
+---@type string
 local CALLSIGN_PATTERN = '^%d%d?%d?%-[A-Z][A-Z]+%-%d%d?%d?$'
 
+---@param callsign any
+---@return boolean, string
 function Officers.ValidateCallsign(callsign)
     if type(callsign) ~= 'string' then return false, 'invalid_type' end
     local normalized = Utils.UpperTrim(callsign)
@@ -15,6 +16,8 @@ function Officers.ValidateCallsign(callsign)
     return true, normalized
 end
 
+---@param identifier string|nil
+---@return string|nil
 function Officers.GetCallsign(identifier)
     if not identifier then return nil end
     local result = MySQL.query.await(
@@ -25,6 +28,9 @@ function Officers.GetCallsign(identifier)
     return nil
 end
 
+---@param identifier string|nil
+---@param callsign string
+---@return boolean
 function Officers.SetCallsignDB(identifier, callsign)
     if not identifier then return false end
     local now = os.date('%Y-%m-%dT%H:%M:%S')
@@ -35,10 +41,16 @@ function Officers.SetCallsignDB(identifier, callsign)
     return true
 end
 
+---@param source integer
+---@param callsign string
+---@return boolean
 function Officers.SyncToFramework(source, callsign)
     return Core.SaveCallsign(source, callsign)
 end
 
+---@param callsign string
+---@param excludeIdentifier string|nil
+---@return boolean
 function Officers.CheckDuplicate(callsign, excludeIdentifier)
     local result = MySQL.query.await(
         'SELECT identifier FROM cad_officers WHERE callsign = ? AND identifier != ?',

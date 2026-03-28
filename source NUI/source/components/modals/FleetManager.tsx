@@ -113,7 +113,7 @@ export function FleetManager() {
           <div class="fleet-filters">
             <select
               value={fleetState.filterDepartment}
-              onChange={(e) => fleetActions.setFilterDepartment(e.currentTarget.value as any)}
+              onChange={(e) => fleetActions.setFilterDepartment(e.currentTarget.value as 'ALL' | 'POLICE' | 'EMS')}
             >
               <option value="ALL">Todos los departamentos</option>
               <option value="POLICE">👮 Policía</option>
@@ -121,7 +121,7 @@ export function FleetManager() {
             </select>
             <select
               value={fleetState.filterStatus}
-              onChange={(e) => fleetActions.setFilterStatus(e.currentTarget.value as any)}
+              onChange={(e) => fleetActions.setFilterStatus(e.currentTarget.value as VehicleStatus | 'ALL')}
             >
               <option value="ALL">Todos los estados</option>
               <option value="AVAILABLE">✓ Disponible</option>

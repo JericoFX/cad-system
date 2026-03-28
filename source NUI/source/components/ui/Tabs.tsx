@@ -11,7 +11,7 @@ interface TabsContextValue {
 
 const TabsContext = createContext<TabsContextValue>();
 
-function useTabsContext() {
+function useTabsContext(): TabsContextValue {
   const context = useContext(TabsContext);
   if (!context) {
     throw new Error('Tabs components must be used inside Tabs.Root');

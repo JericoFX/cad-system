@@ -2,7 +2,7 @@ import { isEnvBrowser } from '~/utils/misc';
 import { appActions } from '~/stores/appStore';
 
 export function BrowserHelper() {
-  const emitCadOpened = () => {
+  const emitCadOpened = (): void => {
     const bootMode = appActions.hasBooted() ? 'warm' : 'cold';
 
     window.postMessage(
@@ -20,7 +20,7 @@ export function BrowserHelper() {
     );
   };
 
-  const openCad = () => {
+  const openCad = (): void => {
     localStorage.setItem('cad-mock-no-callsign', '0');
     appActions.updateBootConfig({
       enabled: true,
@@ -31,7 +31,7 @@ export function BrowserHelper() {
     emitCadOpened();
   };
 
-  const openCadWithoutCallsign = () => {
+  const openCadWithoutCallsign = (): void => {
     localStorage.setItem('cad-mock-no-callsign', '1');
     appActions.updateBootConfig({
       enabled: true,
@@ -42,7 +42,7 @@ export function BrowserHelper() {
     emitCadOpened();
   };
 
-  const powerCycleAndOpen = () => {
+  const powerCycleAndOpen = (): void => {
     localStorage.setItem('cad-mock-no-callsign', '0');
     appActions.powerCycle();
     emitCadOpened();

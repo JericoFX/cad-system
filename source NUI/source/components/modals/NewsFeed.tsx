@@ -3,7 +3,6 @@ import { terminalActions } from '~/stores/terminalStore';
 import {
   newsState,
   newsActions,
-  type NewsArticle,
   type NewsCategory,
 } from '~/stores/newsStore';
 import { Button, Modal } from '~/components/ui';

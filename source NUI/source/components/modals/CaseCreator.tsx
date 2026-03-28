@@ -76,7 +76,16 @@ export function CaseCreator() {
     setIsSubmitting(true);
 
     try {
-      const caseData: any = {
+      const caseData: {
+        caseType: string;
+        title: string;
+        description: string;
+        priority: number;
+        linkedCallId?: string;
+        linkedUnits?: string[];
+        personId?: string;
+        personName?: string;
+      } = {
         caseType: caseType(),
         title: title(),
         description: description(),

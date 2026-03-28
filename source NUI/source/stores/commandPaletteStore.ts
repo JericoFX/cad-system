@@ -198,7 +198,7 @@ const initialState: CommandPaletteState = {
   filteredItems: generatePaletteItems(),
 };
 
-export const [commandPaletteState, setCommandPaletteState] = createStore(initialState);
+export const [commandPaletteState, setCommandPaletteState] = createStore<CommandPaletteState>(initialState);
 
 export const commandPaletteActions = {
   open: () => {

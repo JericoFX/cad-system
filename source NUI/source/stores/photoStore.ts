@@ -20,16 +20,11 @@ export interface PhotoMetadata {
   description: string;
   fov: PhotoFOV;
   
-  // Police specific
   isEvidence?: boolean;
   stagingId?: string;
   attachedCaseId?: string;
   custodyChain?: CustodyEvent[];
-  
-  // News specific
   usedInArticles?: string[];
-  
-  // Release tracking
   releasedToPress?: boolean;
   releasedBy?: string;
   releasedAt?: string;
@@ -104,22 +99,18 @@ function removeFromList(list: PhotoMetadata[], photoId: string): PhotoMetadata[]
 }
 
 export const photoActions = {
-  // Set loading state
   setLoading(isLoading: boolean) {
     setPhotoState('isLoading', isLoading);
   },
 
-  // Set error
   setError(error: string | null) {
     setPhotoState('error', error);
   },
 
-  // Clear error
   clearError() {
     setPhotoState('error', null);
   },
 
-  // Set current photo
   setCurrentPhoto(photo: PhotoMetadata | null) {
     setPhotoState('currentPhoto', photo);
   },
@@ -172,7 +163,6 @@ export const photoActions = {
     });
   },
 
-  // Fetch staging photos (for police)
   async fetchStagingPhotos() {
     photoActions.setLoading(true);
     photoActions.clearError();
@@ -189,7 +179,6 @@ export const photoActions = {
         batch(() => {
           setPhotoState('stagingPhotos', photos);
           
-          // Update photos map
           const photosMap: Record<string, PhotoMetadata> = {};
           photos.forEach(photo => {
             photosMap[photo.photoId] = photo;
@@ -206,7 +195,6 @@ export const photoActions = {
     }
   },
 
-  // Fetch inventory photos (for news)
   async fetchInventoryPhotos() {
     photoActions.setLoading(true);
     photoActions.clearError();
@@ -222,11 +210,7 @@ export const photoActions = {
         const photos = response.photos;
         batch(() => {
           setPhotoState('inventoryPhotos', photos);
-          
-          // Filter news photos only
           const newsPhotos = photos.filter(p => p.job === 'reporter');
-          
-          // Update photos map
           const photosMap: Record<string, PhotoMetadata> = {};
           newsPhotos.forEach(photo => {
             photosMap[photo.photoId] = photo;
@@ -243,7 +227,6 @@ export const photoActions = {
     }
   },
 
-  // Fetch released photos (for news)
   async fetchReleasedPhotos() {
     photoActions.setLoading(true);
     photoActions.clearError();
@@ -259,8 +242,6 @@ export const photoActions = {
         const photos = response.photos;
         batch(() => {
           setPhotoState('releasedPhotos', photos);
-          
-          // Update photos map
           const photosMap: Record<string, PhotoMetadata> = {};
           photos.forEach(photo => {
             photosMap[photo.photoId] = photo;
@@ -277,7 +258,6 @@ export const photoActions = {
     }
   },
 
-  // Release photo to press (police only)
   async releaseToPress(photoId: string, reason: string, expiryDate?: string) {
     photoActions.setLoading(true);
     photoActions.clearError();
@@ -295,11 +275,8 @@ export const photoActions = {
       });
       
       if (response?.ok) {
-        // Update photo state
         setPhotoState('photos', photoId, 'releasedToPress', true);
         setPhotoState('photos', photoId, 'releasedAt', response.releasedAt);
-        
-        // Refresh released photos
         await photoActions.fetchReleasedPhotos();
         
         return { success: true, photoId: response.photoId };
@@ -315,7 +292,6 @@ export const photoActions = {
     }
   },
 
-  // Submit photo to police (news)
   async submitToPolice(photoId: string, caseId: string | undefined, reason: string) {
     photoActions.setLoading(true);
     photoActions.clearError();
@@ -346,7 +322,6 @@ export const photoActions = {
     }
   },
 
-  // Fetch review queue (police)
   async fetchReviewQueue() {
     photoActions.setLoading(true);
     photoActions.clearError();
@@ -370,7 +345,6 @@ export const photoActions = {
     }
   },
 
-  // Review submission (police)
   async reviewSubmission(submissionId: string, action: 'ACCEPT' | 'REJECT', notes?: string) {
     photoActions.setLoading(true);
     photoActions.clearError();
@@ -388,12 +362,9 @@ export const photoActions = {
       });
       
       if (response?.ok) {
-        // Remove from queue
-        setPhotoState('reviewQueue', queue => 
+        setPhotoState('reviewQueue', queue =>
           queue.filter(s => s.id !== submissionId)
         );
-        
-        // Refresh staging if accepted
         if (action === 'ACCEPT') {
           await photoActions.fetchStagingPhotos();
         }
@@ -411,7 +382,6 @@ export const photoActions = {
     }
   },
 
-  // Attach photo to case
   async attachToCase(photoId: string, caseId: string) {
     photoActions.setLoading(true);
     photoActions.clearError();
@@ -428,11 +398,8 @@ export const photoActions = {
       });
       
       if (response?.ok) {
-        // Update photo state
         setPhotoState('photos', photoId, 'attachedCaseId', caseId);
-        
-        // Remove from staging
-        setPhotoState('stagingPhotos', photos => 
+        setPhotoState('stagingPhotos', photos =>
           photos.filter(p => p.photoId !== photoId)
         );
         
@@ -449,32 +416,26 @@ export const photoActions = {
     }
   },
 
-  // Get photo by ID
   getPhoto(photoId: string): PhotoMetadata | undefined {
     return photoState.photos[photoId];
   },
 
-  // Get staging photos
   getStagingPhotos(): PhotoMetadata[] {
     return photoState.stagingPhotos;
   },
 
-  // Get inventory photos
   getInventoryPhotos(): PhotoMetadata[] {
     return photoState.inventoryPhotos;
   },
 
-  // Get released photos
   getReleasedPhotos(): PhotoMetadata[] {
     return photoState.releasedPhotos;
   },
 
-  // Get review queue
   getReviewQueue(): PhotoSubmission[] {
     return photoState.reviewQueue;
   },
 
-  // Clear all state
   reset() {
     setPhotoState({
       photos: {},

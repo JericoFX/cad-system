@@ -1,9 +1,8 @@
 
 import { registerNewsDashboardCommand } from './dashboard';
 
-export function registerNewsCommands() {
+export function registerNewsCommands(): void {
   registerNewsDashboardCommand();
-  console.log('[Commands] News commands registered');
 }
 
 export { registerNewsDashboardCommand } from './dashboard';

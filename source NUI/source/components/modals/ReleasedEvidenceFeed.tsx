@@ -55,8 +55,7 @@ export function ReleasedEvidenceFeed(props: ReleasedEvidenceFeedProps) {
 
   return (
     <div class="released-evidence-feed" style={{ padding: '16px' }}>
-      {/* Header */}
-      <div style={{ 
+      <div style={{
         'margin-bottom': '20px',
         padding: '15px',
         'background-color': 'rgba(255, 255, 0, 0.1)',
@@ -82,7 +81,6 @@ export function ReleasedEvidenceFeed(props: ReleasedEvidenceFeedProps) {
         </p>
       </div>
 
-      {/* Search */}
       <div style={{ 'margin-bottom': '15px' }}>
         <Input.Root
           type="text"
@@ -94,7 +92,6 @@ export function ReleasedEvidenceFeed(props: ReleasedEvidenceFeedProps) {
         />
       </div>
 
-      {/* Loading State */}
       <Show when={isLoading()}>
         <div style={{ 
           display: 'flex', 
@@ -107,7 +104,6 @@ export function ReleasedEvidenceFeed(props: ReleasedEvidenceFeedProps) {
         </div>
       </Show>
 
-      {/* Empty State */}
       <Show when={!isLoading() && filteredPhotos().length === 0}>
         <div style={{ 
           padding: '40px',
@@ -126,7 +122,6 @@ export function ReleasedEvidenceFeed(props: ReleasedEvidenceFeedProps) {
         </div>
       </Show>
 
-      {/* Photo Grid */}
       <Show when={!isLoading() && filteredPhotos().length > 0}>
         <div style={{ 
           display: 'grid',
@@ -154,7 +149,6 @@ export function ReleasedEvidenceFeed(props: ReleasedEvidenceFeedProps) {
                     transition: 'all 0.2s'
                   }}
                 >
-                  {/* Image */}
                   <div style={{
                     height: '160px',
                     'background-color': '#000',
@@ -171,7 +165,6 @@ export function ReleasedEvidenceFeed(props: ReleasedEvidenceFeedProps) {
                       }}
                     />
                     
-                    {/* Expiry Badge */}
                     <Show when={daysRemaining !== null}>
                       <div style={{
                         position: 'absolute',
@@ -188,7 +181,6 @@ export function ReleasedEvidenceFeed(props: ReleasedEvidenceFeedProps) {
                       </div>
                     </Show>
                     
-                    {/* View Overlay */}
                     <div style={{
                       position: 'absolute',
                       inset: 0,
@@ -205,7 +197,6 @@ export function ReleasedEvidenceFeed(props: ReleasedEvidenceFeedProps) {
                     </div>
                   </div>
 
-                  {/* Info */}
                   <div style={{ padding: '12px' }}>
                     <div style={{ 
                       'font-size': '12px', 
@@ -251,7 +242,6 @@ export function ReleasedEvidenceFeed(props: ReleasedEvidenceFeedProps) {
         </div>
       </Show>
 
-      {/* Selected Photo Detail Modal */}
       <Show when={selectedPhoto()}>
                 <Modal.Root onClose={() => setSelectedPhoto(null)} useContentWrapper={false}>
           <div
@@ -277,7 +267,6 @@ export function ReleasedEvidenceFeed(props: ReleasedEvidenceFeedProps) {
             </div>
 
             <div class="modal-body" style={{ padding: '20px' }}>
-              {/* Full Image */}
               <div style={{
                 'margin-bottom': '20px',
                 border: '1px solid #ffff00',
@@ -297,7 +286,6 @@ export function ReleasedEvidenceFeed(props: ReleasedEvidenceFeedProps) {
                 />
               </div>
 
-              {/* Details Grid */}
               <div style={{
                 display: 'grid',
                 'grid-template-columns': 'repeat(2, 1fr)',
@@ -372,7 +360,6 @@ export function ReleasedEvidenceFeed(props: ReleasedEvidenceFeedProps) {
                 </div>
               </div>
 
-              {/* Release Reason */}
               <Show when={selectedPhoto()!.releaseReason}>
                 <div style={{
                   padding: '15px',
@@ -389,7 +376,6 @@ export function ReleasedEvidenceFeed(props: ReleasedEvidenceFeedProps) {
                 </div>
               </Show>
 
-              {/* Description */}
               <Show when={selectedPhoto()!.description}>
                 <div style={{
                   padding: '15px',
@@ -406,7 +392,6 @@ export function ReleasedEvidenceFeed(props: ReleasedEvidenceFeedProps) {
                 </div>
               </Show>
 
-              {/* Usage Notice */}
               <div style={{
                 padding: '12px',
                 'background-color': 'rgba(255, 0, 0, 0.05)',
@@ -424,7 +409,6 @@ export function ReleasedEvidenceFeed(props: ReleasedEvidenceFeedProps) {
                 </p>
               </div>
 
-              {/* Actions */}
               <div class="modal-footer" style={{ 
                 display: 'flex', 
                 'justify-content': 'space-between',

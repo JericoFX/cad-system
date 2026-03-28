@@ -36,7 +36,7 @@ export {
 
 export { terminalAPI } from './terminalApi';
 
-export function registerAllCommands() {
+export function registerAllCommands(): void {
   registerCaseCommands();
   registerCaseTaskCommands();
   registerNoteCommands();
@@ -58,6 +58,4 @@ export function registerAllCommands() {
   registerFleetCommands();
   registerFineCommands();
   registerStatusCommands();
-  
-  console.log('[Commands] All commands registered successfully');
 }

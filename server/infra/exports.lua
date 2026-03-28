@@ -7,6 +7,7 @@ local DB = require 'modules.server.database'
 local Registry = require 'modules.shared.registry'
 
 
+---@return boolean
 local function dispatchEnabled()
     if Config.IsFeatureEnabled then
         return Config.IsFeatureEnabled('Dispatch')
@@ -15,6 +16,8 @@ local function dispatchEnabled()
     return true
 end
 
+---@param caseObj table
+---@return boolean, string|nil
 local function saveCaseDb(caseObj)
     local ok, err = pcall(function()
         MySQL.insert.await([[
@@ -59,6 +62,8 @@ local function saveCaseDb(caseObj)
     return true
 end
 
+---@param call table
+---@return boolean, string|nil
 local function saveCallDb(call)
     local ok, err = pcall(function()
         MySQL.insert.await([[
@@ -97,6 +102,8 @@ local function saveCallDb(call)
     return true
 end
 
+---@param source number
+---@return table|nil
 local function requireOfficer(source)
     local officer = Auth.GetOfficerData(source)
     if not officer then

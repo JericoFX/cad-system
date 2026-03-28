@@ -7,7 +7,7 @@ import { featureState } from '~/stores/featureStore';
 const EVIDENCE_TYPES = ['PHOTO_URL', 'VIDEO_URL', 'DOCUMENT', 'PHYSICAL', 'DIGITAL'] as const;
 type EvidenceType = typeof EVIDENCE_TYPES[number];
 
-export function registerEvidenceCommands() {
+export function registerEvidenceCommands(): void {
   createCommand({
     name: 'addevidence',
     aliases: ['add-evidence', 'evidence-add'],

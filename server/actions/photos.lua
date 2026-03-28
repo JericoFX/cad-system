@@ -15,6 +15,7 @@ Photos.State = {
     LastId = 0
 }
 
+---@return string
 local function generatePhotoId()
     Photos.State.LastId = Photos.State.LastId + 1
     return string.format('PHOTO_%s_%05d', os.time(), Photos.State.LastId)
@@ -30,12 +31,17 @@ function Photos.RegisterProvider(name, handler)
     return true
 end
 
+---@return function|nil
 local function getProvider()
     local config = Config.PhotoSystem
     local providerName = config and config.Provider or 'screenshot-basic'
     return Photos.Providers[providerName] or Photos.Providers['screenshot-basic']
 end
 
+---@param url string
+---@param key string
+---@param value string
+---@return string
 local function appendQueryParam(url, key, value)
     if type(url) ~= 'string' or url == '' then
         return url
@@ -45,6 +51,7 @@ local function appendQueryParam(url, key, value)
     return string.format('%s%s%s=%s', url, separator, key, value)
 end
 
+---@return string, string, table
 local function getUploadSelectionConfig()
     local photoConfig = Config.PhotoSystem or {}
     local upload = type(photoConfig.Upload) == 'table' and photoConfig.Upload or {}
@@ -61,6 +68,8 @@ local function getUploadSelectionConfig()
     return method, service, apiConfig
 end
 
+---@param apiConfig table
+---@return table
 local function getFiveManageConfig(apiConfig)
     local cfg = type(apiConfig.FiveManage) == 'table' and apiConfig.FiveManage or {}
 
@@ -76,6 +85,8 @@ local function getFiveManageConfig(apiConfig)
     }
 end
 
+---@param apiConfig table
+---@return table
 local function getDiscordConfig(apiConfig)
     local cfg = type(apiConfig.Discord) == 'table' and apiConfig.Discord or {}
     return {
@@ -84,6 +95,8 @@ local function getDiscordConfig(apiConfig)
     }
 end
 
+---@param apiConfig table
+---@return table
 local function getMedalConfig(apiConfig)
     local cfg = type(apiConfig.Medal) == 'table' and apiConfig.Medal or {}
     return {
@@ -96,6 +109,8 @@ local function getMedalConfig(apiConfig)
     }
 end
 
+---@param apiConfig table
+---@return table
 local function getCustomUploadConfig(apiConfig)
     local cfg = type(apiConfig.Custom) == 'table' and apiConfig.Custom or {}
     return {
@@ -109,6 +124,7 @@ local function getCustomUploadConfig(apiConfig)
     }
 end
 
+---@return table|nil, string|nil
 local function getCaptureUploadConfig()
     local method, service, apiConfig = getUploadSelectionConfig()
 
@@ -241,6 +257,8 @@ local function getCaptureUploadConfig()
     return nil, 'unsupported_upload_type'
 end
 
+---@param value any
+---@return number|nil
 local function isoToTime(value)
     if type(value) ~= 'string' then
         return nil
@@ -268,6 +286,8 @@ local function isoToTime(value)
     return parsedLocal + utcOffset
 end
 
+---@param raw any
+---@return table|nil
 local function decodeJson(raw)
     if type(raw) ~= 'string' or raw == '' then
         return nil
@@ -285,6 +305,8 @@ local function decodeJson(raw)
     return decoded
 end
 
+---@param responseBody any
+---@return string|nil
 local function extractUploadedUrl(responseBody)
     local decoded = decodeJson(responseBody)
     if not decoded then
@@ -320,6 +342,11 @@ local function extractUploadedUrl(responseBody)
     return nil
 end
 
+---@param url string
+---@param method string
+---@param body string
+---@param headers table
+---@return table
 local function performHttpRequestAwait(url, method, body, headers)
     local pending = promise.new()
 
@@ -334,6 +361,8 @@ local function performHttpRequestAwait(url, method, body, headers)
     return Citizen.Await(pending)
 end
 
+---@param source integer
+---@return string|nil, string|nil
 local function requestScreenshotDataUri(source)
     if GetResourceState('screenshot-basic') ~= 'started' then
         return nil, 'screenshot_basic_missing'
@@ -371,6 +400,9 @@ local function requestScreenshotDataUri(source)
     return result.data, nil
 end
 
+---@param dataUri string
+---@param payload table|nil
+---@return string|nil, string|nil
 local function uploadScreenshotToFiveManage(dataUri, payload)
     local _, _, apiConfig = getUploadSelectionConfig()
     local fiveManage = getFiveManageConfig(apiConfig)
@@ -422,6 +454,9 @@ local function uploadScreenshotToFiveManage(dataUri, payload)
     return url, nil
 end
 
+---@param imageData string
+---@param metadata table
+---@return string|nil, string|nil
 local function uploadToExternalAPI(imageData, metadata)
     local config = Config.PhotoSystem
     local apiConfig = config and config.UploadAPI
@@ -513,6 +548,10 @@ Photos.RegisterProvider('cad-upload', function(source, payload)
     }
 end)
 
+---@param source integer
+---@param payload table
+---@param job string
+---@return table|nil, string|nil
 local function createPhotoMetadata(source, payload, job)
     local officer = Auth.GetOfficer(source)
     if not officer then
@@ -574,6 +613,8 @@ local function createPhotoMetadata(source, payload, job)
     return metadata, nil
 end
 
+---@param source integer
+---@param photoId string
 local function addToStaging(source, photoId)
     if not Photos.State.Staging[source] then
         Photos.State.Staging[source] = {}
@@ -586,6 +627,7 @@ local function addToStaging(source, photoId)
     end
 end
 
+---@param photoId string
 local function removePhotoFromAllStaging(photoId)
     for source, bucket in pairs(Photos.State.Staging) do
         if type(bucket) == 'table' then
@@ -602,6 +644,8 @@ local function removePhotoFromAllStaging(photoId)
     end
 end
 
+---@param officer table|nil
+---@return boolean
 local function isSupervisor(officer)
     if not officer or not officer.grade then
         return false
@@ -617,6 +661,9 @@ local function isSupervisor(officer)
     return officer.grade >= requiredRank
 end
 
+---@param bucket string
+---@param handler function
+---@return function
 local function withPhotoGuard(bucket, handler)
     return Auth.WithGuard(bucket, function(source, payload, officer)
         return handler(source, type(payload) == 'table' and payload or {}, officer)

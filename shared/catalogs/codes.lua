@@ -153,6 +153,7 @@ local CodeCatalog = {
     },
 }
 
+---@return table
 function CodeCatalog.Get()
     return lib.table.deepclone(CodeCatalog)
 end

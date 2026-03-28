@@ -2,7 +2,7 @@
 import { createCommand } from '../commandBuilder';
 import { radioState, radioActions } from '~/stores/radioStore';
 
-export function registerRadioCommands() {
+export function registerRadioCommands(): void {
   createCommand({
     name: 'radio',
     description: 'Abrir panel de radio (GUI)',

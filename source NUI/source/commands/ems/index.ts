@@ -4,12 +4,11 @@ import { registerTreatmentCommand } from './treatment';
 import { registerInventoryCommand } from './inventory';
 import { registerEMSDashboardCommand } from './dashboard';
 
-export function registerEMSCommands() {
+export function registerEMSCommands(): void {
   registerEMSDashboardCommand();
   registerTriageCommand();
   registerTreatmentCommand();
   registerInventoryCommand();
-  console.log('[Commands] EMS commands registered');
 }
 
 export { registerTriageCommand } from './triage';

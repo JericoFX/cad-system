@@ -72,7 +72,7 @@ export const Map: Component<MapProps> = (props) => {
     });
   };
 
-  const addMarkerToMap = (marker: MapMarker) => {
+  const addMarkerToMap = (marker: MapMarker): void => {
     if (!mapInstance) return;
 
     if (leafletMarkers.has(marker.id)) {
@@ -117,7 +117,7 @@ export const Map: Component<MapProps> = (props) => {
     }
   };
 
-  const removeMarkerFromMap = (id: string) => {
+  const removeMarkerFromMap = (id: string): void => {
     const marker = leafletMarkers.get(id);
     if (marker && mapInstance) {
       mapInstance.removeLayer(marker);

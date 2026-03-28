@@ -1,7 +1,7 @@
 
 import { createCommand } from '../commandBuilder';
 
-export function registerNewsDashboardCommand() {
+export function registerNewsDashboardCommand(): void {
   createCommand({
     name: 'news',
     description: 'Abrir el Centro de Noticias (News Manager)',

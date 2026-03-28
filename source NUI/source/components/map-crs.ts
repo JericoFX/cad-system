@@ -32,8 +32,8 @@ export function latLngToGta(latLng: L.LatLng): { x: number; y: number } {
 export const GTA_MAP_URL = '/gta-map.jpeg';
 
 export const GTA_MAP_BOUNDS: L.LatLngBoundsExpression = [
-  [-4000, -4000], // Southwest
-  [4000, 4000]    // Northeast
+  [-4000, -4000],
+  [4000, 4000],
 ];
 
 export const GTA_MAP_CENTER: L.LatLngExpression = [0, -1024];

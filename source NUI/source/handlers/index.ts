@@ -1,8 +1,3 @@
-/**
- * NUI Handlers Index
- * Central registration for all automatic NUI handlers
- */
-
 import { initNuiRouter } from '~/utils/nuiRouter';
 import { initDispatchHandlers } from './dispatchHandlers';
 import { initCaseHandlers } from './caseHandlers';
@@ -16,15 +11,9 @@ import { initCadHandlers } from './cadHandlers';
 import { initVehicleHandlers } from './vehicleHandlers';
 import { initSecurityCameraHandlers } from './securityCameraHandlers';
 
-/**
- * Initialize all NUI handlers
- * Called once at system startup
- */
 export function initAllNuiHandlers(): void {
-  // Ensure router is initialized
   initNuiRouter();
-  
-  // Initialize all domain handlers
+
   initCadHandlers();
   initVehicleHandlers();
   initSecurityCameraHandlers();
@@ -36,11 +25,8 @@ export function initAllNuiHandlers(): void {
   initPhotoHandlers();
   initFineHandlers();
   initPoliceHandlers();
-  
-  console.log('[NUI Handlers] All handlers registered');
 }
 
-// Re-export all handlers for manual use
 export * from './cadHandlers';
 export * from './vehicleHandlers';
 export * from './securityCameraHandlers';

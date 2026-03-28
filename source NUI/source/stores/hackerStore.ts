@@ -20,9 +20,8 @@ const initialState: HackerState = {
   maxLines: 50,
 };
 
-export const [hackerState, setHackerState] = createStore(initialState);
+export const [hackerState, setHackerState] = createStore<HackerState>(initialState);
 
-// Command templates for different actions
 const commandTemplates: Record<string, string[]> = {
   modal: [
     'access {modal} --force',
@@ -103,7 +102,6 @@ const systemOutputs: Record<string, string[]> = {
   ],
 };
 
-// Random system noise commands
 const noiseCommands = [
   'ping -c 1 dispatch.local',
   'netstat -tuln',
@@ -162,13 +160,11 @@ export const hackerActions = {
     
     hackerActions.addLine(`$ ${command}`, 'command');
     
-    // Simulate output after a short delay
     setTimeout(() => {
       const outputType = getRandomItem(['success', 'success', 'info']);
       const outputs = systemOutputs[outputType];
       const output = getRandomItem(outputs);
       
-      // Add some data interpolation for outputs
       const dataVars: Record<string, string> = {
         count: Math.floor(Math.random() * 100).toString(),
         size: `${Math.floor(Math.random() * 50 + 1)}MB`,
@@ -199,7 +195,6 @@ export const hackerActions = {
     }, Math.random() * 200 + 50);
   },
 
-  // Specific action methods
   onModalOpen: (modalName: string) => {
     hackerActions.addCommand('modal', { modal: modalName.toLowerCase().replace('_', '-') });
   },
@@ -261,7 +256,6 @@ export const hackerActions = {
   },
 };
 
-// Auto-generate background noise
 let noiseInterval: number | null = null;
 
 export const hackerEffects = {

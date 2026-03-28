@@ -12,7 +12,7 @@ export interface EntityNote {
   important?: boolean;
 }
 
-interface EntityNoteResponse {
+export interface EntityNoteResponse {
   ok?: boolean;
   notes?: EntityNote[];
   note?: EntityNote;

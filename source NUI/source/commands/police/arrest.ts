@@ -3,7 +3,7 @@ import { createCommand } from '../commandBuilder';
 import { cadActions, cadState } from '~/stores/cadStore';
 import { userActions } from '~/stores/userStore';
 
-export function registerArrestCommand() {
+export function registerArrestCommand(): void {
   createCommand({
     name: 'arrest',
     description: 'Register an arrest with charges and details',

@@ -2,6 +2,23 @@ local ClientFn = require 'modules.client.functions'
 local Registry = require 'modules.shared.registry'
 local Utils = require 'modules.shared.utils'
 
+---@class PhotosModule
+---@field CapturePolicePhoto fun(): nil
+---@field CaptureNewsPhoto fun(): nil
+
+---@class PhotoCaptureState
+---@field ped number|nil
+---@field isCapturing boolean
+---@field captureConfig table|nil
+---@field captureConfigAt number
+
+---@class FovData
+---@field hit boolean
+---@field hitCoords { x: number, y: number, z: number }|nil
+---@field distance number
+---@field entityType string|nil
+---@field location { x: number, y: number, z: number }
+
 local Photos = {}
 
 local PHOTO_CONFIG = {
@@ -24,10 +41,14 @@ local state = {
     captureConfigAt = 0,
 }
 
+---@return number
 local function getPed()
     return cache.ped or PlayerPedId()
 end
 
+---@param message string
+---@param nType string|nil
+---@return nil
 local function notify(message, nType)
     lib.notify({
         title = 'CAD',
@@ -36,7 +57,8 @@ local function notify(message, nType)
     })
 end
 
-
+---@param distance number
+---@return boolean, vector3|nil, number|nil
 local function raycastFromCamera(distance)
     local hit, entity, hitCoords = lib.raycast.fromCamera(511, 4, distance)
     if ClientFn.NormalizeRaycastHit(hit) and hitCoords and hitCoords.x and hitCoords.y and hitCoords.z then
@@ -46,6 +68,8 @@ local function raycastFromCamera(distance)
     return false, nil, nil
 end
 
+---@param coords vector3
+---@return nil
 local function drawHitMarker(coords)
     if not PHOTO_CONFIG.fov.showMarker then
         return
@@ -79,6 +103,8 @@ local function drawHitMarker(coords)
     )
 end
 
+---@param entity number|nil
+---@return string|nil
 local function getEntityTypeString(entity)
     if not entity or entity == 0 then
         return nil
@@ -98,6 +124,8 @@ local function getEntityTypeString(entity)
     return 'unknown'
 end
 
+---@param force boolean
+---@return table|nil, string|nil
 local function getCaptureConfig(force)
     local now = GetGameTimer()
     if not force and state.captureConfig and (now - state.captureConfigAt) < 30000 then
@@ -125,6 +153,8 @@ local function getCaptureConfig(force)
     return state.captureConfig
 end
 
+---@param data string|nil
+---@return string|nil
 local function parseScreenshotUpload(data)
     local decoded = json.decode(data or '{}')
     if type(decoded) ~= 'table' then
@@ -154,6 +184,8 @@ local function parseScreenshotUpload(data)
     return nil
 end
 
+---@param captureConfig table
+---@return string|nil, string|nil
 local function requestScreenshotUrl(captureConfig)
     if GetResourceState('screenshot-basic') ~= 'started' then
         return nil, 'screenshot_basic_missing'
@@ -213,6 +245,8 @@ local function requestScreenshotUrl(captureConfig)
     return result.url, nil
 end
 
+---@param job string
+---@return string|nil, string|nil, string|nil
 local function requestServerProxyUpload(job)
     local response = lib.callback.await('cad:photos:uploadCapture', false, {
         job = job,
@@ -225,6 +259,9 @@ local function requestServerProxyUpload(job)
     return response.url, tostring(response.provider or 'server_proxy'), nil
 end
 
+---@param job string
+---@param payload table
+---@return table|nil, string|nil
 local function persistCapture(job, payload)
     local callbackName = job == 'police' and 'cad:photos:capturePolicePhoto' or 'cad:photos:captureNewsPhoto'
     local response = lib.callback.await(callbackName, false, payload)
@@ -235,6 +272,9 @@ local function persistCapture(job, payload)
     return response.metadata, nil
 end
 
+---@param job string
+---@param fovData FovData
+---@return nil
 local function runCapture(job, fovData)
     local captureConfig, captureConfigErr = getCaptureConfig(false)
     if not captureConfig then
@@ -269,6 +309,7 @@ local function runCapture(job, fovData)
     notify(('Photo saved: %s'):format(metadata.photoId), 'success')
 end
 
+---@return nil
 function Photos.CapturePolicePhoto()
     if state.isCapturing then
         return
@@ -326,6 +367,7 @@ function Photos.CapturePolicePhoto()
     state.isCapturing = false
 end
 
+---@return nil
 function Photos.CaptureNewsPhoto()
     if state.isCapturing then
         return

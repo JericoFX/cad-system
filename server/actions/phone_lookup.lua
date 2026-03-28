@@ -6,6 +6,10 @@ local Fn = require 'modules.server.functions'
 local PHONE_LOOKUP_JOBS = { 'police', 'sheriff', 'csi', 'dispatch', 'admin' }
 local GCPHONE_RESOURCE = 'gcphone-next'
 
+---@param sql string
+---@param params table|nil
+---@param context string|nil
+---@return table
 local function safeQuery(sql, params, context)
     local ok, rows = pcall(function()
         return MySQL.query.await(sql, params or {})
@@ -19,11 +23,17 @@ local function safeQuery(sql, params, context)
     return rows or {}
 end
 
+---@param sql string
+---@param params table|nil
+---@param context string|nil
+---@return table|nil
 local function safeSingle(sql, params, context)
     local rows = safeQuery(sql, params, context)
     return rows[1]
 end
 
+---@param raw any
+---@return table|nil
 local function decodeJson(raw)
     if type(raw) ~= 'string' or raw == '' then
         return nil
@@ -37,6 +47,9 @@ local function decodeJson(raw)
     return decoded
 end
 
+---@param value any
+---@param maxLen integer
+---@return string|nil
 local function sanitizeLookupValue(value, maxLen)
     local sanitized = Fn.SanitizeString(value, maxLen)
     if sanitized == '' then
@@ -46,6 +59,8 @@ local function sanitizeLookupValue(value, maxLen)
     return sanitized
 end
 
+---@param row any
+---@return table|nil
 local function normalizePhoneLookupRecord(row)
     if type(row) ~= 'table' then
         return nil
@@ -62,13 +77,14 @@ local function normalizePhoneLookupRecord(row)
     }
 end
 
+---@param phoneNumber any
+---@return table|nil, string|nil
 local function getPhoneRecordByNumber(phoneNumber)
     local safePhoneNumber = sanitizeLookupValue(phoneNumber, 20)
     if not safePhoneNumber then
         return nil, 'invalid_phone_number'
     end
 
-    -- Verified: gcphone-next sql/schema.sql defines phone_numbers(identifier, phone_number, imei).
     local row = safeSingle([[
         SELECT identifier, phone_number, imei, is_stolen, stolen_at, stolen_reason, stolen_reporter
         FROM phone_numbers
@@ -83,13 +99,14 @@ local function getPhoneRecordByNumber(phoneNumber)
     return normalizePhoneLookupRecord(row), nil
 end
 
+---@param imei any
+---@return table|nil, string|nil
 local function getPhoneRecordByImei(imei)
     local safeImei = sanitizeLookupValue(imei, 32)
     if not safeImei then
         return nil, 'invalid_imei'
     end
 
-    -- Verified: gcphone-next server/modules/database.lua migration 16 adds is_stolen, stolen_at, stolen_reason, stolen_reporter.
     local row = safeSingle([[
         SELECT identifier, phone_number, imei, is_stolen, stolen_at, stolen_reason, stolen_reporter
         FROM phone_numbers
@@ -104,6 +121,8 @@ local function getPhoneRecordByImei(imei)
     return normalizePhoneLookupRecord(row), nil
 end
 
+---@param identifier any
+---@return table|nil
 local function buildPersonFromIdentifier(identifier)
     local safeIdentifier = sanitizeLookupValue(identifier, 80)
     if not safeIdentifier then
@@ -148,6 +167,8 @@ local function buildPersonFromIdentifier(identifier)
     }
 end
 
+---@param phone table|nil
+---@return table|nil
 local function buildPhoneLookupResponse(phone)
     if not phone then
         return nil
@@ -178,14 +199,22 @@ local function buildPhoneLookupResponse(phone)
     }
 end
 
+---@param source number
+---@return boolean
 local function isAllowedOfficer(source)
     return Fn.HasRole(source, PHONE_LOOKUP_JOBS)
 end
 
+---@return boolean
 local function isGcPhoneAvailable()
     return GetResourceState(GCPHONE_RESOURCE) == 'started'
 end
 
+---@param action string
+---@param phoneNumber string
+---@param imei string
+---@param officerName string
+---@return any, string|nil
 local function executeStolenAction(action, phoneNumber, imei, officerName)
     if not isGcPhoneAvailable() then
         return nil, 'gcphone_unavailable'

@@ -19,7 +19,7 @@ export interface NotesListProps {
 }
 
 export function NotesList(props: NotesListProps) {
-  const sortedNotes = () =>
+  const sortedNotes = (): NoteItem[] =>
     props.notes()
       .slice()
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());

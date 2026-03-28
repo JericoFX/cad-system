@@ -1,5 +1,6 @@
 
 import { createCommand } from '../commandBuilder';
+import type { TerminalAPI } from '../types';
 
 interface MedicalItem {
   id: string;
@@ -23,7 +24,7 @@ const medicalInventory: MedicalItem[] = [
   { id: 'MED010', name: 'Tourniquet', category: 'Trauma', quantity: 15, unit: 'units', description: 'Combat application' }
 ];
 
-export function registerInventoryCommand() {
+export function registerInventoryCommand(): void {
   createCommand({
     name: 'inventory',
     description: 'View and manage EMS medical supplies',
@@ -62,14 +63,14 @@ export function registerInventoryCommand() {
   });
 }
 
-async function handleViewInventory(terminal: any) {
+async function handleViewInventory(terminal: TerminalAPI): Promise<void> {
   terminal.print('\n=== MEDICAL INVENTORY ===', 'system');
 
   const categories = [...new Set(medicalInventory.map(item => item.category))];
-  
+
   for (const category of categories) {
     terminal.print(`\n[${category.toUpperCase()}]`, 'system');
-    
+
     const items = medicalInventory.filter(item => item.category === category);
     const headers = ['ID', 'NAME', 'QTY', 'UNIT'];
     const rows = items.map(item => [
@@ -86,15 +87,15 @@ async function handleViewInventory(terminal: any) {
   terminal.print(`\nTotal items in stock: ${totalItems}`, 'info');
 }
 
-async function handleUseItem(terminal: any) {
+async function handleUseItem(terminal: TerminalAPI): Promise<void> {
   terminal.print('\n=== USE MEDICAL ITEM ===', 'system');
-  
+
   const itemNames = medicalInventory.map(item => `${item.id} - ${item.name} (${item.quantity} ${item.unit})`);
   const selected = await terminal.select('Select item to use:', itemNames);
-  
+
   const itemId = selected.split(' - ')[0];
   const item = medicalInventory.find(i => i.id === itemId);
-  
+
   if (!item) {
     terminal.print('Item not found', 'error');
     return;
@@ -123,7 +124,7 @@ async function handleUseItem(terminal: any) {
   if (notes) terminal.print(`Notes: ${notes}`, 'info');
 
   const confirmed = await terminal.confirm('Confirm usage?');
-  
+
   if (!confirmed) {
     terminal.print('Usage cancelled', 'warning');
     return;
@@ -139,15 +140,15 @@ async function handleUseItem(terminal: any) {
   }
 }
 
-async function handleRestock(terminal: any) {
+async function handleRestock(terminal: TerminalAPI): Promise<void> {
   terminal.print('\n=== RESTOCK INVENTORY ===', 'system');
-  
+
   const itemNames = medicalInventory.map(item => `${item.id} - ${item.name} (${item.quantity} ${item.unit})`);
   const selected = await terminal.select('Select item to restock:', itemNames);
-  
+
   const itemId = selected.split(' - ')[0];
   const item = medicalInventory.find(i => i.id === itemId);
-  
+
   if (!item) {
     terminal.print('Item not found', 'error');
     return;
@@ -170,7 +171,7 @@ async function handleRestock(terminal: any) {
   terminal.print(`New total: ${item.quantity + qty} ${item.unit}`, 'info');
 
   const confirmed = await terminal.confirm('Confirm restock?');
-  
+
   if (!confirmed) {
     terminal.print('Restock cancelled', 'warning');
     return;

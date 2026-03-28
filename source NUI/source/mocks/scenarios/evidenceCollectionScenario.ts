@@ -27,7 +27,6 @@ export const evidenceCollectionScenario: Scenario = {
           type: ['general', 'observation', 'interview', 'evidence'][i % 4] as any,
         })),
         evidence: [
-          // Photos (10 items)
           ...Array.from({ length: 10 }, (_, i) => ({
             evidenceId: `EVID_PHOTO_${String(i + 1).padStart(3, '0')}`,
             caseId: 'CASE_EVIDENCE_001',
@@ -60,7 +59,6 @@ export const evidenceCollectionScenario: Scenario = {
               },
             ],
           })),
-          // Videos (5 items)
           ...Array.from({ length: 5 }, (_, i) => ({
             evidenceId: `EVID_VIDEO_${String(i + 1).padStart(3, '0')}`,
             caseId: 'CASE_EVIDENCE_001',
@@ -75,7 +73,6 @@ export const evidenceCollectionScenario: Scenario = {
             attachedAt: new Date(Date.now() - (i + 11) * 86400000).toISOString(),
             custodyChain: [],
           })),
-          // Audio (5 items)
           ...Array.from({ length: 5 }, (_, i) => ({
             evidenceId: `EVID_AUDIO_${String(i + 1).padStart(3, '0')}`,
             caseId: 'CASE_EVIDENCE_001',
@@ -90,7 +87,6 @@ export const evidenceCollectionScenario: Scenario = {
             attachedAt: new Date(Date.now() - (i + 16) * 86400000).toISOString(),
             custodyChain: [],
           })),
-          // Documents (10 items)
           ...Array.from({ length: 10 }, (_, i) => ({
             evidenceId: `EVID_DOC_${String(i + 1).padStart(3, '0')}`,
             caseId: 'CASE_EVIDENCE_001',
@@ -104,7 +100,6 @@ export const evidenceCollectionScenario: Scenario = {
             attachedAt: new Date(Date.now() - (i + 21) * 86400000).toISOString(),
             custodyChain: [],
           })),
-          // Biological evidence (10 items)
           ...Array.from({ length: 10 }, (_, i) => ({
             evidenceId: `EVID_BIO_${String(i + 1).padStart(3, '0')}`,
             caseId: 'CASE_EVIDENCE_001',
@@ -119,7 +114,6 @@ export const evidenceCollectionScenario: Scenario = {
             attachedAt: new Date(Date.now() - (i + 31) * 86400000).toISOString(),
             custodyChain: [],
           })),
-          // Weapons (5 items)
           ...Array.from({ length: 5 }, (_, i) => ({
             evidenceId: `EVID_WEAPON_${String(i + 1).padStart(3, '0')}`,
             caseId: 'CASE_EVIDENCE_001',
@@ -133,7 +127,6 @@ export const evidenceCollectionScenario: Scenario = {
             attachedAt: new Date(Date.now() - (i + 41) * 86400000).toISOString(),
             custodyChain: [],
           })),
-          // Physical evidence (5 items)
           ...Array.from({ length: 5 }, (_, i) => ({
             evidenceId: `EVID_PHYS_${String(i + 1).padStart(3, '0')}`,
             caseId: 'CASE_EVIDENCE_001',

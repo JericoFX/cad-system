@@ -1,3 +1,5 @@
+---@param data { metadata: { fineId: string|nil } }
+---@param slot number|nil
 exports('useCadTicket', function(data, slot)
     if GetResourceState('ox_inventory') ~= 'started' then
         lib.notify({ title = 'CAD', description = 'ox_inventory not available', type = 'error' })

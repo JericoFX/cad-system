@@ -7,6 +7,7 @@ local Fn = require 'modules.server.functions'
 
 local fines = State.Fines
 
+---@return table
 local function getFineCatalog()
     local catalogOk, catalog = pcall(require, 'shared.catalogs.fines')
     if catalogOk and catalog and catalog.Get then
@@ -20,6 +21,8 @@ local function getFineCatalog()
     return {}
 end
 
+---@param code any
+---@return table|nil
 local function findFineDefinition(code)
     local needle = tostring(code or ''):upper()
     if needle == '' then
@@ -37,6 +40,8 @@ local function findFineDefinition(code)
     return nil
 end
 
+---@param fine table
+---@return boolean, string|nil
 local function saveFineDb(fine)
     local ok, err = pcall(function()
         MySQL.insert.await([[
@@ -78,6 +83,8 @@ local function saveFineDb(fine)
     return true
 end
 
+---@param identifier string
+---@return number|nil
 local function getSourceByIdentifier(identifier)
     local players = GetPlayers()
     for i = 1, #players do
@@ -89,6 +96,9 @@ local function getSourceByIdentifier(identifier)
     return nil
 end
 
+---@param payload table
+---@param officer table
+---@return table
 local function issueFine(payload, officer)
     local fineCode = Fn.SanitizeString(payload.fineCode, 32)
     local def = findFineDefinition(fineCode)
@@ -158,6 +168,9 @@ local function issueFine(payload, officer)
     return fine
 end
 
+---@param source number
+---@param fine table
+---@return boolean
 local function canPlayerPayFine(source, fine)
     local payerIdentifier = Fn.GetIdentifier(source)
     if payerIdentifier and payerIdentifier == fine.targetId then
@@ -176,6 +189,10 @@ local function canPlayerPayFine(source, fine)
     return false
 end
 
+---@param source number
+---@param fineId string
+---@param method string|nil
+---@return table
 local function payFine(source, fineId, method)
     local fine = fines[fineId]
     if not fine then

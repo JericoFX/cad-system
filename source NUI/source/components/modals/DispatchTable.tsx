@@ -330,7 +330,6 @@ export function DispatchTable() {
     }
   });
 
-  // Clock for timestamps
   createEffect(() => {
     const clockInterval = window.setInterval(() => {
       setNowMs(Date.now());

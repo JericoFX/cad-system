@@ -2,7 +2,7 @@
 import { createCommand } from '../commandBuilder';
 import { cadActions, cadState, type Warrant } from '~/stores/cadStore';
 
-export function registerWarrantCommand() {
+export function registerWarrantCommand(): void {
   createCommand({
     name: 'warrant',
     description: 'Issue, search, and cancel arrest/search warrants',
@@ -44,7 +44,7 @@ export function registerWarrantCommand() {
   });
 }
 
-async function handleIssueWarrant(terminal: any) {
+async function handleIssueWarrant(terminal: import('../types').TerminalAPI): Promise<void> {
   const warrantType = await terminal.select(
     'Select warrant type:',
     ['ARREST', 'SEARCH']
@@ -115,7 +115,7 @@ async function handleIssueWarrant(terminal: any) {
   }
 }
 
-async function handleSearchWarrants(terminal: any) {
+async function handleSearchWarrants(terminal: import('../types').TerminalAPI): Promise<void> {
   const query = await terminal.prompt('Search by name or Citizen ID:');
   
   if (!query) {
@@ -154,7 +154,7 @@ async function handleSearchWarrants(terminal: any) {
   terminal.printTable(headers, rows);
 }
 
-async function handleCancelWarrant(terminal: any) {
+async function handleCancelWarrant(terminal: import('../types').TerminalAPI): Promise<void> {
   const warrantId = await terminal.prompt('Enter warrant ID to cancel:');
   
   if (!warrantId) {
@@ -198,7 +198,7 @@ async function handleCancelWarrant(terminal: any) {
   terminal.print(`\n✓ Warrant cancelled: ${warrantId}`, 'success');
 }
 
-async function handleListWarrants(terminal: any) {
+async function handleListWarrants(terminal: import('../types').TerminalAPI): Promise<void> {
   const warrants = Object.values(cadState.warrants) as Warrant[];
   const activeWarrants = warrants.filter(w => w.active && !w.executed);
 

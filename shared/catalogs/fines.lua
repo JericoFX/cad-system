@@ -43,6 +43,7 @@ local FineCatalog = {
     },
 }
 
+---@return table[]
 function FineCatalog.Get()
     return lib.table.deepclone(FineCatalog)
 end

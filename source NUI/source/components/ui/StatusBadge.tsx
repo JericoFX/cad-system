@@ -78,7 +78,6 @@ export function StatusBadge(props: StatusBadgeProps) {
   );
 }
 
-// Utility functions for backwards compatibility
 export function getPriorityColor(priority: string | number): string {
   if (typeof priority === 'number') {
     return PRIORITY_NUMERIC_COLORS[priority] || '#808080';

@@ -1,7 +1,7 @@
 
 import { createCommand } from '../commandBuilder';
 
-export function registerPropertyCommands() {
+export function registerPropertyCommands(): void {
   createCommand({
     name: 'property',
     description: 'Buscar propiedades',

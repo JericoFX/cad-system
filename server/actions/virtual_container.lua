@@ -1,5 +1,3 @@
--- This is a way to not use stash from ox and use my own implementations, basically a table that handle the items... thats it
-
 local Config = require 'modules.shared.config'
 local State = require 'modules.shared.state'
 local Utils = require 'modules.shared.utils'
@@ -14,10 +12,14 @@ State.Forensics.VirtualContainerLocks = State.Forensics.VirtualContainerLocks or
 local containers = State.Forensics.VirtualContainers
 local containerLocks = State.Forensics.VirtualContainerLocks
 
+---@param ts any
+---@return string
 local function safeIso(ts)
     return Utils.ToIso(ts)
 end
 
+---@param raw any
+---@return string
 local function sanitizeKey(raw)
     local value = tostring(raw or '')
     value = value:gsub('[\r\n\t]+', '')
@@ -28,10 +30,14 @@ local function sanitizeKey(raw)
     return value
 end
 
+---@param value any
+---@return any
 local function clone(value)
     return lib.table.deepclone(value)
 end
 
+---@param raw any
+---@return any
 local function decodeJson(raw)
     if type(raw) ~= 'string' or raw == '' then
         return nil
@@ -45,6 +51,7 @@ local function decodeJson(raw)
     return decoded
 end
 
+---@return boolean
 local function isPersistenceEnabled()
     local cfg = Config and Config.Forensics and Config.Forensics.VirtualContainer or nil
     if cfg and cfg.Persistence == false then
@@ -53,6 +60,9 @@ local function isPersistenceEnabled()
     return true
 end
 
+---@param containerKey string
+---@param options table|nil
+---@return table|nil
 local function ensureContainerRecord(containerKey, options)
     local key = sanitizeKey(containerKey)
     if key == '' then
@@ -111,6 +121,11 @@ local function ensureContainerRecord(containerKey, options)
     return container
 end
 
+---@param containerKey string
+---@param container table
+---@param slotIndex integer
+---@param slotData table
+---@return boolean, string|nil
 local function upsertSlotInDatabase(containerKey, container, slotIndex, slotData)
     if not isPersistenceEnabled() then
         return true
@@ -164,6 +179,9 @@ local function upsertSlotInDatabase(containerKey, container, slotIndex, slotData
     return true
 end
 
+---@param containerKey string
+---@param slotIndex integer
+---@return boolean, string|nil
 local function clearSlotInDatabase(containerKey, slotIndex)
     if not isPersistenceEnabled() then
         return true
@@ -184,6 +202,9 @@ local function clearSlotInDatabase(containerKey, slotIndex)
     return true
 end
 
+---@param containerKey string
+---@param handler function
+---@return any, any, any
 function VirtualContainer.WithLock(containerKey, handler)
     local key = sanitizeKey(containerKey)
     if key == '' then
@@ -208,6 +229,9 @@ function VirtualContainer.WithLock(containerKey, handler)
     return a, b, c
 end
 
+---@param containerKey string
+---@param options table|nil
+---@return table|nil, string|nil
 function VirtualContainer.Ensure(containerKey, options)
     local container = ensureContainerRecord(containerKey, options)
     if not container then
@@ -216,6 +240,8 @@ function VirtualContainer.Ensure(containerKey, options)
     return container
 end
 
+---@param containerKey string
+---@return table|nil
 function VirtualContainer.Get(containerKey)
     local key = sanitizeKey(containerKey)
     if key == '' then
@@ -224,6 +250,9 @@ function VirtualContainer.Get(containerKey)
     return containers[key]
 end
 
+---@param containerKey string
+---@param slot any
+---@return table|nil
 function VirtualContainer.GetSlot(containerKey, slot)
     local container = VirtualContainer.Get(containerKey)
     if not container then
@@ -238,6 +267,8 @@ function VirtualContainer.GetSlot(containerKey, slot)
     return container.slots[slotIndex]
 end
 
+---@param containerKey string
+---@return integer|nil, table|nil
 function VirtualContainer.GetFirstOccupied(containerKey)
     local container = VirtualContainer.Get(containerKey)
     if not container then
@@ -254,6 +285,8 @@ function VirtualContainer.GetFirstOccupied(containerKey)
     return nil, nil
 end
 
+---@param containerKey string
+---@return table[]
 function VirtualContainer.List(containerKey)
     local container = VirtualContainer.Get(containerKey)
     if not container then
@@ -273,6 +306,10 @@ function VirtualContainer.List(containerKey)
     return output
 end
 
+---@param containerKey string
+---@param slot any
+---@param slotData table
+---@return boolean, string|nil
 function VirtualContainer.SetSlot(containerKey, slot, slotData)
     local container = VirtualContainer.Get(containerKey)
     if not container then
@@ -313,6 +350,9 @@ function VirtualContainer.SetSlot(containerKey, slot, slotData)
     return true
 end
 
+---@param containerKey string
+---@param slot any
+---@return boolean, string|nil
 function VirtualContainer.ClearSlot(containerKey, slot)
     local container = VirtualContainer.Get(containerKey)
     if not container then
@@ -343,6 +383,7 @@ function VirtualContainer.ClearSlot(containerKey, slot)
     return true
 end
 
+---@return integer
 function VirtualContainer.LoadFromDatabase()
     if not isPersistenceEnabled() then
         return 0

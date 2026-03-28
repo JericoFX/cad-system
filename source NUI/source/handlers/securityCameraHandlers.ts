@@ -1,8 +1,3 @@
-/**
- * Security Camera Handlers
- * Handles CCTV events from Lua
- */
-
 import { onNuiMessage } from '~/utils/nuiRouter';
 import type {
   CameraCreatedData,
@@ -37,6 +32,4 @@ export function initSecurityCameraHandlers(): void {
     const { terminalActions } = await import('~/stores/terminalStore');
     terminalActions.addLine('Camera view stopped', 'system');
   });
-
-  console.log('[NUI Handlers] Security camera handlers registered');
 }

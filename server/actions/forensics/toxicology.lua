@@ -11,10 +11,14 @@ local citizenExposureCache = {}
 local trackedItemsCache = nil
 local trackedItemsRef = nil
 
+---@return integer
 local function getNowMs()
     return os.time() * 1000
 end
 
+---@param raw any
+---@param fallback any
+---@return any
 local function safeJsonDecode(raw, fallback)
     if type(raw) ~= 'string' or raw == '' then
         return fallback
@@ -28,6 +32,9 @@ local function safeJsonDecode(raw, fallback)
     return decoded
 end
 
+---@param value any
+---@param fallback string|nil
+---@return string|nil
 local function sanitizeIdentifier(value, fallback)
     local text = tostring(value or fallback or '')
     text = text:gsub('[^%w_]', '')
@@ -37,6 +44,8 @@ local function sanitizeIdentifier(value, fallback)
     return text
 end
 
+---@param value any
+---@return integer|nil
 local function parseIsoToMs(value)
     if type(value) ~= 'string' then
         return nil
@@ -58,11 +67,13 @@ local function parseIsoToMs(value)
     }) * 1000
 end
 
+---@return table
 local function getConfig()
     local forensics = Config and Config.Forensics or {}
     return forensics.Toxicology or {}
 end
 
+---@return boolean
 local function isEnabled()
     local cfg = getConfig()
     if cfg.Enabled == false then
@@ -72,6 +83,7 @@ local function isEnabled()
     return true
 end
 
+---@return string
 local function getMetadataKey()
     local cfg = getConfig()
     local key = Fn.SanitizeString(cfg.MetadataKey, 64)
@@ -81,6 +93,7 @@ local function getMetadataKey()
     return key
 end
 
+---@return string
 local function getStateBagKey()
     local cfg = getConfig()
     local key = Fn.SanitizeString(cfg.StateBagKey, 64)
@@ -90,6 +103,7 @@ local function getStateBagKey()
     return key
 end
 
+---@return integer
 local function getDefaultWindowMs()
     local cfg = getConfig()
     local windowMs = tonumber(cfg.DefaultWindowMs) or 1800000
@@ -99,11 +113,15 @@ local function getDefaultWindowMs()
     return math.floor(windowMs)
 end
 
+---@param value any
+---@return string
 local function normalizeItemName(value)
     local itemName = string.lower(Utils.Trim(tostring(value or '')))
     return itemName
 end
 
+---@param value any
+---@return string
 local function normalizeSubstance(value)
     local substance = Fn.SanitizeString(value, 64)
     if substance == '' then
@@ -112,6 +130,8 @@ local function normalizeSubstance(value)
     return string.upper(substance)
 end
 
+---@param value any
+---@return 'LOW'|'MEDIUM'|'HIGH'|'CRITICAL'
 local function normalizeSeverity(value)
     local severity = string.upper(Fn.SanitizeString(value, 16))
     if severity ~= 'LOW' and severity ~= 'MEDIUM' and severity ~= 'HIGH' and severity ~= 'CRITICAL' then
@@ -120,6 +140,7 @@ local function normalizeSeverity(value)
     return severity
 end
 
+---@return table<string, table>
 local function getTrackedItemsMap()
     local cfg = getConfig()
     local trackedItems = type(cfg.TrackedItems) == 'table' and cfg.TrackedItems or {}
@@ -152,6 +173,8 @@ local function getTrackedItemsMap()
     return mapped
 end
 
+---@param sourceLabel string|nil
+---@return table
 local function buildEmptySnapshot(sourceLabel)
     return {
         testedAt = Utils.ToIso(),
@@ -162,6 +185,9 @@ local function buildEmptySnapshot(sourceLabel)
     }
 end
 
+---@param rawExposures any
+---@param nowMs integer
+---@return table<string, table>
 local function normalizeActiveExposures(rawExposures, nowMs)
     local normalized = {}
     if type(rawExposures) ~= 'table' then
@@ -201,6 +227,9 @@ local function normalizeActiveExposures(rawExposures, nowMs)
     return normalized
 end
 
+---@param metadataTable any
+---@param nowMs integer
+---@return table<string, table>
 local function extractExposuresFromMetadataTable(metadataTable, nowMs)
     if type(metadataTable) ~= 'table' then
         return {}
@@ -216,6 +245,9 @@ local function extractExposuresFromMetadataTable(metadataTable, nowMs)
     return normalizeActiveExposures(exposures, nowMs)
 end
 
+---@param exposures table<string, table>
+---@param nowMs integer
+---@return table
 local function buildMetadataStore(exposures, nowMs)
     return {
         updatedAt = Utils.ToIso(math.floor(nowMs / 1000)),
@@ -224,6 +256,10 @@ local function buildMetadataStore(exposures, nowMs)
     }
 end
 
+---@param exposures table<string, table>|nil
+---@param nowMs integer
+---@param sourceLabel string|nil
+---@return table
 local function buildSnapshot(exposures, nowMs, sourceLabel)
     local list = {}
     for _, value in pairs(exposures or {}) do
@@ -256,6 +292,7 @@ local function buildSnapshot(exposures, nowMs, sourceLabel)
     }
 end
 
+---@return table|nil
 local function getQBCoreObject()
     if GetResourceState('qb-core') ~= 'started' then
         return nil
@@ -272,6 +309,8 @@ local function getQBCoreObject()
     return qb
 end
 
+---@param playerSource any
+---@return table|nil
 local function getQbPlayerBySource(playerSource)
     local source = tonumber(playerSource)
     if not source or source <= 0 then
@@ -294,6 +333,8 @@ local function getQbPlayerBySource(playerSource)
     return qbPlayer
 end
 
+---@param citizenId string
+---@return table|nil
 local function getQbPlayerByCitizenId(citizenId)
     local qb = getQBCoreObject()
     if not qb or not qb.Functions then
@@ -322,6 +363,8 @@ local function getQbPlayerByCitizenId(citizenId)
     return nil
 end
 
+---@param qbPlayer table|nil
+---@return string|nil
 local function getCitizenIdFromQbPlayer(qbPlayer)
     local playerData = qbPlayer and qbPlayer.PlayerData or {}
     local citizenId = Fn.SanitizeString(playerData.citizenid, 64)
@@ -331,6 +374,8 @@ local function getCitizenIdFromQbPlayer(qbPlayer)
     return citizenId
 end
 
+---@param qbPlayer table|nil
+---@return integer|nil
 local function getSourceFromQbPlayer(qbPlayer)
     local playerData = qbPlayer and qbPlayer.PlayerData or {}
     local source = tonumber(playerData.source)
@@ -340,11 +385,15 @@ local function getSourceFromQbPlayer(qbPlayer)
     return nil
 end
 
+---@param qbPlayer table|nil
+---@return table
 local function getMetadataFromQbPlayer(qbPlayer)
     local playerData = qbPlayer and qbPlayer.PlayerData or {}
     return type(playerData.metadata) == 'table' and playerData.metadata or {}
 end
 
+---@param playerSource any
+---@param snapshot table
 local function setPlayerStateBag(playerSource, snapshot)
     local source = tonumber(playerSource)
     if not source or source <= 0 then
@@ -370,6 +419,10 @@ local function setPlayerStateBag(playerSource, snapshot)
     end
 end
 
+---@param qbPlayer table|nil
+---@param exposures table<string, table>
+---@param nowMs integer
+---@return boolean
 local function setToxicologyMetadataOnQbPlayer(qbPlayer, exposures, nowMs)
     if not qbPlayer or not qbPlayer.Functions or not qbPlayer.Functions.SetMetaData then
         return false
@@ -380,6 +433,7 @@ local function setToxicologyMetadataOnQbPlayer(qbPlayer, exposures, nowMs)
     return true
 end
 
+---@return table
 local function getDataSourceConfig()
     local forensics = Config.Forensics or {}
     local idReader = type(forensics.IdReader) == 'table' and forensics.IdReader or {}
@@ -393,6 +447,8 @@ local function getDataSourceConfig()
     }
 end
 
+---@param citizenId string
+---@return table
 local function loadMetadataFromDatabase(citizenId)
     local source = getDataSourceConfig()
     local sql = ('SELECT %s FROM %s WHERE %s = ? LIMIT 1')
@@ -416,6 +472,8 @@ local function loadMetadataFromDatabase(citizenId)
     return safeJsonDecode(metadataRaw, {})
 end
 
+---@param citizenId string
+---@return table<string, table>, integer, string
 local function resolveActiveExposuresByCitizenId(citizenId)
     local nowMs = getNowMs()
     local cached = citizenExposureCache[citizenId]
@@ -448,6 +506,8 @@ local function resolveActiveExposuresByCitizenId(citizenId)
     return active, nowMs, 'QBCORE_DB_METADATA'
 end
 
+---@param citizenId any
+---@return table
 function Forensic.Toxicology.GetSnapshotForCitizen(citizenId)
     local normalizedCitizenId = Fn.SanitizeString(citizenId, 64)
     if normalizedCitizenId == '' then
@@ -462,6 +522,8 @@ function Forensic.Toxicology.GetSnapshotForCitizen(citizenId)
     return buildSnapshot(exposures, nowMs, sourceLabel)
 end
 
+---@param playerSource any
+---@return table
 function Forensic.Toxicology.GetSnapshotForSource(playerSource)
     local source = tonumber(playerSource)
     if not source or source <= 0 then
@@ -487,6 +549,10 @@ function Forensic.Toxicology.GetSnapshotForSource(playerSource)
     return snapshot
 end
 
+---@param playerSource any
+---@param itemName any
+---@param slotId any
+---@return table|nil, string|nil
 function Forensic.Toxicology.RecordItemUse(playerSource, itemName, slotId)
     local source = tonumber(playerSource)
     if not source or source <= 0 then
@@ -547,6 +613,8 @@ function Forensic.Toxicology.RecordItemUse(playerSource, itemName, slotId)
     return snapshot
 end
 
+---@param playerSource any
+---@return table
 function Forensic.Toxicology.SyncPlayerState(playerSource)
     return Forensic.Toxicology.GetSnapshotForSource(playerSource)
 end

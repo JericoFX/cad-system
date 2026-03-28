@@ -35,6 +35,8 @@ local casesPublicCfg = Config.Cases and Config.Cases.PublicState or {}
 local CASES_PUBLIC_CLOSED_TTL_MINUTES = math.max(1, tonumber(casesPublicCfg.ClosedRetentionMinutes) or 10)
 local CASES_PUBLIC_MAX_CASES = math.max(10, tonumber(casesPublicCfg.MaxCases) or 300)
 
+---@param value any
+---@return any
 local function cloneTable(value)
     return lib.table.deepclone(value)
 end
@@ -165,6 +167,8 @@ end
 
 Cases.PublishPublicState = publishCasesPublicState
 
+---@param caseObj CaseRecord
+---@return table
 local function caseToClient(caseObj)
     return {
         caseId = caseObj.caseId,
@@ -188,6 +192,8 @@ local function caseToClient(caseObj)
     }
 end
 
+---@param caseId string
+---@return CaseRecord|nil
 local function ensureCase(caseId)
     local caseObj = cases[caseId]
     if not caseObj then
@@ -199,6 +205,8 @@ local function ensureCase(caseId)
     return caseObj
 end
 
+---@param caseObj CaseRecord
+---@return boolean, string|nil
 local function saveCaseDb(caseObj)
     local ok, err = pcall(function()
         MySQL.insert.await([[

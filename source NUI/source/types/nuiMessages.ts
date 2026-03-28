@@ -1,16 +1,8 @@
-/**
- * NUI Message Types
- * Defines all message interfaces for Lua <-> JS communication
- */
-
 export interface NuiMessage<T = unknown> {
   action: string;
   data: T;
 }
 
-// ============================================================
-// CAD General
-// ============================================================
 export interface CadOpenedData {
   terminalId: string;
   location?: { x: number; y: number; z: number };
@@ -23,9 +15,6 @@ export interface CadClosedData {
   timestamp: number;
 }
 
-// ============================================================
-// Dispatch
-// ============================================================
 export interface DispatchCall {
   callId: string;
   type: string;
@@ -57,9 +46,6 @@ export interface DispatchPublicStateData {
   units: Record<string, DispatchUnit>;
 }
 
-// ============================================================
-// Security Cameras
-// ============================================================
 export interface SecurityCamera {
   cameraId: string;
   cameraNumber: number;
@@ -97,9 +83,6 @@ export interface CameraViewStoppedData {
   timestamp: number;
 }
 
-// ============================================================
-// Cases
-// ============================================================
 export interface Case {
   caseId: string;
   caseType: string;
@@ -153,9 +136,6 @@ export interface CasePublicStateData {
   cases: Record<string, Case>;
 }
 
-// ============================================================
-// Evidence
-// ============================================================
 export interface Evidence {
   evidenceId: string;
   caseId: string;
@@ -205,9 +185,6 @@ export interface EvidenceTransferredData {
   transferredAt: string;
 }
 
-// ============================================================
-// EMS
-// ============================================================
 export interface EmsAlert {
   alertId: string;
   title?: string;
@@ -298,9 +275,6 @@ export interface EmsHandoffCompleteData {
   completedAt: string;
 }
 
-// ============================================================
-// Forensics
-// ============================================================
 export interface ForensicAnalysis {
   analysisId: string;
   caseId?: string;
@@ -370,9 +344,6 @@ export interface ForensicsTraceBaggedData {
   };
 }
 
-// ============================================================
-// Photos
-// ============================================================
 export interface PhotoPreviewData {
   imageUrl: string;
   isBase64: boolean;
@@ -425,9 +396,6 @@ export interface PhotoReleasedToPressData {
   };
 }
 
-// ============================================================
-// Fines
-// ============================================================
 export interface Fine {
   fineId: string;
   targetType: 'PERSON' | 'VEHICLE';
@@ -460,9 +428,6 @@ export interface FinePaidData {
   paidBy: string;
 }
 
-// ============================================================
-// Police
-// ============================================================
 export interface JailTransfer {
   transferId: string;
   citizenId: string;
@@ -487,9 +452,6 @@ export interface PoliceJailTransferLoggedData {
   transfer: JailTransfer;
 }
 
-// ============================================================
-// Notifications
-// ============================================================
 export interface NotificationShowData {
   title: string;
   message: string;
@@ -497,9 +459,6 @@ export interface NotificationShowData {
   duration?: number;
 }
 
-// ============================================================
-// Offline Sync
-// ============================================================
 export interface OfflineSyncData {
   events: Array<{
     action: string;
@@ -508,9 +467,6 @@ export interface OfflineSyncData {
   }>;
 }
 
-// ============================================================
-// Vehicle Tablet
-// ============================================================
 export interface VehicleContextData {
   isInPoliceVehicle: boolean;
   tabletOpen?: boolean;
@@ -541,34 +497,20 @@ export interface VehiclePrefillSearchData {
   plate?: string;
 }
 
-// ============================================================
-// Message Map
-// ============================================================
 export interface NuiMessageMap {
-  // CAD
   'cad:opened': CadOpenedData;
   'cad:closed': CadClosedData;
-  
-  // Dispatch
   'dispatch:publicState': DispatchPublicStateData;
-
-  // Security Cameras
   'camera:created': CameraCreatedData;
   'camera:updated': CameraUpdatedData;
   'camera:removed': CameraRemovedData;
   'camera:viewStarted': CameraViewStartedData;
   'camera:viewStopped': CameraViewStoppedData;
-  
-  // Cases
   'case:publicState': CasePublicStateData;
-  
-  // Evidence
   'evidence:staged': EvidenceStagedData;
   'evidence:analyzed': EvidenceAnalyzedData;
   'evidence:collected': EvidenceCollectedData;
   'evidence:transferred': EvidenceTransferredData;
-  
-  // EMS
   'ems:alertCreated': EmsAlertCreatedData;
   'ems:alertUpdated': EmsAlert;
   'ems:criticalPatient': EmsCriticalPatientData;
@@ -576,34 +518,20 @@ export interface NuiMessageMap {
   'ems:bloodRequestCreated': EmsBloodRequestCreatedData;
   'ems:bloodRequestFulfilled': EmsBloodRequestFulfilledData;
   'ems:handoffComplete': EmsHandoffCompleteData;
-  
-  // Forensics
   'forensics:analysisStarted': ForensicsAnalysisStartedData;
   'forensics:analysisCompleted': ForensicsAnalysisCompletedData;
   'forensics:evidenceCompared': ForensicsEvidenceComparedData;
   'forensics:worldTraceFound': ForensicsWorldTraceFoundData;
   'forensics:traceBagged': ForensicsTraceBaggedData;
-  
-  // Photos
   'photo:preview': PhotoPreviewData;
   'photo:view': PhotoViewData;
   'photo:captured': PhotoCapturedData;
   'photo:releasedToPress': PhotoReleasedToPressData;
-  
-  // Fines
   'fine:created': FineCreatedData;
   'fine:paid': FinePaidData;
-  
-  // Police
   'police:jailTransferLogged': PoliceJailTransferLoggedData;
-  
-  // Notifications
   'notification:show': NotificationShowData;
-  
-  // Offline sync
   'cad:syncOffline': OfflineSyncData;
-
-  // Vehicle
   'vehicle:context': VehicleContextData;
   'vehicle:cadOpen': VehicleCadToggleData;
   'vehicle:cadClose': VehicleCadToggleData;

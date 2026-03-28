@@ -1,11 +1,11 @@
--- modules/server/functions.lua
-
 local Config = require 'modules.shared.config'
 local Utils = require 'modules.shared.utils'
 local Core = require 'modules.server.core'
 
 local Fn = {}
 
+---@param source integer
+---@return string|nil
 function Fn.GetIdentifier(source)
     local player = tonumber(source)
     if not player or player <= 0 then return nil end
@@ -27,6 +27,8 @@ function Fn.GetIdentifier(source)
     return tostring(player)
 end
 
+---@param source integer
+---@return table|nil
 function Fn.GetPlayerIdentity(source)
     local player = tonumber(source)
     if not player or player <= 0 then return nil end
@@ -35,11 +37,16 @@ function Fn.GetPlayerIdentity(source)
     return Core.GetPlayerIdentity(player, identifier, Officers.GetCallsign)
 end
 
+---@param job string|nil
+---@return boolean
 function Fn.IsAllowedJob(job)
     if not job then return false end
     return Config.Security.AllowedJobs[job] == true or Config.Security.AdminJobs[job] == true
 end
 
+---@param source integer
+---@param roles string|string[]
+---@return boolean
 function Fn.HasRole(source, roles)
     local identity = Fn.GetPlayerIdentity(source)
     if not identity then return false end
@@ -54,6 +61,9 @@ function Fn.HasRole(source, roles)
     return false
 end
 
+---@param value any
+---@param maxLen integer|nil
+---@return string
 function Fn.SanitizeString(value, maxLen)
     local text = tostring(value or '')
     text = text:gsub('<.->', '')
@@ -66,6 +76,9 @@ function Fn.SanitizeString(value, maxLen)
     return text
 end
 
+---@param source integer
+---@param message string
+---@param notificationType string|nil
 function Fn.Notify(source, message, notificationType)
     TriggerClientEvent('ox_lib:notify', source, {
         title = 'CAD',
@@ -74,6 +87,9 @@ function Fn.Notify(source, message, notificationType)
     })
 end
 
+---@param jobs string|string[]
+---@param message string
+---@param notificationType string|nil
 function Fn.NotifyJobs(jobs, message, notificationType)
     local players = GetPlayers()
     for i = 1, #players do
@@ -84,6 +100,9 @@ function Fn.NotifyJobs(jobs, message, notificationType)
     end
 end
 
+---@param jobs string|string[]
+---@param eventName string
+---@param data any
 function Fn.BroadcastToJobs(jobs, eventName, data)
     local players = GetPlayers()
     for i = 1, #players do
@@ -94,20 +113,29 @@ function Fn.BroadcastToJobs(jobs, eventName, data)
     end
 end
 
+---@param eventName string
+---@param data any
 function Fn.BroadcastToAll(eventName, data)
     TriggerClientEvent('cad:client:' .. eventName, -1, data)
 end
 
+---@param source integer
+---@param eventName string
+---@param data any
 function Fn.BroadcastToPlayer(source, eventName, data)
     TriggerClientEvent('cad:client:' .. eventName, source, data)
 end
 
--- Offline queue
-
+---@type table<integer, table[]>
 local offlineQueue = {}
+---@type integer
 local OFFLINE_QUEUE_MAX_PER_PLAYER = 50
+---@type integer
 local OFFLINE_QUEUE_TTL_SECONDS = 1800
 
+---@param playerId integer
+---@param eventName string
+---@param data any
 function Fn.QueueOfflineEvent(playerId, eventName, data)
     if not offlineQueue[playerId] then
         offlineQueue[playerId] = {}
@@ -123,6 +151,8 @@ function Fn.QueueOfflineEvent(playerId, eventName, data)
     }
 end
 
+---@param playerId integer
+---@param source integer
 function Fn.SendOfflineQueue(playerId, source)
     if offlineQueue[playerId] then
         local events = offlineQueue[playerId]

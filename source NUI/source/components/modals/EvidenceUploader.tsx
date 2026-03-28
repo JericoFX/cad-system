@@ -24,9 +24,8 @@ const sanitizeUrl = (url: string): { valid: boolean; sanitized: string; error?: 
   if (!sanitized.match(/^https?:\/\//i)) {
     sanitized = 'https://' + sanitized;
   }
-  let urlObj: URL;
   try {
-    urlObj = new URL(sanitized);
+    new URL(sanitized);
   } catch {
     return { valid: false, sanitized: '', error: 'Invalid URL format' };
   }
@@ -168,7 +167,7 @@ export function EvidenceUploader() {
     setValidationError('');
 
     try {
-      let evidenceData: any;
+      let evidenceData: Record<string, unknown>;
       
       if (uploadMode() === 'file' && selectedFile()) {
         const file = selectedFile()!;

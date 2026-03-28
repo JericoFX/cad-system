@@ -15,14 +15,18 @@ cameraState.LastNumber = tonumber(cameraState.LastNumber) or 0
 
 local cameras = cameraState.Cameras
 
+---@param value any
+---@return any
 local function clone(value)
     return lib.table.deepclone(value)
 end
 
+---@return table
 local function getConfig()
     return Config.SecurityCameras or {}
 end
 
+---@return boolean
 local function isDispatchFeatureEnabled()
     if Config.IsFeatureEnabled then
         return Config.IsFeatureEnabled('Dispatch')
@@ -31,6 +35,7 @@ local function isDispatchFeatureEnabled()
     return true
 end
 
+---@return boolean
 local function isSecurityCameraFeatureEnabled()
     if Config.IsFeatureEnabled then
         return Config.IsFeatureEnabled('SecurityCameras')
@@ -39,6 +44,7 @@ local function isSecurityCameraFeatureEnabled()
     return true
 end
 
+---@return boolean
 local function isCameraSystemEnabled()
     local config = getConfig()
     if config.Enabled == false then
@@ -48,6 +54,7 @@ local function isCameraSystemEnabled()
     return isDispatchFeatureEnabled() and isSecurityCameraFeatureEnabled()
 end
 
+---@return table<string, boolean>
 local function getAllowedJobs()
     local config = getConfig()
     if type(config.AllowedJobs) == 'table' then
@@ -62,6 +69,8 @@ local function getAllowedJobs()
     }
 end
 
+---@param officer table|nil
+---@return boolean
 local function canUseCameraSystem(officer)
     if not officer then
         return false
@@ -79,6 +88,7 @@ local function canUseCameraSystem(officer)
     return getAllowedJobs()[job] == true
 end
 
+---@return string[]
 local function getBroadcastJobs()
     local jobs = {}
     for jobName, enabled in pairs(getAllowedJobs()) do
@@ -94,6 +104,9 @@ local function getBroadcastJobs()
     return jobs
 end
 
+---@param bucket string
+---@param handler function
+---@return function
 local function withCameraGuard(bucket, handler)
     return Auth.WithGuard(bucket, function(source, payload, officer)
         if not isCameraSystemEnabled() then
@@ -114,6 +127,11 @@ local function withCameraGuard(bucket, handler)
     end)
 end
 
+---@param value any
+---@param min number
+---@param max number
+---@param fallback number
+---@return number
 local function normalizeNumber(value, min, max, fallback)
     local parsed = tonumber(value)
     if not parsed then
@@ -131,6 +149,9 @@ local function normalizeNumber(value, min, max, fallback)
     return parsed
 end
 
+---@param raw any
+---@param maxAbs number
+---@return table|nil
 local function parseVector3(raw, maxAbs)
     if type(raw) ~= 'table' then
         return nil
@@ -154,6 +175,8 @@ local function parseVector3(raw, maxAbs)
     }
 end
 
+---@param camera table
+---@return table
 local function cameraToClient(camera)
     return {
         cameraId = camera.cameraId,
@@ -173,6 +196,7 @@ local function cameraToClient(camera)
     }
 end
 
+---@return table[]
 local function getCameraList()
     local list = {}
     for _, camera in pairs(cameras) do
@@ -190,6 +214,8 @@ local function getCameraList()
     return list
 end
 
+---@param camera table
+---@return boolean, string|nil
 local function saveCameraDb(camera)
     local ok, err = pcall(function()
         MySQL.insert.await([[
@@ -245,6 +271,8 @@ local function saveCameraDb(camera)
     return true
 end
 
+---@param cameraId string
+---@return boolean, string|nil
 local function deleteCameraDb(cameraId)
     local ok, err = pcall(function()
         MySQL.query.await('DELETE FROM cad_security_cameras WHERE camera_id = ?', {

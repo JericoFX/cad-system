@@ -1,7 +1,7 @@
 
 import { createCommand } from '../commandBuilder';
 
-export function registerPoliceDashboardCommand() {
+export function registerPoliceDashboardCommand(): void {
   createCommand({
     name: 'police',
     aliases: ['pd', 'police-dashboard'],

@@ -1,8 +1,26 @@
 local EvidenceTypes = require 'shared.evidence_types'
 local ClientFn = require 'modules.client.functions'
 
+---@class BloodEvidence
+---@field coords { x: number, y: number, z: number }
+---@field visibility number
+
+---@class FingerprintEvidence
+---@field entityNetId number
+---@field entity number|nil
+---@field bone string|nil
+---@field visibility number
+---@field revealed boolean|nil
+
+---@class CasingEvidence
+---@field coords { x: number, y: number, z: number }
+---@field visibility number
+
+---@type table<string, BloodEvidence>
 local ForensicBloodEvidence = {}
+---@type table<string, FingerprintEvidence>
 local ForensicFingerprintsEvidence = {}
+---@type table<string, CasingEvidence>
 local ForensicCasingsEvidence = {}
 
 local ForensicTargets = {
@@ -16,9 +34,13 @@ local ForensicVisuals = {
     casings = {},
 }
 
+---@type number
 local CASING_MODEL = joaat('prop_cs_casing_01')
+---@type number
 local lastFingerprintTargetRefresh = 0
 
+---@param value any
+---@return any
 local function deepCopy(value)
     if type(value) ~= 'table' then
         return value
@@ -31,14 +53,18 @@ local function deepCopy(value)
     return out
 end
 
+---@return number
 local function getPed()
     return cache.ped or PlayerPedId()
 end
 
+---@return boolean
 local function isOxTargetReady()
     return GetResourceState('ox_target') == 'started'
 end
 
+---@param toolName string
+---@return boolean
 local function hasTool(toolName)
     if GetResourceState('ox_inventory') ~= 'started' then
         return false
@@ -47,6 +73,9 @@ local function hasTool(toolName)
     return exports.ox_inventory:Search('count', toolName) > 0
 end
 
+---@param duration number
+---@param label string
+---@return boolean
 local function showProgress(duration, label)
     return lib.progressBar({
         duration = duration,
@@ -66,6 +95,8 @@ local function showProgress(duration, label)
 end
 
 
+---@param value any
+---@return number
 local function clampVisibility(value)
     local visibility = tonumber(value) or 1.0
     if visibility < 0.0 then
@@ -77,6 +108,8 @@ local function clampVisibility(value)
     return visibility
 end
 
+---@param input table|nil
+---@return table
 local function cloneEvidenceMap(input)
     if type(input) ~= 'table' then
         return {}
@@ -89,6 +122,8 @@ local function cloneEvidenceMap(input)
     return out
 end
 
+---@param entry FingerprintEvidence|nil
+---@return vector3|nil
 local function getFingerprintCoords(entry)
     local entityNetId = tonumber(entry and (entry.entityNetId or entry.entity))
     if not entityNetId or entityNetId <= 0 then
@@ -115,6 +150,8 @@ local function getFingerprintCoords(entry)
     return GetEntityCoords(entity)
 end
 
+---@param evidenceState { blood?: table<string, BloodEvidence>, fingerprints?: table<string, FingerprintEvidence>, casings?: table<string, CasingEvidence> }|nil
+---@return nil
 local function applySceneEvidenceState(evidenceState)
     local evidences = type(evidenceState) == 'table' and evidenceState or {}
     ForensicBloodEvidence = cloneEvidenceMap(evidences.blood)
@@ -122,11 +159,14 @@ local function applySceneEvidenceState(evidenceState)
     ForensicCasingsEvidence = cloneEvidenceMap(evidences.casings)
 end
 
+---@return nil
 local function refreshSceneEvidenceFromStateBag()
     local evidenceState = GlobalState and GlobalState.evidences or nil
     applySceneEvidenceState(evidenceState)
 end
 
+---@param zoneId any
+---@return nil
 local function removeTargetZone(zoneId)
     if not zoneId or not isOxTargetReady() then
         return
@@ -135,6 +175,8 @@ local function removeTargetZone(zoneId)
     exports.ox_target:removeZone(zoneId)
 end
 
+---@param entry { zoneId: any }|any
+---@return nil
 local function removeTargetEntry(entry)
     if type(entry) == 'table' then
         removeTargetZone(entry.zoneId)
@@ -144,6 +186,8 @@ local function removeTargetEntry(entry)
     removeTargetZone(entry)
 end
 
+---@param targetMap table
+---@return nil
 local function clearTargetMap(targetMap)
     for evidenceId, entry in pairs(targetMap) do
         removeTargetEntry(entry)
@@ -151,6 +195,10 @@ local function clearTargetMap(targetMap)
     end
 end
 
+---@param previousCoords vector3|nil
+---@param currentCoords vector3|nil
+---@param threshold number|nil
+---@return boolean
 local function coordsChanged(previousCoords, currentCoords, threshold)
     if not previousCoords or not currentCoords then
         return true
@@ -159,12 +207,16 @@ local function coordsChanged(previousCoords, currentCoords, threshold)
     return #(previousCoords - currentCoords) > (threshold or 0.15)
 end
 
+---@return nil
 local function clearAllTargets()
     clearTargetMap(ForensicTargets.blood)
     clearTargetMap(ForensicTargets.fingerprints)
     clearTargetMap(ForensicTargets.casings)
 end
 
+---@param coords vector3
+---@param visibility number
+---@return number
 local function createBloodDecal(coords, visibility)
     local config = EvidenceTypes.GetType('blood')
     local decalType = config and config.visualization and tonumber(config.visualization.decalType) or 1010
@@ -195,6 +247,8 @@ local function createBloodDecal(coords, visibility)
     )
 end
 
+---@param bloodId string
+---@return nil
 local function removeBloodVisual(bloodId)
     local visual = ForensicVisuals.blood[bloodId]
     if not visual then
@@ -208,6 +262,9 @@ local function removeBloodVisual(bloodId)
     ForensicVisuals.blood[bloodId] = nil
 end
 
+---@param model number
+---@param timeoutMs number|nil
+---@return boolean
 local function requestModel(model, timeoutMs)
     if HasModelLoaded(model) then
         return true
@@ -223,6 +280,8 @@ local function requestModel(model, timeoutMs)
     return HasModelLoaded(model)
 end
 
+---@param casingId string
+---@return nil
 local function removeCasingVisual(casingId)
     local visual = ForensicVisuals.casings[casingId]
     if not visual then
@@ -236,6 +295,7 @@ local function removeCasingVisual(casingId)
     ForensicVisuals.casings[casingId] = nil
 end
 
+---@return nil
 local function syncBloodVisuals()
     local evidences = ForensicBloodEvidence or {}
 
@@ -268,6 +328,7 @@ local function syncBloodVisuals()
     end
 end
 
+---@return nil
 local function syncCasingVisuals()
     local evidences = ForensicCasingsEvidence or {}
 
@@ -319,6 +380,7 @@ local function syncCasingVisuals()
     end
 end
 
+---@return nil
 local function clearAllVisuals()
     for bloodId in pairs(ForensicVisuals.blood) do
         removeBloodVisual(bloodId)
@@ -329,6 +391,9 @@ local function clearAllVisuals()
     end
 end
 
+---@param bloodId string
+---@param blood BloodEvidence
+---@return nil
 local function createBloodTarget(bloodId, blood)
     if not isOxTargetReady() then
         return
@@ -385,6 +450,10 @@ local function createBloodTarget(bloodId, blood)
     }
 end
 
+---@param fpId string
+---@param fingerprint FingerprintEvidence
+---@param coords vector3
+---@return nil
 local function createFingerprintTarget(fpId, fingerprint, coords)
     if not isOxTargetReady() then
         return
@@ -440,6 +509,9 @@ local function createFingerprintTarget(fpId, fingerprint, coords)
     }
 end
 
+---@param casingId string
+---@param casing CasingEvidence
+---@return nil
 local function createCasingTarget(casingId, casing)
     if not isOxTargetReady() then
         return
@@ -481,6 +553,7 @@ local function createCasingTarget(casingId, casing)
     }
 end
 
+---@return nil
 local function rebuildBloodTargets()
     clearTargetMap(ForensicTargets.blood)
 
@@ -493,6 +566,7 @@ local function rebuildBloodTargets()
     end
 end
 
+---@return nil
 local function rebuildCasingTargets()
     clearTargetMap(ForensicTargets.casings)
 
@@ -505,6 +579,8 @@ local function rebuildCasingTargets()
     end
 end
 
+---@param force boolean
+---@return nil
 local function refreshFingerprintTargets(force)
     if not isOxTargetReady() then
         clearTargetMap(ForensicTargets.fingerprints)
@@ -539,6 +615,7 @@ local function refreshFingerprintTargets(force)
     end
 end
 
+---@return boolean
 local function drawFingerprintMarkers()
     local ped = getPed()
     if not ped or ped == 0 then
@@ -589,6 +666,7 @@ local function drawFingerprintMarkers()
     return drawn
 end
 
+---@return nil
 local function reconcileSceneEvidence()
     syncBloodVisuals()
     syncCasingVisuals()

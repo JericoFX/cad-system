@@ -1,30 +1,38 @@
--- modules/client/functions.lua
-
 local ClientFn = {}
 
+---@param coords vector3
+---@return string
 function ClientFn.GetStreetName(coords)
     local streetHash = GetStreetNameAtCoord(coords.x, coords.y, coords.z)
     return GetStreetNameFromHashKey(streetHash)
 end
 
+---@param coords vector3
+---@return string
 function ClientFn.GetZoneName(coords)
     return GetLabelText(GetNameOfZone(coords.x, coords.y, coords.z))
 end
 
+---@param coords vector3
+---@return string
 function ClientFn.FormatCoords(coords)
     return string.format('%.2f, %.2f, %.2f', coords.x, coords.y, coords.z)
 end
 
+---@param heading number
+---@return string
 function ClientFn.GetDirection(heading)
     local directions = { 'N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW' }
     local index = math.floor((heading + 22.5) / 45) % 8
     return directions[index + 1]
 end
 
+---@return boolean
 function ClientFn.IsInVehicle()
     return cache.vehicle ~= nil
 end
 
+---@return { model: integer, name: string, plate: string }|nil
 function ClientFn.GetVehicleInfo()
     if not cache.vehicle then return nil end
     local vehicle = cache.vehicle
@@ -34,6 +42,12 @@ function ClientFn.GetVehicleInfo()
     return { model = model, name = name, plate = plate }
 end
 
+---@param coords vector3
+---@param sprite integer
+---@param color integer
+---@param scale number
+---@param label string
+---@return integer
 function ClientFn.CreateBlip(coords, sprite, color, scale, label)
     local blip = AddBlipForCoord(coords.x, coords.y, coords.z)
     SetBlipSprite(blip, sprite)
@@ -46,10 +60,13 @@ function ClientFn.CreateBlip(coords, sprite, color, scale, label)
     return blip
 end
 
+---@param blip integer|nil
 function ClientFn.RemoveBlip(blip)
     if blip then RemoveBlip(blip) end
 end
 
+---@param coords vector3
+---@param text string
 function ClientFn.Draw3DText(coords, text)
     local onScreen, x, y = GetScreenCoordFromWorldCoord(coords.x, coords.y, coords.z)
     if onScreen then
@@ -66,6 +83,8 @@ function ClientFn.Draw3DText(coords, text)
     end
 end
 
+---@param rotation vector3
+---@return { x: number, y: number, z: number }
 function ClientFn.RotationToDirection(rotation)
     local adjustedRotation = {
         x = math.rad(rotation.x),
@@ -79,6 +98,8 @@ function ClientFn.RotationToDirection(rotation)
     }
 end
 
+---@param coords any
+---@return boolean
 function ClientFn.IsValidCoords(coords)
     return coords and coords.x and coords.y and coords.z
         and coords.x ~= 0 and coords.y ~= 0

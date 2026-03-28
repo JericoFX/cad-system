@@ -3,8 +3,9 @@ import { createCommand } from '../commandBuilder';
 import { cadActions, cadState, type CaseTask } from '~/stores/cadStore';
 import { userActions } from '~/stores/userStore';
 import { requireCaseLoaded } from '../commandBuilder';
+import type { TerminalAPI } from '../types';
 
-export function registerCaseTaskCommands() {
+export function registerCaseTaskCommands(): void {
   createCommand({
     name: 'task',
     description: 'Manage case follow-up tasks',
@@ -52,7 +53,7 @@ export function registerCaseTaskCommands() {
   });
 }
 
-async function handleAddTask(caseId: string, args: string[], terminal: any) {
+async function handleAddTask(caseId: string, args: string[], terminal: TerminalAPI): Promise<void> {
   let title = args.join(' ');
 
   if (!title) {
@@ -65,11 +66,11 @@ async function handleAddTask(caseId: string, args: string[], terminal: any) {
 
   const description = await terminal.prompt('Description (optional):');
   const assignedTo = await terminal.prompt('Assigned to (optional):');
-  
+
   const dueDays = await terminal.prompt('Due in how many days? (0 for no due date):');
-  const dueDate = dueDays && parseInt(dueDays) > 0 
+  const dueDate = dueDays && parseInt(dueDays) > 0
     ? new Date(Date.now() + parseInt(dueDays) * 24 * 60 * 60 * 1000).toISOString()
-    : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // Default 7 days
+    : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
   const task: CaseTask = {
     taskId: `TASK_${Date.now()}`,
@@ -90,7 +91,7 @@ async function handleAddTask(caseId: string, args: string[], terminal: any) {
   terminal.print(`  Due: ${new Date(dueDate).toLocaleDateString()}`, 'info');
 }
 
-function handleListTasks(caseId: string, terminal: any) {
+function handleListTasks(caseId: string, terminal: TerminalAPI): void {
   const caseData = cadState.cases[caseId];
   if (!caseData?.tasks?.length) {
     terminal.print('No tasks for this case', 'system');
@@ -131,17 +132,17 @@ function handleListTasks(caseId: string, terminal: any) {
   }
 }
 
-async function handleCompleteTask(caseId: string, taskIdOrIndex: string, terminal: any) {
+async function handleCompleteTask(caseId: string, taskIdOrIndex: string, terminal: TerminalAPI): Promise<void> {
   const caseData = cadState.cases[caseId];
   const pending = cadActions.getPendingTasks(caseId);
-  
+
   if (pending.length === 0) {
     terminal.print('No pending tasks', 'system');
     return;
   }
 
   let taskId = taskIdOrIndex;
-  
+
   if (!taskId) {
     terminal.print('Pending tasks:', 'system');
     pending.forEach((t, i) => {
@@ -150,7 +151,7 @@ async function handleCompleteTask(caseId: string, taskIdOrIndex: string, termina
 
     const selection = await terminal.prompt('Enter number to complete:');
     const index = parseInt(selection) - 1;
-    
+
     if (isNaN(index) || index < 0 || index >= pending.length) {
       terminal.print('Invalid selection', 'error');
       return;

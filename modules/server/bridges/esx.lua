@@ -3,8 +3,10 @@ local Utils = require 'modules.shared.utils'
 
 local ESX = {}
 
+---@type table|nil
 local esxObj = nil
 
+---@return table|nil
 function ESX.GetObject()
     if esxObj then return esxObj end
     local ok, obj = pcall(function()
@@ -17,11 +19,16 @@ function ESX.GetObject()
     return nil
 end
 
+---@return boolean
 function ESX.IsAvailable()
     if GetResourceState('es_extended') ~= 'started' then return false end
     return ESX.GetObject() ~= nil
 end
 
+---@param source integer
+---@param fallbackIdentifier string
+---@param getCallsignFn function|nil
+---@return table|nil
 function ESX.ResolveIdentity(source, fallbackIdentifier, getCallsignFn)
     local esx = ESX.GetObject()
     if not esx then return nil end
@@ -53,11 +60,15 @@ function ESX.ResolveIdentity(source, fallbackIdentifier, getCallsignFn)
     }
 end
 
+---@param source integer
+---@param callsign string
+---@return boolean
 function ESX.SaveCallsign(source, callsign)
-    -- ESX has no built-in callsign metadata; persisted via cad_officers table by Officers module
     return true
 end
 
+---@param source integer
+---@return number
 function ESX.GetPlayerMoney(source)
     local esx = ESX.GetObject()
     if not esx then return 0 end
@@ -66,6 +77,9 @@ function ESX.GetPlayerMoney(source)
     return xPlayer.getMoney() or 0
 end
 
+---@param source integer
+---@param amount number
+---@return boolean
 function ESX.RemoveMoney(source, amount)
     local esx = ESX.GetObject()
     if not esx then return false end

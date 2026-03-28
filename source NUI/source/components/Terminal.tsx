@@ -18,7 +18,7 @@ export function Terminal() {
   onCleanup(() => {
   });
   
-  const scrollToBottom = () => {
+  const scrollToBottom = (): void => {
     if (terminalRef) {
       terminalRef.scrollTop = terminalRef.scrollHeight;
     }
@@ -30,9 +30,9 @@ export function Terminal() {
     }
   });
 
-  const showInputLine = () => isActive();
+  const showInputLine = (): boolean => isActive();
 
-  const getPromptPrefix = () => {
+  const getPromptPrefix = (): string => {
     if (isActive()) {
       switch (promptType()) {
         case 'text': return '?';
@@ -47,7 +47,7 @@ export function Terminal() {
     return '>';
   };
 
-  const getPlaceholder = () => {
+  const getPlaceholder = (): string => {
     if (!isActive()) return '';
     switch (promptType()) {
       case 'text': return 'Enter text...';
@@ -80,7 +80,7 @@ export function Terminal() {
     }, 0);
   };
 
-  const handlePromptSubmit = (value: string) => {
+  const handlePromptSubmit = (value: string): void => {
     const type = promptType();
     const opts = options();
     
@@ -123,7 +123,7 @@ export function Terminal() {
     }, 0);
   };
   
-  const handleKeyDown = (e: KeyboardEvent) => {
+  const handleKeyDown = (e: KeyboardEvent): void => {
     if (e.key === 'Escape' && isActive()) {
       e.preventDefault();
       terminalActions.addLine('^C (cancelled)', 'system');
@@ -185,7 +185,7 @@ export function Terminal() {
     }
   };
   
-  const getLineClass = (type: string) => {
+  const getLineClass = (type: string): string => {
     switch (type) {
       case 'input': return 'terminal-line--input';
       case 'error': return 'terminal-line--error';

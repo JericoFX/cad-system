@@ -3,6 +3,7 @@ import { createCommandWithSubcommands } from '../commandBuilder';
 import { cadState, cadActions, type Vehicle, type Person } from '~/stores/cadStore';
 import { hackerActions } from '~/stores/hackerStore';
 import { fetchNui } from '~/utils/fetchNui';
+import type { TerminalAPI } from '../types';
 
 interface LookupVehiclesResponse {
   ok?: boolean;
@@ -10,7 +11,7 @@ interface LookupVehiclesResponse {
   error?: string;
 }
 
-export function registerVehicleSearchCommand() {
+export function registerVehicleSearchCommand(): void {
   createCommandWithSubcommands({
     name: 'search-vehicle',
     aliases: ['vehicle', 'plate', 'find-vehicle'],
@@ -21,14 +22,14 @@ export function registerVehicleSearchCommand() {
     subcommands: {
       gui: {
         description: 'Open vehicle search GUI (DMV)',
-        handler: async ({ terminal }: { terminal: any }) => {
+        handler: async ({ terminal }: { terminal: TerminalAPI }) => {
           terminal.openModal('VEHICLE_SEARCH');
           terminal.print('Opening vehicle search database...', 'system');
         }
       },
       search: {
         description: 'Search vehicles (CLI mode)',
-        handler: async ({ rawArgs, terminal }: { rawArgs: string[]; terminal: any }) => {
+        handler: async ({ rawArgs, terminal }: { rawArgs: string[]; terminal: TerminalAPI }) => {
           let plate = rawArgs[1] as string | undefined;
 
           if (!plate) {
@@ -39,7 +40,6 @@ export function registerVehicleSearchCommand() {
             }
           }
 
-          // Emit hacker command for search
           hackerActions.onSearch(plate, 'vehicle');
 
           const stopLoading = terminal.showLoading('Searching vehicle database');
@@ -72,7 +72,7 @@ export function registerVehicleSearchCommand() {
             await showVehicleDetails(terminal, uniqueResults[0]);
           } else {
             terminal.print(`\n=== VEHICLE SEARCH RESULTS (${uniqueResults.length}) ===`, 'system');
-            
+
             const headers = ['PLATE', 'VEHICLE', 'YEAR', 'COLOR', 'OWNER', 'STATUS'];
             const rows = uniqueResults.map(v => [
               v.plate,
@@ -84,7 +84,7 @@ export function registerVehicleSearchCommand() {
             ]);
 
             terminal.printTable(headers, rows);
-            
+
             terminal.print('\nUse "search-vehicle search <PLATE>" for full details', 'info');
           }
         }
@@ -103,28 +103,28 @@ function getVehicleStatus(vehicle: Vehicle): string {
   return vehicle.registrationStatus;
 }
 
-async function showVehicleDetails(terminal: any, vehicle: Vehicle) {
+async function showVehicleDetails(terminal: TerminalAPI, vehicle: Vehicle): Promise<void> {
   terminal.print(`\n=== VEHICLE RECORD ===`, 'system');
   terminal.print(`Plate: ${vehicle.plate}`, 'info');
   terminal.print(`VIN: ${vehicle.vin}`, 'info');
   terminal.print(`Vehicle: ${vehicle.year} ${vehicle.make} ${vehicle.model}`, 'info');
   terminal.print(`Color: ${vehicle.color}`, 'info');
-  
+
   terminal.print('\n--- OWNERSHIP ---', 'system');
   terminal.print(`Owner: ${vehicle.ownerName}`, 'info');
   terminal.print(`Owner ID: ${vehicle.ownerId}`, 'info');
-  
+
   terminal.print('\n--- REGISTRATION ---', 'system');
-  terminal.print(`Registration: ${vehicle.registrationStatus}`, 
+  terminal.print(`Registration: ${vehicle.registrationStatus}`,
     vehicle.registrationStatus === 'SUSPENDED' ? 'warning' : 'info');
-  terminal.print(`Insurance: ${vehicle.insuranceStatus}`, 
+  terminal.print(`Insurance: ${vehicle.insuranceStatus}`,
     vehicle.insuranceStatus !== 'VALID' ? 'warning' : 'info');
-  
+
   if (vehicle.stolen) {
     terminal.print(`\n⚠ STOLEN VEHICLE ⚠`, 'error');
     terminal.print(`Reported: ${vehicle.stolenReportedAt ? new Date(vehicle.stolenReportedAt).toLocaleDateString() : 'Unknown'}`, 'error');
   }
-  
+
   if (vehicle.flags && vehicle.flags.length > 0) {
     terminal.print(`\n--- FLAGS ---`, 'warning');
     vehicle.flags.forEach(flag => {
@@ -135,13 +135,13 @@ async function showVehicleDetails(terminal: any, vehicle: Vehicle) {
   const owner = (Object.values(cadState.persons) as Person[]).find(
     p => p.citizenid === vehicle.ownerId
   );
-  
+
   if (owner) {
     terminal.print('\n--- OWNER DETAILS ---', 'system');
     terminal.print(`Name: ${owner.firstName} ${owner.lastName}`, 'info');
     terminal.print(`Phone: ${owner.phone || 'N/A'}`, 'info');
     terminal.print(`Address: ${owner.address || 'N/A'}`, 'info');
-    
+
     if (owner.isDead) {
       terminal.print(`⚠ OWNER IS DECEASED`, 'error');
     }
@@ -149,7 +149,7 @@ async function showVehicleDetails(terminal: any, vehicle: Vehicle) {
 
   const otherVehicles = (Object.values(cadState.vehicles) as Vehicle[])
     .filter(v => v.ownerId === vehicle.ownerId && v.plate !== vehicle.plate);
-  
+
   if (otherVehicles.length > 0) {
     terminal.print(`\n--- OTHER VEHICLES (${otherVehicles.length}) ---`, 'system');
     otherVehicles.forEach(v => {

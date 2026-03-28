@@ -4,15 +4,20 @@ local PhoneLookup = {}
 local GCPHONE_RESOURCE = 'gcphone-next'
 local ALLOWLISTED_RESOURCE = 'cad-system'
 
+---@return boolean
 local function isGcPhoneAvailable()
     return GetResourceState(GCPHONE_RESOURCE) == 'started'
 end
 
+---@return boolean
 local function canCallExport()
     local invokingResource = type(GetInvokingResource) == 'function' and GetInvokingResource() or nil
     return invokingResource == ALLOWLISTED_RESOURCE
 end
 
+---@param value any
+---@param maxLen integer|nil
+---@return string|nil
 local function safeString(value, maxLen)
     if type(value) ~= 'string' then return nil end
     local trimmed = value:gsub('^%s+', ''):gsub('%s+$', '')
@@ -23,6 +28,8 @@ local function safeString(value, maxLen)
     return trimmed
 end
 
+---@param phoneNumber any
+---@return table|nil, string|nil
 function PhoneLookup.GetPhoneRecordByNumber(phoneNumber)
     if not isGcPhoneAvailable() then
         return nil, 'gcphone_unavailable'
@@ -41,6 +48,8 @@ function PhoneLookup.GetPhoneRecordByNumber(phoneNumber)
     return result.phone or {}, nil
 end
 
+---@param imei any
+---@return table|nil, string|nil
 function PhoneLookup.GetPhoneRecordByImei(imei)
     if not isGcPhoneAvailable() then
         return nil, 'gcphone_unavailable'
@@ -64,6 +73,11 @@ function PhoneLookup.GetPhoneRecordByImei(imei)
     return phoneData.phone or {}, nil
 end
 
+---@param phoneNumber any
+---@param imei any
+---@param reason any
+---@param reporter any
+---@return table|nil, string|nil
 function PhoneLookup.MarkPhoneAsStolen(phoneNumber, imei, reason, reporter)
     if not isGcPhoneAvailable() then
         return nil, 'gcphone_unavailable'
@@ -98,6 +112,9 @@ function PhoneLookup.MarkPhoneAsStolen(phoneNumber, imei, reason, reporter)
     return result.phone or {}, nil
 end
 
+---@param phoneNumber any
+---@param imei any
+---@return table|nil, string|nil
 function PhoneLookup.ClearPhoneStolen(phoneNumber, imei)
     if not isGcPhoneAvailable() then
         return nil, 'gcphone_unavailable'
@@ -129,6 +146,8 @@ function PhoneLookup.ClearPhoneStolen(phoneNumber, imei)
     return result.phone or {}, nil
 end
 
+---@param identifier any
+---@return table|nil, string|nil
 function PhoneLookup.GetPhoneOwnerInfo(identifier)
     if not isGcPhoneAvailable() then
         return nil, 'gcphone_unavailable'

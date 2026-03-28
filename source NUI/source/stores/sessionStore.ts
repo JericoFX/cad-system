@@ -20,7 +20,6 @@ interface SessionState {
   isVisible: boolean;
   isExpanded: boolean;
   
-  // Terminal context
   terminalId: string | null;
   terminalLocation: { x: number; y: number; z: number } | null;
   hasContainer: boolean;
@@ -39,14 +38,13 @@ const initialState: SessionState = {
   radioStatus: 'disconnected',
   isVisible: true,
   isExpanded: false,
-  // Terminal context
   terminalId: null,
   terminalLocation: null,
   hasContainer: false,
   hasReader: false,
 };
 
-export const [sessionState, setSessionState] = createStore(initialState);
+export const [sessionState, setSessionState] = createStore<SessionState>(initialState);
 
 let sessionEffectsDisposer: (() => void) | null = null;
 
@@ -195,8 +193,7 @@ export const sessionActions = {
     return parts.join(' | ') || 'No active context';
   },
 
-  // Terminal context actions
-  setTerminalContext: (context: { 
+  setTerminalContext: (context: {
     terminalId: string; 
     location?: { x: number; y: number; z: number }; 
     hasContainer?: boolean; 

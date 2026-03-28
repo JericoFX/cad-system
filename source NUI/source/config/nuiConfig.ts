@@ -1,12 +1,4 @@
-/**
- * NUI Customization Configuration
- * 
- * Modify this file to customize the NUI interface
- * without changing core system files
- */
-
 export interface NuiCustomization {
-  // Theme customization
   theme: {
     primaryColor?: string;
     secondaryColor?: string;
@@ -15,7 +7,6 @@ export interface NuiCustomization {
     fontSize?: string;
   };
 
-  // Layout customization
   layout: {
     dockPosition?: 'bottom' | 'left' | 'right';
     dockSize?: 'small' | 'medium' | 'large';
@@ -23,7 +14,6 @@ export interface NuiCustomization {
     terminalHeight?: number;
   };
 
-  // Feature toggles
   features: {
     enableDispatch?: boolean;
     enableEvidence?: boolean;
@@ -35,21 +25,18 @@ export interface NuiCustomization {
     enableSecurityCameras?: boolean;
   };
 
-  // Custom CSS classes
   styles: {
     terminalClass?: string;
     dockClass?: string;
     modalClass?: string;
   };
 
-  // Custom components (path to custom component files)
   components: {
     customDock?: string;
     customTerminal?: string;
     customModals?: string[];
   };
 
-  // Phone customization
   phone: {
     enablePhone?: boolean;
     phoneResource?: string;
@@ -57,7 +44,6 @@ export interface NuiCustomization {
   };
 }
 
-// Default configuration
 export const defaultConfig: NuiCustomization = {
   theme: {
     primaryColor: '#00ff00',
@@ -104,7 +90,6 @@ export const defaultConfig: NuiCustomization = {
   },
 };
 
-// Export merged config helper
 export function mergeConfig(base: NuiCustomization, override: Partial<NuiCustomization>): NuiCustomization {
   return {
     ...base,

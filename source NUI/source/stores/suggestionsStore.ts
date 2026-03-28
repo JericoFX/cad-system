@@ -23,7 +23,7 @@ const initialState: SuggestionsState = {
   isVisible: false,
 };
 
-export const [suggestionsState, setSuggestionsState] = createStore(initialState);
+export const [suggestionsState, setSuggestionsState] = createStore<SuggestionsState>(initialState);
 
 export const COMMAND_SUGGESTIONS: Record<string, string[]> = {
   'case': ['addnote', 'addevidence', 'task add', 'notes', 'evidence'],

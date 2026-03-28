@@ -4,7 +4,7 @@ import { cadState, cadActions, type Vehicle } from '~/stores/cadStore';
 import { fetchNui } from '~/utils/fetchNui';
 import { Button, Input, Modal, Tabs, Textarea } from '~/components/ui';
 import { PhotoGallery } from '~/components/ui/PhotoGallery';
-import { useEntityNotes } from '~/hooks/useEntityNotes';
+import type { EntityNoteResponse, EntityNote } from '~/hooks/useEntityNotes';
 import { formatDate as formatDateUtil } from '~/utils/storeHelpers/dateHelpers';
 
 interface LookupVehiclesResponse {
@@ -65,7 +65,7 @@ export function VehicleSearch() {
       });
 
       const notes = Array.isArray(response.notes)
-        ? response.notes.map((note) => ({
+        ? response.notes.map((note: EntityNote) => ({
             id: note.id,
             content: note.content,
             author: note.authorName || note.author,

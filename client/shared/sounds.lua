@@ -1,7 +1,24 @@
 local Registry = require 'modules.shared.registry'
 
+---@class SoundConfig
+---@field soundName string
+---@field soundSet string
+---@field soundRef string|nil
+
+---@class SoundsModule
+---@field Play fun(soundConfig: SoundConfig): nil
+---@field PTTStart fun(): nil
+---@field PTTEnd fun(): nil
+---@field DispatchIncoming fun(): nil
+---@field EmergencyAlert fun(): nil
+---@field Success fun(): nil
+---@field Error fun(): nil
+---@field Click fun(): nil
+---@field Back fun(): nil
+
 local Sounds = {}
 
+---@type table<string, SoundConfig>
 local SOUND_IDS = {
 
     PTT_START = { soundName = "Start_Squelch", soundSet = "CB_RADIO_SFX" },
@@ -17,6 +34,8 @@ local SOUND_IDS = {
     BACK = { soundName = "BACK", soundSet = "HUD_FRONTEND_DEFAULT_SOUNDSET" },
 }
 
+---@param soundConfig SoundConfig
+---@return nil
 function Sounds.Play(soundConfig)
     if not soundConfig then return end
 

@@ -1,14 +1,17 @@
 local State = require 'modules.shared.state'
 local EvidenceTypes = require 'shared.evidence_types'
 
+---@return number
 local function getPed()
     return cache.ped or PlayerPedId()
 end
 
+---@return number
 local function getLocalServerId()
     return GetPlayerServerId(PlayerId())
 end
 
+---@return boolean
 local function isWearingGloves()
     if GetResourceState('qb-core') ~= 'started' then
         return false
@@ -19,6 +22,7 @@ local function isWearingGloves()
     return tonumber(metadata.glove) ~= 0
 end
 
+---@return boolean
 local function isCrimeContext()
     local calls = State.Dispatch.Calls or {}
     for _, call in pairs(calls) do
@@ -30,6 +34,10 @@ local function isCrimeContext()
     return false
 end
 
+---@param entity number
+---@param boneName string
+---@param surfaceType string
+---@return nil
 local function createFingerprintEvidence(entity, boneName, surfaceType)
     if not DoesEntityExist(entity) then
         return

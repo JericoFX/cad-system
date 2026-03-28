@@ -10,7 +10,7 @@ interface NotificationCenterProps {
 }
 
 export function NotificationCenter(props: NotificationCenterProps = {}) {
-  const mode = () => props.mode || 'floating';
+  const mode = (): string => props.mode || 'floating';
 
   const filteredNotifications = createMemo(() => {
     switch (notificationState.filter) {
@@ -38,7 +38,7 @@ export function NotificationCenter(props: NotificationCenterProps = {}) {
 
   const getPriorityColor = (priority: Notification['priority']): string => getColor(priority);
 
-  const handleAction = (notification: Notification) => {
+  const handleAction = (notification: Notification): void => {
     notificationActions.markAsRead(notification.id);
     
     if (notification.action?.modal) {
@@ -50,7 +50,7 @@ export function NotificationCenter(props: NotificationCenterProps = {}) {
     notificationActions.close();
   };
 
-  const toggle = () => {
+  const toggle = (): void => {
     const opening = !notificationState.isOpen;
     notificationActions.toggle();
     if (opening) {

@@ -3,7 +3,7 @@ import { createCommand } from '../commandBuilder';
 import { cadActions, cadState, type BOLO } from '~/stores/cadStore';
 import { userActions } from '~/stores/userStore';
 
-export function registerBOLOCommands() {
+export function registerBOLOCommands(): void {
   createCommand({
     name: 'bolo-gui',
     aliases: ['bolos'],
@@ -51,7 +51,7 @@ export function registerBOLOCommands() {
   });
 }
 
-async function handleAddBOLO(args: string[], terminal: any) {
+async function handleAddBOLO(args: string[], terminal: import('../types').TerminalAPI): Promise<void> {
   const type = args[0] as 'person' | 'vehicle';
   
   if (!type || (type !== 'person' && type !== 'vehicle')) {
@@ -115,7 +115,7 @@ async function handleAddBOLO(args: string[], terminal: any) {
   terminal.print(`  Issued by: ${bolo.issuedByName}`, 'info');
 }
 
-function handleListBOLOs(terminal: any) {
+function handleListBOLOs(terminal: import('../types').TerminalAPI): void {
   const bolos = cadActions.getActiveBOLOs();
   
   if (bolos.length === 0) {
@@ -146,7 +146,7 @@ function handleListBOLOs(terminal: any) {
   );
 }
 
-async function handleRemoveBOLO(boloId: string, terminal: any) {
+async function handleRemoveBOLO(boloId: string, terminal: import('../types').TerminalAPI): Promise<void> {
   if (!boloId) {
     const bolos = cadActions.getActiveBOLOs();
     if (bolos.length === 0) {
@@ -186,7 +186,7 @@ async function handleRemoveBOLO(boloId: string, terminal: any) {
   terminal.print(`✓ BOLO removed: ${bolo.identifier}`, 'success');
 }
 
-async function handleCheckBOLO(args: string[], terminal: any) {
+async function handleCheckBOLO(args: string[], terminal: import('../types').TerminalAPI): Promise<void> {
   const type = args[0] as 'person' | 'vehicle';
   const identifier = args[1];
 

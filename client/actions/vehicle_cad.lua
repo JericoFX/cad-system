@@ -41,6 +41,7 @@ local quickDockEnabled = true
 ---@type CadVehicleQuickLock|nil
 local lastQuickLock = nil
 
+---@return table
 local function getVehicleTabletConfig()
     local cfg = Config.Forensics and Config.Forensics.IdReader or {}
     if type(cfg.VehicleTablet) == 'table' then
@@ -49,6 +50,8 @@ local function getVehicleTabletConfig()
     return {}
 end
 
+---@param vehicle number|nil
+---@return boolean
 local function isPoliceVehicle(vehicle)
     if not vehicle or vehicle == 0 then
         return false
@@ -86,6 +89,8 @@ local function isPoliceVehicle(vehicle)
     return POLICE_VEHICLES[modelName] == true
 end
 
+---@param vehicle number
+---@return string
 local function getVehicleLabel(vehicle)
     local model = GetEntityModel(vehicle)
     local display = GetDisplayNameFromVehicleModel(model)
@@ -96,6 +101,8 @@ local function getVehicleLabel(vehicle)
     return Utils.Trim(label)
 end
 
+---@param vehicle number|nil
+---@return 'DRIVER'|'PASSENGER'|'OTHER'|'NONE'
 local function getVehicleRole(vehicle)
     if type(cachedSeat) == 'number' then
         if cachedSeat == -1 or cachedSeat == 0 then
@@ -122,6 +129,7 @@ local function getVehicleRole(vehicle)
     return 'OTHER'
 end
 
+---@return boolean
 local function canUseScanner()
     if not isInPoliceVehicle then
         return false
@@ -136,6 +144,7 @@ local function canUseScanner()
     return role == 'DRIVER' or role == 'PASSENGER'
 end
 
+---@return nil
 local function updateRadarVisibility()
     local shouldHide = isInPoliceVehicle and tabletOpen
 
@@ -151,6 +160,7 @@ local function updateRadarVisibility()
     end
 end
 
+---@return nil
 local function sendVehicleContextNui()
     local ped = cache.ped or PlayerPedId()
     local vehicle = GetVehiclePedIsIn(ped, false)
@@ -175,6 +185,8 @@ local function sendVehicleContextNui()
     })
 end
 
+---@param autoOpened boolean|nil
+---@return nil
 local function openVehicleCad(autoOpened)
     if autoOpened == true then
         quickDockEnabled = true
@@ -199,6 +211,8 @@ local function openVehicleCad(autoOpened)
     updateRadarVisibility()
 end
 
+---@param forceClose boolean|nil
+---@return nil
 local function closeVehicleCad(forceClose)
     tabletOpen = false
 
@@ -220,6 +234,9 @@ local function closeVehicleCad(forceClose)
     updateRadarVisibility()
 end
 
+---@param nextState boolean
+---@param autoOpen boolean|nil
+---@return nil
 local function setPoliceVehicleContext(nextState, autoOpen)
     local desired = nextState == true
     if desired == isInPoliceVehicle then
@@ -243,6 +260,8 @@ local function setPoliceVehicleContext(nextState, autoOpen)
     end
 end
 
+---@param maxDistance number|nil
+---@return number|nil, vector3|nil
 local function raycastVehicleFromCamera(maxDistance)
     local distance = tonumber(maxDistance) or 60.0
     if distance < 5.0 then
@@ -384,6 +403,8 @@ function Vehicle.LockFrontQuick()
     }
 end
 
+---@param payload { type?: string }|nil
+---@return { ok: boolean }
 function Vehicle.PlayAlert(payload)
     local alertType = Utils.Trim(payload and payload.type or 'wanted'):lower()
 
@@ -403,6 +424,8 @@ function Vehicle.PlayAlert(payload)
     return { ok = true }
 end
 
+---@param open boolean
+---@return { ok: boolean, tabletOpen?: boolean, error?: string }
 function Vehicle.SetTabletOpen(open)
     if open == true and not isInPoliceVehicle then
         return {
@@ -423,22 +446,29 @@ function Vehicle.SetTabletOpen(open)
     }
 end
 
+---@param autoOpened boolean|nil
+---@return nil
 function Vehicle.OpenTablet(autoOpened)
     openVehicleCad(autoOpened == true)
 end
 
+---@param forceClose boolean|nil
+---@return nil
 function Vehicle.CloseTablet(forceClose)
     closeVehicleCad(forceClose == true)
 end
 
+---@return boolean
 function Vehicle.IsTabletOpen()
     return tabletOpen == true
 end
 
+---@return boolean
 function Vehicle.IsPoliceVehicleContext()
     return isInPoliceVehicle == true
 end
 
+---@return { ok: boolean, isInPoliceVehicle: boolean, tabletOpen: boolean, quickDockEnabled: boolean, quickLock: CadVehicleQuickLock|nil }
 function Vehicle.GetContext()
     return {
         ok = true,
@@ -449,6 +479,7 @@ function Vehicle.GetContext()
     }
 end
 
+---@return { ok: boolean, hasReader?: boolean, endpointType?: string, endpointId?: string, vehicleNetId?: number, error?: string }
 function Vehicle.GetReaderContext()
     local vehicleReaderCfg = getVehicleTabletConfig()
     if vehicleReaderCfg.Enabled ~= true then
@@ -491,6 +522,8 @@ function Vehicle.GetReaderContext()
     }
 end
 
+---@param enabled boolean
+---@return { ok: boolean, quickDockEnabled: boolean }
 function Vehicle.SetQuickDockEnabled(enabled)
     quickDockEnabled = enabled == true
     sendVehicleContextNui()

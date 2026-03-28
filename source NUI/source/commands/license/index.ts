@@ -2,7 +2,7 @@
 import { createCommand } from '../commandBuilder';
 import { licenseActions, LICENSE_TYPES } from '~/stores/licenseStore';
 
-export function registerLicenseCommands() {
+export function registerLicenseCommands(): void {
   createCommand({
     name: 'license',
     description: 'Abrir gestor de licencias (GUI)',

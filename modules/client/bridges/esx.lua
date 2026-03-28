@@ -1,9 +1,11 @@
 local ESXClient = {}
 
+---@return boolean
 function ESXClient.IsAvailable()
     return GetResourceState('es_extended') == 'started'
 end
 
+---@param refreshAccess function
 function ESXClient.RegisterAccessEvents(refreshAccess)
     RegisterNetEvent('esx:playerLoaded', function()
         refreshAccess()

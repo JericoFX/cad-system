@@ -18,14 +18,14 @@ async function ensureCatalog(): Promise<FineCatalogItem[]> {
   return catalogCache;
 }
 
-async function refreshFinesForTarget(targetId: string) {
+async function refreshFinesForTarget(targetId: string): Promise<Fine[]> {
   const rows = await fetchNui<Fine[]>('cad:getFines', { targetId });
   const record = Object.fromEntries((rows || []).map((fine) => [fine.fineId, fine]));
   cadActions.setFines(record);
   return rows || [];
 }
 
-export function registerFineCommands() {
+export function registerFineCommands(): void {
   createCommandWithSubcommands({
     name: 'fine',
     aliases: ['ticket', 'multa'],

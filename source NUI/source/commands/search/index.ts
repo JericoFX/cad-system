@@ -3,7 +3,7 @@ import { createCommand } from '../commandBuilder';
 import { registerPersonSearchCommand } from './person';
 import { registerVehicleSearchCommand } from './vehicle';
 
-export function registerSearchCommands() {
+export function registerSearchCommands(): void {
   createCommand({
     name: 'search',
     description: 'Search help - shows available search commands',

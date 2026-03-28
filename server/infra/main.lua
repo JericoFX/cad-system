@@ -8,6 +8,10 @@ local DB = require 'modules.server.database'
 local Registry = require 'modules.shared.registry'
 
 
+---@param raw any
+---@param fallback any
+---@param context string|nil
+---@return any
 local function safeJsonDecode(raw, fallback, context)
     if type(raw) ~= 'string' or raw == '' then
         return fallback
@@ -26,6 +30,10 @@ local function safeJsonDecode(raw, fallback, context)
     return decoded
 end
 
+---@param sql string
+---@param params table|nil
+---@param context string|nil
+---@return table
 local function safeQuery(sql, params, context)
     local ok, rows = pcall(function()
         return MySQL.query.await(sql, params or {})
@@ -39,6 +47,7 @@ local function safeQuery(sql, params, context)
     return rows or {}
 end
 
+---@return table
 local function bootstrapCases()
     local caseRows = safeQuery('SELECT case_id, case_type, title, description, status, priority, created_by, assigned_to, linked_call_id, person_id, person_name, created_at, updated_at FROM cad_cases', {}, 'cad_cases')
     for i = 1, #caseRows do
@@ -99,6 +108,7 @@ local function bootstrapCases()
     return caseRows
 end
 
+---@return table
 local function bootstrapDispatchCalls()
     local callRows = {}
     if Config.IsFeatureEnabled == nil or Config.IsFeatureEnabled('Dispatch') then
@@ -122,6 +132,7 @@ local function bootstrapDispatchCalls()
     return callRows
 end
 
+---@return table
 local function bootstrapFines()
     local fineRows = safeQuery('SELECT * FROM cad_fines WHERE status = ?', { 'PENDING' }, 'cad_fines')
     for i = 1, #fineRows do
@@ -148,6 +159,7 @@ local function bootstrapFines()
     return fineRows
 end
 
+---@return table
 local function bootstrapEMS()
     local bloodRows = {}
     if Config.IsFeatureEnabled == nil or Config.IsFeatureEnabled('EMS') then
@@ -190,6 +202,7 @@ local function bootstrapEMS()
     return bloodRows
 end
 
+---@return table
 local function bootstrapJailTransfers()
     local jailRows = safeQuery('SELECT transfer_id, citizen_id, person_name, case_id, jail_months, reason, facility, notes, created_by, created_by_name, created_at FROM cad_jail_transfers ORDER BY created_at DESC LIMIT 500', {}, 'cad_jail_transfers')
     for i = 1, #jailRows do
@@ -211,6 +224,7 @@ local function bootstrapJailTransfers()
     return jailRows
 end
 
+---@return table
 local function bootstrapCameras()
     State.SecurityCameras = State.SecurityCameras or {
         Cameras = {},
@@ -251,6 +265,7 @@ local function bootstrapCameras()
     return cameraRows
 end
 
+---@return integer
 local function bootstrapExtensions()
     local TopologyAction = Registry.Get("Topology")
     if TopologyAction and TopologyAction.LoadFromDatabase then
@@ -266,6 +281,7 @@ local function bootstrapExtensions()
     return virtualSlots
 end
 
+---@return nil
 local function bootstrapFromDatabase()
     local caseRows = bootstrapCases()
     local callRows = bootstrapDispatchCalls()
@@ -288,6 +304,7 @@ local function bootstrapFromDatabase()
     )
 end
 
+---@return string[]
 local function validateConfig()
     local errors = {}
 
@@ -351,6 +368,7 @@ local function validateConfig()
     return errors
 end
 
+---@return string
 local function readVersion()
     local raw = LoadResourceFile(GetCurrentResourceName(), 'version.txt')
     if not raw then return 'unknown' end
@@ -388,6 +406,7 @@ lib.callback.register('cad:getConfig', Auth.WithGuard('default', function()
     }
 end))
 
+---@return table
 local function getCallsignPolicy()
     local policy = Config.Security and Config.Security.Callsign or {}
     local prefixes = {}

@@ -1,3 +1,5 @@
+---@param itemName string
+---@return boolean
 local function hasItem(itemName)
     if GetResourceState('ox_inventory') ~= 'started' then
         return false
@@ -6,10 +8,15 @@ local function hasItem(itemName)
     return exports.ox_inventory:Search('count', itemName) > 0
 end
 
+---@return number
 local function getPed()
     return cache.ped or PlayerPedId()
 end
 
+---@param duration number
+---@param label string
+---@param anim { dict: string, clip: string }|nil
+---@return boolean
 local function showProgress(duration, label, anim)
     return lib.progressBar({
         duration = duration,
@@ -28,6 +35,7 @@ local function showProgress(duration, label, anim)
     })
 end
 
+---@return nil
 local function useForensicKit()
     lib.notify({
         title = 'Forensics',
@@ -36,6 +44,7 @@ local function useForensicKit()
     })
 end
 
+---@return nil
 local function useUVFlashlight()
     if not hasItem('uv_flashlight') then
         lib.notify({ title = 'Forensics', description = 'You need a UV flashlight', type = 'error' })
@@ -57,6 +66,7 @@ local function useUVFlashlight()
     lib.notify({ title = 'Forensics', description = 'Blood evidence revealed', type = 'success' })
 end
 
+---@return nil
 local function useFingerprintPowder()
     if not hasItem('fingerprint_powder') then
         lib.notify({ title = 'Forensics', description = 'You need fingerprint powder', type = 'error' })
@@ -76,6 +86,7 @@ local function useFingerprintPowder()
     lib.notify({ title = 'Forensics', description = 'Fingerprints revealed', type = 'success' })
 end
 
+---@return nil
 local function useFingerprintTape()
     if not hasItem('fingerprint_tape') then
         lib.notify({ title = 'Forensics', description = 'You need fingerprint tape', type = 'error' })
@@ -95,6 +106,7 @@ local function useFingerprintTape()
     lib.notify({ title = 'Forensics', description = 'Fingerprint collected', type = 'success' })
 end
 
+---@return nil
 local function useHydrogenPeroxide()
     if not hasItem('hydrogen_peroxide') then
         lib.notify({ title = 'Forensics', description = 'You need hydrogen peroxide', type = 'error' })

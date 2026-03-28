@@ -17,6 +17,8 @@ local LEGACY_DOC_HINTS = {
     registration = true,
 }
 
+---@param path string
+---@return string[]
 local function splitPath(path)
     local parts = {}
     for segment in tostring(path):gmatch('[^%.]+') do
@@ -25,6 +27,9 @@ local function splitPath(path)
     return parts
 end
 
+---@param tbl any
+---@param path string
+---@return any
 local function deepGet(tbl, path)
     if type(tbl) ~= 'table' or type(path) ~= 'string' or path == '' then
         return nil
@@ -42,6 +47,9 @@ local function deepGet(tbl, path)
     return cursor
 end
 
+---@param tbl any
+---@param keys string[]
+---@return string|nil
 local function firstString(tbl, keys)
     if type(tbl) ~= 'table' then
         return nil
@@ -57,6 +65,9 @@ local function firstString(tbl, keys)
     return nil
 end
 
+---@param tbl any
+---@param keys string[]
+---@return number|nil
 local function firstNumber(tbl, keys)
     if type(tbl) ~= 'table' then
         return nil
@@ -73,6 +84,9 @@ local function firstNumber(tbl, keys)
     return nil
 end
 
+---@param tbl any
+---@param keys string[]
+---@return boolean|nil
 local function firstBool(tbl, keys)
     if type(tbl) ~= 'table' then
         return nil
@@ -100,6 +114,8 @@ local function firstBool(tbl, keys)
     return nil
 end
 
+---@param raw any
+---@return 'MALE'|'FEMALE'|'OTHER'
 local function normalizeGender(raw)
     local value = tostring(raw or ''):lower()
     if value == 'm' or value == 'male' or value == 'man' then
@@ -111,6 +127,8 @@ local function normalizeGender(raw)
     return 'OTHER'
 end
 
+---@param name any
+---@return string|nil, string|nil
 local function splitFullName(name)
     if type(name) ~= 'string' then
         return nil, nil
@@ -134,6 +152,8 @@ local function splitFullName(name)
     return first, last
 end
 
+---@param metadata table
+---@return string
 local function detectMetadataSource(metadata)
     if type(metadata.info) == 'table' then
         return 'qb-inventory-info'
@@ -144,6 +164,9 @@ local function detectMetadataSource(metadata)
     return 'generic'
 end
 
+---@param metadata table
+---@param itemName string|nil
+---@return string
 local function detectDocumentType(metadata, itemName)
     local plate = firstString(metadata, {
         'plate', 'licensePlate', 'vehPlate', 'vehicle.plate', 'info.plate', 'info.licensePlate',
@@ -182,6 +205,10 @@ local function detectDocumentType(metadata, itemName)
     return 'UNKNOWN'
 end
 
+---@param itemName string|nil
+---@param metadata table
+---@param sourceSlot integer|nil
+---@return table
 local function normalizeDocumentPerson(itemName, metadata, sourceSlot)
     local citizenId = firstString(metadata, {
         'citizenid', 'citizenId', 'cid', 'identifier', 'charid', 'charId',
@@ -275,6 +302,8 @@ local function normalizeDocumentPerson(itemName, metadata, sourceSlot)
     return person
 end
 
+---@param metadata table
+---@return table|nil
 local function normalizeVehicleDocument(metadata)
     local plate = firstString(metadata, {
         'plate', 'licensePlate', 'vehPlate', 'vehicle.plate', 'info.plate', 'info.licensePlate',
@@ -375,6 +404,10 @@ local function normalizeVehicleDocument(metadata)
     }
 end
 
+---@param itemName string|nil
+---@param metadata table
+---@param sourceSlot integer|nil
+---@return table|nil, string|nil
 local function normalizeDocumentPayload(itemName, metadata, sourceSlot)
     local documentType = detectDocumentType(metadata, itemName)
     local source = detectMetadataSource(metadata)
@@ -402,6 +435,8 @@ local function normalizeDocumentPayload(itemName, metadata, sourceSlot)
     }
 end
 
+---@param terminalId string
+---@return table|nil
 local function getTerminalById(terminalId)
     local points = Config.UI.AccessPoints or {}
     for i = 1, #points do
@@ -414,10 +449,15 @@ local function getTerminalById(terminalId)
     return nil
 end
 
+---@param value any
+---@return boolean
 local function isVehicleEndpointId(value)
     return type(value) == 'string' and value:sub(1, 8) == 'vehicle:'
 end
 
+---@param payload table|nil
+---@param terminalId string|nil
+---@return integer|nil
 local function extractVehicleNetId(payload, terminalId)
     if isVehicleEndpointId(terminalId) then
         local parsed = tonumber(terminalId:sub(9))
@@ -434,6 +474,9 @@ local function extractVehicleNetId(payload, terminalId)
     return nil
 end
 
+---@param officer table
+---@param allowedJobs table
+---@return boolean
 local function hasVehicleTabletAccess(officer, allowedJobs)
     if officer.isAdmin then
         return true
@@ -453,6 +496,11 @@ local function hasVehicleTabletAccess(officer, allowedJobs)
     return false
 end
 
+---@param source number
+---@param payload table|nil
+---@param officer table
+---@param rawTerminalId string|nil
+---@return string|nil, table|nil, table|nil, table|nil
 local function resolveVehicleReaderContext(source, payload, officer, rawTerminalId)
     local global = Config.Forensics and Config.Forensics.IdReader or {}
     local vehicleCfg = type(global.VehicleTablet) == 'table' and global.VehicleTablet or {}
@@ -541,6 +589,8 @@ local function resolveVehicleReaderContext(source, payload, officer, rawTerminal
     return terminalId, context, readerConfig, nil
 end
 
+---@param terminal table
+---@return table|nil
 local function normalizeReaderConfig(terminal)
     local global = Config.Forensics and Config.Forensics.IdReader or {}
     local reader = terminal.idReader
@@ -567,6 +617,9 @@ local function normalizeReaderConfig(terminal)
     }
 end
 
+---@param officer table
+---@param terminal table
+---@return boolean
 local function hasTerminalAccess(officer, terminal)
     if not terminal.jobs or #terminal.jobs == 0 then
         return true
@@ -585,6 +638,9 @@ local function hasTerminalAccess(officer, terminal)
     return false
 end
 
+---@param readerConfig table
+---@param itemName string
+---@return boolean
 local function isAllowedItemName(readerConfig, itemName)
     local strict = readerConfig.strictAllowedItems == true
     if not strict then
@@ -605,6 +661,9 @@ local function isAllowedItemName(readerConfig, itemName)
     return false
 end
 
+---@param readerConfig table
+---@param item table|nil
+---@return boolean, string
 local function isDocumentCandidate(readerConfig, item)
     if not item or not item.name then
         return false, 'UNKNOWN'
@@ -628,11 +687,16 @@ local function isDocumentCandidate(readerConfig, item)
     return LEGACY_DOC_HINTS[tostring(item.name):lower()] == true, 'PERSON'
 end
 
+---@return boolean
 local function readerFeatureEnabled()
     local cfg = Config.Forensics and Config.Forensics.IdReader or {}
     return cfg.Enabled == true and cfg.UseVirtualContainer == true and Registry.Get("VirtualContainer") ~= nil
 end
 
+---@param source number
+---@param payload table|nil
+---@param officer table
+---@return string|nil, table|nil, table|nil, table|nil
 local function resolveReaderContext(source, payload, officer)
     local terminalId = Fn.SanitizeString(payload and payload.terminalId, 64)
     if terminalId == '' then
@@ -672,6 +736,8 @@ local function resolveReaderContext(source, payload, officer)
     return terminalId, terminal, readerConfig, nil
 end
 
+---@param terminalId string
+---@return string
 local function getVirtualContainerKey(terminalId)
     if isVehicleEndpointId(terminalId) then
         return terminalId
@@ -680,6 +746,9 @@ local function getVirtualContainerKey(terminalId)
     return ('terminal:%s'):format(terminalId)
 end
 
+---@param terminalId string
+---@param readerConfig table
+---@return table|nil, string|nil
 local function ensureVirtualReaderContainer(terminalId, readerConfig)
     local containerKey = getVirtualContainerKey(terminalId)
     local container, ensureErr = Registry.Get("VirtualContainer").Ensure(containerKey, {
@@ -698,6 +767,8 @@ local function ensureVirtualReaderContainer(terminalId, readerConfig)
     return container, nil
 end
 
+---@param source number
+---@return table[]
 local function getInventoryItems(source)
     local items = exports.ox_inventory:GetInventoryItems(source) or {}
     local output = {}
@@ -710,6 +781,10 @@ local function getInventoryItems(source)
     return output
 end
 
+---@param containerKey string
+---@param readerConfig table
+---@param requestedSlot any
+---@return integer|nil, table|nil
 local function getVirtualReaderSlot(containerKey, readerConfig, requestedSlot)
     local targetSlot = tonumber(requestedSlot)
     if targetSlot and targetSlot > 0 then
@@ -735,6 +810,9 @@ local function getVirtualReaderSlot(containerKey, readerConfig, requestedSlot)
     return nil, nil
 end
 
+---@param terminal table
+---@param readerConfig table
+---@return boolean, string|nil
 local function ensureReaderStash(terminal, readerConfig)
     if GetResourceState('ox_inventory') ~= 'started' then
         return false, 'ox_inventory_missing'
@@ -771,6 +849,9 @@ local function ensureReaderStash(terminal, readerConfig)
     return true
 end
 
+---@param readerConfig table
+---@param slot any
+---@return table|nil
 local function getReaderStashSlotItem(readerConfig, slot)
     local targetSlot = tonumber(slot) or readerConfig.readSlot
     if targetSlot and targetSlot > 0 then

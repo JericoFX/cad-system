@@ -13,33 +13,33 @@ export function SessionContextBar() {
     sessionActions.initialize();
   });
 
-  const switchCase = () => {
+  const switchCase = (): void => {
     terminalActions.setActiveModal('CASE_MANAGER');
   };
 
-  const clearActiveCase = () => {
+  const clearActiveCase = (): void => {
     registry.execute('case close');
     sessionActions.clearActiveCase();
   };
 
-  const openLinkedCall = () => {
+  const openLinkedCall = (): void => {
     if (featureState.dispatch.visible && sessionState.activeCallId) {
       terminalActions.setActiveModal('DISPATCH_PANEL');
       terminalActions.addLine(`Opening dispatch panel for call ${sessionState.activeCallId}...`, 'system');
     }
   };
 
-  const viewCase = () => {
+  const viewCase = (): void => {
     if (sessionState.activeCaseId) {
       registry.execute(`case view ${sessionState.activeCaseId}`);
     }
   };
 
-  const openRadio = () => {
+  const openRadio = (): void => {
     terminalActions.setActiveModal('RADIO_PANEL');
   };
 
-  const toggleExpand = () => {
+  const toggleExpand = (): void => {
     sessionActions.toggleExpanded();
   };
 

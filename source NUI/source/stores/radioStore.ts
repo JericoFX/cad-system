@@ -443,7 +443,7 @@ export const radioActions = {
     return false;
   },
   
-  emitRadioEvent(event: string, data: any) {
+  emitRadioEvent(event: string, data: unknown) {
     window.dispatchEvent(new CustomEvent(`radio:${event}`, { detail: data }));
   },
   
@@ -457,7 +457,6 @@ export const radioActions = {
     setRadioState('isConnected', false);
   },
 
-  // Radio Chatter Simulation
   toggleChatter() {
     setRadioState('chatterEnabled', !radioState.chatterEnabled);
     if (radioState.chatterEnabled) {
@@ -526,7 +525,7 @@ export const radioActions = {
     const scheduleNextChatter = () => {
       if (!radioState.chatterEnabled) return;
 
-      const delay = Math.random() * 40000 + 20000; // 20-60 seconds
+      const delay = Math.random() * 40000 + 20000;
       chatterTimeoutId = window.setTimeout(() => {
         if (!radioState.chatterEnabled) return;
 
@@ -538,7 +537,6 @@ export const radioActions = {
 
         this.addChatter(message, unit, type);
 
-        // Also add as system message if connected
         if (radioState.currentChannel && radioState.isConnected) {
           this.injectSystemMessage(
             radioState.currentChannel,
@@ -567,7 +565,6 @@ export const radioActions = {
 let chatterTimeoutId: number | null = null;
 let chatterAutoStartId: number | null = null;
 
-// Auto-start radio chatter on import
 if (typeof window !== 'undefined') {
   chatterAutoStartId = window.setTimeout(() => radioActions.startChatter(), 5000);
 }

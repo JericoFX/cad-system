@@ -28,6 +28,9 @@ local Fn = require 'modules.server.functions'
 
 local ALLOWED_JOBS = { 'police', 'sheriff', 'csi', 'dispatch', 'admin' }
 
+---@param value any
+---@param fallback string|nil
+---@return string|nil
 local function sanitizeIdentifier(value, fallback)
     local text = tostring(value or fallback or '')
     text = text:gsub('[^%w_]', '')
@@ -37,6 +40,9 @@ local function sanitizeIdentifier(value, fallback)
     return text
 end
 
+---@param raw any
+---@param fallback any
+---@return any
 local function safeJsonDecode(raw, fallback)
     if type(raw) ~= 'string' or raw == '' then
         return fallback
@@ -54,6 +60,10 @@ local function safeJsonDecode(raw, fallback)
     return decoded
 end
 
+---@param sql string
+---@param params table|nil
+---@param context string|nil
+---@return table[]
 local function safeQuery(sql, params, context)
     local ok, rows = pcall(function()
         return MySQL.query.await(sql, params or {})
@@ -67,6 +77,10 @@ local function safeQuery(sql, params, context)
     return rows or {}
 end
 
+---@param sql string
+---@param params table|nil
+---@param context string|nil
+---@return boolean
 local function safeInsert(sql, params, context)
     local ok, result = pcall(function()
         return MySQL.insert.await(sql, params or {})
@@ -80,10 +94,14 @@ local function safeInsert(sql, params, context)
     return true
 end
 
+---@param source integer
+---@return boolean
 local function isAllowedOfficer(source)
     return Fn.HasRole(source, ALLOWED_JOBS)
 end
 
+---@param value any
+---@return 'PERSON'|'VEHICLE'|nil
 local function normalizeEntityType(value)
     local entityType = tostring(value or ''):upper()
     if entityType == 'PERSON' or entityType == 'VEHICLE' then
@@ -92,6 +110,8 @@ local function normalizeEntityType(value)
     return nil
 end
 
+---@param value any
+---@return boolean
 local function boolFromAny(value)
     if value == true or value == 1 or value == '1' then
         return true
@@ -105,6 +125,9 @@ local function boolFromAny(value)
     return false
 end
 
+---@param value any
+---@param fallback string
+---@return string
 local function stringOrFallback(value, fallback)
     local text = Fn.SanitizeString(value, 128)
     if text == '' then
@@ -114,6 +137,8 @@ local function stringOrFallback(value, fallback)
     return text
 end
 
+---@param vehicleRaw any
+---@return string|nil, boolean
 local function decodeVehicleModel(vehicleRaw)
     local decoded = safeJsonDecode(vehicleRaw, nil)
     if type(decoded) ~= 'table' then
@@ -138,6 +163,7 @@ local function decodeVehicleModel(vehicleRaw)
     return model ~= '' and model or nil, stolen
 end
 
+---@return table
 local function resolveDataSource()
     local cfg = Config.Forensics and Config.Forensics.IdReader or {}
     local tabletCfg = type(cfg.VehicleTablet) == 'table' and cfg.VehicleTablet or {}
@@ -155,6 +181,9 @@ local function resolveDataSource()
     }
 end
 
+---@param row table
+---@param source table
+---@return table
 local function formatPersonFromRow(row, source)
     local charinfoRaw = row[source.playersCharinfoColumn]
     local metadataRaw = row[source.playersMetadataColumn]
@@ -193,6 +222,9 @@ local function formatPersonFromRow(row, source)
     }
 end
 
+---@param citizenId string
+---@param source table
+---@return table|nil
 local function getPersonByCitizenId(citizenId, source)
     if citizenId == '' then
         return nil
@@ -209,6 +241,9 @@ local function getPersonByCitizenId(citizenId, source)
     return formatPersonFromRow(row, source)
 end
 
+---@param plate string
+---@param source table
+---@return table|nil
 local function getVehicleByPlate(plate, source)
     local sql = ('SELECT * FROM %s WHERE %s = ? LIMIT 1')
         :format(source.playerVehiclesTable, source.vehiclesPlateColumn)
@@ -274,6 +309,10 @@ local function listEntityNotes(entityType, entityId, limit)
     return notes
 end
 
+---@param vehicle table|nil
+---@param ownerId string
+---@param noteRows table[]
+---@return table
 local function getRiskFromData(vehicle, ownerId, noteRows)
     local hasImportant = false
     local hasWarrant = false

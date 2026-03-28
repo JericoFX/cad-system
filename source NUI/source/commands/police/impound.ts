@@ -2,7 +2,7 @@
 import { createCommand } from '../commandBuilder';
 import { cadActions, cadState, type Vehicle } from '~/stores/cadStore';
 
-export function registerImpoundCommand() {
+export function registerImpoundCommand(): void {
   createCommand({
     name: 'impound',
     description: 'Impound or release vehicles',
@@ -41,7 +41,7 @@ export function registerImpoundCommand() {
   });
 }
 
-async function handleImpoundVehicle(terminal: any) {
+async function handleImpoundVehicle(terminal: import('../types').TerminalAPI): Promise<void> {
   const plate = await terminal.prompt('Enter vehicle plate:');
   
   if (!plate) {
@@ -135,7 +135,7 @@ async function handleImpoundVehicle(terminal: any) {
   }
 }
 
-async function handleReleaseVehicle(terminal: any) {
+async function handleReleaseVehicle(terminal: import('../types').TerminalAPI): Promise<void> {
   const plate = await terminal.prompt('Enter vehicle plate to release:');
   
   if (!plate) {
@@ -184,7 +184,7 @@ async function handleReleaseVehicle(terminal: any) {
   terminal.print(`Release reason: ${releaseReason || 'No reason provided'}`, 'info');
 }
 
-async function handleListImpounded(terminal: any) {
+async function handleListImpounded(terminal: import('../types').TerminalAPI): Promise<void> {
   const vehicles = Object.values(cadState.vehicles) as Vehicle[];
   const impoundedVehicles = vehicles.filter(v => 
     v.flags?.some(f => f === 'IMPOUNDED')

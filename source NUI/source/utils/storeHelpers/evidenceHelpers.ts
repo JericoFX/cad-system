@@ -1,16 +1,5 @@
-/**
- * Evidence Management Helpers
- * 
- * Utility functions for evidence-related operations
- */
-
 import type { CustodyEvent } from '~/stores/cadStore';
 
-/**
- * Create a custody event with standardized properties
- * @param params Parameters for the custody event
- * @returns A new CustodyEvent object
- */
 export function createCustodyEvent(params: {
   evidenceId: string;
   eventType: 'COLLECTED' | 'TRANSFERRED' | 'STORED' | 'ANALYZED' | 'SUBMITTED' | 'RELEASED';
@@ -33,14 +22,6 @@ export function createCustodyEvent(params: {
   };
 }
 
-/**
- * Create a transfer custody event
- * @param evidenceId The ID of the evidence
- * @param fromOfficer The officer transferring the evidence
- * @param toOfficer The officer receiving the evidence
- * @param notes Optional notes about the transfer
- * @returns A new CustodyEvent object for transfer
- */
 export function createTransferEvent(
   evidenceId: string,
   fromOfficer: string,
@@ -57,13 +38,6 @@ export function createTransferEvent(
   });
 }
 
-/**
- * Create an analysis request custody event
- * @param evidenceId The ID of the evidence
- * @param requestedBy The officer requesting analysis
- * @param notes Optional notes about the request
- * @returns A new CustodyEvent object for analysis request
- */
 export function createAnalysisRequestEvent(
   evidenceId: string,
   requestedBy: string,
@@ -78,14 +52,6 @@ export function createAnalysisRequestEvent(
   });
 }
 
-/**
- * Create an analysis completion custody event
- * @param evidenceId The ID of the evidence
- * @param analystId The ID of the analyst
- * @param location The location where analysis was performed
- * @param notes Optional notes about the analysis
- * @returns A new CustodyEvent object for analysis completion
- */
 export function createAnalysisCompletionEvent(
   evidenceId: string,
   analystId: string,

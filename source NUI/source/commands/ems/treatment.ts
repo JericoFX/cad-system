@@ -2,7 +2,7 @@
 import { createCommand } from '../commandBuilder';
 import { userActions } from '~/stores/userStore';
 
-export function registerTreatmentCommand() {
+export function registerTreatmentCommand(): void {
   createCommand({
     name: 'treatment',
     description: 'Provide treatment to a patient',
@@ -62,7 +62,7 @@ export function registerTreatmentCommand() {
       terminal.print(`New Status: ${newStatus}`, 'info');
 
       const confirmed = await terminal.confirm('Record treatment?');
-      
+
       if (!confirmed) {
         terminal.print('Treatment cancelled', 'warning');
         return;
@@ -76,8 +76,8 @@ export function registerTreatmentCommand() {
           patientId,
           type: treatmentType,
           description: treatment,
-          medications: medications && medications.toLowerCase() !== 'none' 
-            ? medications.split(',').map(m => m.trim()) 
+          medications: medications && medications.toLowerCase() !== 'none'
+            ? medications.split(',').map(m => m.trim())
             : [],
           dosage,
           status: newStatus,
@@ -87,7 +87,7 @@ export function registerTreatmentCommand() {
         };
 
         stopLoading();
-        
+
         terminal.print(`\n✓ Treatment recorded: ${treatmentLog.treatmentId}`, 'success');
         terminal.print(`Patient status updated to: ${newStatus}`, 'info');
 

@@ -1,11 +1,6 @@
-/**
- * Photo Handlers
- * Handles photo events from Lua
- */
-
 import { onNuiMessage } from '~/utils/nuiRouter';
 import type { PhotoMetadata as StorePhotoMetadata } from '~/stores/photoStore';
-import type { 
+import type {
   PhotoPreviewData,
   PhotoViewData,
   PhotoCapturedData,
@@ -48,10 +43,7 @@ function normalizeCapturedPhoto(photo: PhotoCapturedData['photo']): StorePhotoMe
 }
 
 export function initPhotoHandlers(): void {
-  // Photo preview (from camera capture)
   onNuiMessage<PhotoPreviewData>('photo:preview', async (data) => {
-    console.log('[NUI] Photo preview');
-
     const { photoActions } = await import('~/stores/photoStore');
     const { viewerActions } = await import('~/stores/viewerStore');
 
@@ -70,20 +62,14 @@ export function initPhotoHandlers(): void {
     photoActions.setCurrentPhoto(previewPhoto);
     viewerActions.openImage(data.imageUrl, `${data.job === 'police' ? 'Evidence' : 'Press'} Preview`);
   });
-  
-  // Photo view (from inventory item)
+
   onNuiMessage<PhotoViewData>('photo:view', async (data) => {
-    console.log('[NUI] Photo view:', data.metadata.photoId);
-    
     const { viewerActions } = await import('~/stores/viewerStore');
-    
+
     viewerActions.openImage(data.url, data.metadata.description || 'Photo');
   });
-  
-  // Photo captured
-  onNuiMessage<PhotoCapturedData>('photo:captured', async (data) => {
-    console.log('[NUI] Photo captured:', data.photo.photoId);
 
+  onNuiMessage<PhotoCapturedData>('photo:captured', async (data) => {
     const { photoActions } = await import('~/stores/photoStore');
     const { terminalActions } = await import('~/stores/terminalStore');
     const { notificationActions } = await import('~/stores/notificationStore');
@@ -111,11 +97,8 @@ export function initPhotoHandlers(): void {
       'success'
     );
   });
-  
-  // Photo released to press
+
   onNuiMessage<PhotoReleasedToPressData>('photo:releasedToPress', async (data) => {
-    console.log('[NUI] Photo released to press:', data.photoId);
-    
     const { notificationActions } = await import('~/stores/notificationStore');
 
     notificationActions.notifySystem(
@@ -124,6 +107,4 @@ export function initPhotoHandlers(): void {
       'info'
     );
   });
-  
-  console.log('[NUI Handlers] Photo handlers registered');
 }

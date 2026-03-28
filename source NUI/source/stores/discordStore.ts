@@ -262,7 +262,7 @@ export const discordActions = {
     
     for (const message of queue) {
       await this.sendToDiscord(message);
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Rate limiting
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
   },
   

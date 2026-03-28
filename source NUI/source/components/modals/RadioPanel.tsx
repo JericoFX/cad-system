@@ -15,15 +15,15 @@ export function RadioPanel() {
   const [newChannelPassword, setNewChannelPassword] = createSignal('');
   const [messageText, setMessageText] = createSignal('');
   const [isTalking, setIsTalking] = createSignal(false);
-  const [frequency, setFrequency] = createSignal(100.0); // Frecuencia en MHz
-  
+  const [frequency, setFrequency] = createSignal(100.0);
+
   const frequencyMap: Record<number, string> = {
-    100.0: 'CH-1', // DISPATCH
-    150.5: 'CH-2', // POLICE
-    200.0: 'CH-3', // EMS
-    250.5: 'CH-4', // TÁCTICO
-    300.0: 'CH-5', // COMBINED
-    350.5: 'CH-6', // NEWS
+    100.0: 'CH-1',
+    150.5: 'CH-2',
+    200.0: 'CH-3',
+    250.5: 'CH-4',
+    300.0: 'CH-5',
+    350.5: 'CH-6',
   };
   
   onMount(() => {

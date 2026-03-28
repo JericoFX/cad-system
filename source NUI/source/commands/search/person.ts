@@ -3,6 +3,7 @@ import { createCommandWithSubcommands } from '../commandBuilder';
 import { cadState, cadActions, type Person, type CriminalRecord, type Warrant, type Fine } from '~/stores/cadStore';
 import { hackerActions } from '~/stores/hackerStore';
 import { fetchNui } from '~/utils/fetchNui';
+import type { TerminalAPI } from '../types';
 
 interface LookupPersonsResponse {
   ok?: boolean;
@@ -10,7 +11,7 @@ interface LookupPersonsResponse {
   error?: string;
 }
 
-export function registerPersonSearchCommand() {
+export function registerPersonSearchCommand(): void {
   createCommandWithSubcommands({
     name: 'search-person',
     aliases: ['person', 'find-person'],
@@ -21,14 +22,14 @@ export function registerPersonSearchCommand() {
     subcommands: {
       gui: {
         description: 'Open person search GUI (MDT)',
-        handler: async ({ terminal }: { terminal: any }) => {
+        handler: async ({ terminal }: { terminal: TerminalAPI }) => {
           terminal.openModal('PERSON_SEARCH');
           terminal.print('Opening person search database...', 'system');
         }
       },
       search: {
         description: 'Search persons (CLI mode)',
-        handler: async ({ rawArgs, terminal }: { rawArgs: string[]; terminal: any }) => {
+        handler: async ({ rawArgs, terminal }: { rawArgs: string[]; terminal: TerminalAPI }) => {
           let query = rawArgs[1] as string | undefined;
 
           if (!query) {
@@ -39,7 +40,6 @@ export function registerPersonSearchCommand() {
             }
           }
 
-          // Emit hacker command for search
           hackerActions.onSearch(query, 'person');
 
           const stopLoading = terminal.showLoading('Searching database');
@@ -72,7 +72,7 @@ export function registerPersonSearchCommand() {
             await showPersonDetails(terminal, uniqueResults[0]);
           } else {
             terminal.print(`\n=== SEARCH RESULTS (${uniqueResults.length}) ===`, 'system');
-            
+
             const headers = ['CITIZEN ID', 'NAME', 'DOB', 'GENDER', 'STATUS'];
             const rows = uniqueResults.map(p => [
               p.citizenid,
@@ -83,7 +83,7 @@ export function registerPersonSearchCommand() {
             ]);
 
             terminal.printTable(headers, rows);
-            
+
             terminal.print('\nUse "search-person search <CitizenID>" for full details', 'info');
           }
         }
@@ -93,7 +93,7 @@ export function registerPersonSearchCommand() {
   });
 }
 
-async function showPersonDetails(terminal: any, person: Person) {
+async function showPersonDetails(terminal: TerminalAPI, person: Person): Promise<void> {
   terminal.print(`\n=== PERSON RECORD ===`, 'system');
   terminal.print(`Citizen ID: ${person.citizenid}`, 'info');
   terminal.print(`Name: ${person.firstName} ${person.lastName}`, 'info');
@@ -102,17 +102,17 @@ async function showPersonDetails(terminal: any, person: Person) {
   terminal.print(`Gender: ${person.gender}`, 'info');
   terminal.print(`Phone: ${person.phone || 'N/A'}`, 'info');
   terminal.print(`Address: ${person.address || 'N/A'}`, 'info');
-  
+
   terminal.print('\n--- PHYSICAL DESCRIPTION ---', 'system');
   terminal.print(`Height: ${person.height || 'N/A'}`, 'info');
   terminal.print(`Weight: ${person.weight || 'N/A'}`, 'info');
   terminal.print(`Eye Color: ${person.eyeColor || 'N/A'}`, 'info');
   terminal.print(`Hair Color: ${person.hairColor || 'N/A'}`, 'info');
-  
+
   terminal.print('\n--- MEDICAL INFO ---', 'system');
   terminal.print(`Blood Type: ${person.bloodType || 'N/A'}`, 'info');
   terminal.print(`Allergies: ${person.allergies || 'None'}`, 'info');
-  
+
   if (person.isDead) {
     terminal.print(`\n⚠ DECEASED - ${person.ckDate ? new Date(person.ckDate).toLocaleDateString() : 'Date unknown'}`, 'error');
   }
@@ -120,7 +120,7 @@ async function showPersonDetails(terminal: any, person: Person) {
   const records = (Object.values(cadState.criminalRecords) as CriminalRecord[]).filter(
     r => r.citizenid === person.citizenid && !r.cleared
   );
-  
+
   if (records.length > 0) {
     terminal.print(`\n--- CRIMINAL RECORD (${records.length}) ---`, 'system');
     records.forEach(record => {
@@ -131,7 +131,7 @@ async function showPersonDetails(terminal: any, person: Person) {
   const warrants = (Object.values(cadState.warrants) as Warrant[]).filter(
     w => w.citizenid === person.citizenid && w.active && !w.executed
   );
-  
+
   if (warrants.length > 0) {
     terminal.print(`\n--- ACTIVE WARRANTS (${warrants.length}) ⚠ ---`, 'error');
     warrants.forEach(warrant => {
@@ -143,7 +143,7 @@ async function showPersonDetails(terminal: any, person: Person) {
   const fines = (Object.values(cadState.fines) as Fine[]).filter(
     f => f.targetId === person.citizenid && !f.paid
   );
-  
+
   if (fines.length > 0) {
     const totalFines = fines.reduce((sum, f) => sum + f.amount, 0);
     terminal.print(`\n--- OUTSTANDING FINES (${fines.length}) ---`, 'warning');

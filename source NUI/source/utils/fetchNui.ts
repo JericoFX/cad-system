@@ -91,12 +91,10 @@ export async function fetchNui<TResponse = unknown, TRequest = unknown>(
   eventName: string,
   data?: TRequest
 ): Promise<TResponse> {
-  // If in browser and mock system is enabled, use mock event-based system
   if (isEnvBrowser() && import.meta.env.DEV && isMockEnabled()) {
     console.log(`[MOCK] fetchNui: ${eventName}`, data);
     return mockFetchNui<TResponse>(eventName, data);
   }
 
-  // Otherwise use native FiveM fetch
   return nativeFetchNui<TResponse, TRequest>(eventName, data);
 }

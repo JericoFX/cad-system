@@ -1,7 +1,7 @@
 
 import { createCommand } from '../commandBuilder';
 
-export function registerFleetCommands() {
+export function registerFleetCommands(): void {
   createCommand({
     name: 'fleet',
     description: 'Panel de flota vehicular',

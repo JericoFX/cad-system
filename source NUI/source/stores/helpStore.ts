@@ -53,7 +53,7 @@ const initialState: HelpState = {
   beginnerMode: false,
 };
 
-export const [helpState, setHelpState] = createStore(initialState);
+export const [helpState, setHelpState] = createStore<HelpState>(initialState);
 
 export const helpActions = {
   open: () => setHelpState('isOpen', true),

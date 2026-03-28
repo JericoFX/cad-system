@@ -8,6 +8,9 @@ State.Police = State.Police or {}
 State.Police.JailTransfers = State.Police.JailTransfers or {}
 local jailTransfers = State.Police.JailTransfers
 
+---@param transfers table
+---@param caseId string|nil
+---@return table[]
 local function toArraySorted(transfers, caseId)
     local out = {}
     for _, row in pairs(transfers) do
@@ -23,6 +26,10 @@ local function toArraySorted(transfers, caseId)
     return out
 end
 
+---@param caseObj table|nil
+---@param officer table
+---@param transfer table
+---@return boolean, string|nil
 local function addCaseNote(caseObj, officer, transfer)
     if not caseObj then
         return true
@@ -71,6 +78,9 @@ local function addCaseNote(caseObj, officer, transfer)
     return true
 end
 
+---@param officer table
+---@param payload table
+---@return table|nil, string|nil
 local function createJailTransfer(officer, payload)
     local citizenId = Fn.SanitizeString(payload.citizenId, 64)
     local personName = Fn.SanitizeString(payload.personName, 128)

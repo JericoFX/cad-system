@@ -13,7 +13,7 @@ export interface UIButtonProps extends JSX.ButtonHTMLAttributes<HTMLButtonElemen
   size?: ButtonSize;
 }
 
-function getVariantClass(variant: ButtonVariant, size: ButtonSize) {
+function getVariantClass(variant: ButtonVariant, size: ButtonSize): string | undefined {
   if (variant === 'primary') {
     return 'btn-primary';
   }

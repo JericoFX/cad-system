@@ -8,6 +8,7 @@ local EvidenceTypes = require 'shared.evidence_types'
 
 local MAX_COORD_ABS = 100000.0
 
+---@return boolean
 local function isForensicsEnabled()
     if Config.IsFeatureEnabled then
         return Config.IsFeatureEnabled('Forensics')
@@ -16,6 +17,8 @@ local function isForensicsEnabled()
     return true
 end
 
+---@param playerSource any
+---@return integer|nil
 local function isConnectedPlayer(playerSource)
     local src = tonumber(playerSource)
     if not src or src <= 0 then
@@ -29,6 +32,10 @@ local function isConnectedPlayer(playerSource)
     return src
 end
 
+---@param evidenceType string
+---@param ownerId any
+---@param source any
+---@return integer
 local function normalizeOwnerId(evidenceType, ownerId, source)
     local src = tonumber(source) or 0
     if src <= 0 then
@@ -42,6 +49,8 @@ local function normalizeOwnerId(evidenceType, ownerId, source)
     return src
 end
 
+---@param raw any
+---@return vector3|nil
 local function parseCoords(raw)
     local x, y, z
 
@@ -68,6 +77,8 @@ local function parseCoords(raw)
     return vector3(x, y, z)
 end
 
+---@param value any
+---@return string
 local function normalizeBloodType(value)
     local bloodType = Fn.SanitizeString(value, 16):upper()
     if bloodType == '' then
@@ -76,6 +87,7 @@ local function normalizeBloodType(value)
     return bloodType
 end
 
+---@return table
 local function ensureEvidenceState()
     local evidences = GlobalState.evidences
     local changed = false

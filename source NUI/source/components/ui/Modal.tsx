@@ -8,7 +8,7 @@ interface ModalContextValue {
 
 const ModalContext = createContext<ModalContextValue>({});
 
-function useModalContext() {
+function useModalContext(): ModalContextValue {
   return useContext(ModalContext);
 }
 

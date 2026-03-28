@@ -78,12 +78,10 @@ export function MapModal() {
           setShowDeleteConfirm(false);
         },
         onDblClick: () => {
-          console.log(unit.location!.x, unit.location!.y);
           mapRef()?.setCenter([unit.location!.x, unit.location!.y]);
         },
       };
       });
-    console.log(`[Map] Unit markers: ${markers.length}`);
     return markers;
   });
 
@@ -125,7 +123,6 @@ export function MapModal() {
           mapRef()?.setCenter([call.coordinates!.x, call.coordinates!.y]);
         },
       }));
-    console.log(`[Map] Call markers: ${markers.length}`);
     return markers;
   });
 
@@ -152,7 +149,6 @@ export function MapModal() {
       return;
     }
 
-    console.log('Map clicked at:', coords);
     setClickCoords(coords);
     setShowCreateForm(true);
   };

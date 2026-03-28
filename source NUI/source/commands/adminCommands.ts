@@ -2,7 +2,7 @@ import { registry } from './registry';
 import { terminalActions } from '~/stores/terminalStore';
 import { cadState, cadActions } from '~/stores/cadStore';
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 const CAD_ASCII = `
 ╔═══════════════════════════════════════╗
@@ -18,7 +18,7 @@ const CAD_ASCII = `
 ╚═══════════════════════════════════════╝
 `;
 
-const animateProgress = async (label: string, duration: number = 2000) => {
+const animateProgress = async (label: string, duration: number = 2000): Promise<void> => {
   const steps = 20;
   const stepDuration = duration / steps;
   const progressId = `progress-${label}-${Date.now()}`;

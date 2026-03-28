@@ -34,7 +34,6 @@ export function useFilter<T>(options: UseFilterOptions<T>): UseFilterResult<T> {
   const filtered = createMemo(() => {
     let items = options.source();
 
-    // Text search
     const query = searchQuery().toLowerCase();
     if (query && options.searchFields) {
       items = items.filter((item) =>
@@ -45,7 +44,6 @@ export function useFilter<T>(options: UseFilterOptions<T>): UseFilterResult<T> {
       );
     }
 
-    // Apply each filter
     for (const filter of options.filters) {
       const [value] = filterSignals[filter.key];
       if (value() !== 'all') {
@@ -56,7 +54,6 @@ export function useFilter<T>(options: UseFilterOptions<T>): UseFilterResult<T> {
       }
     }
 
-    // Sort
     if (options.sort) {
       items = [...items].sort(options.sort);
     }

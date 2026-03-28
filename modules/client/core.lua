@@ -1,8 +1,11 @@
 local Core = {}
 
+---@type table|nil
 local bridgeCache = nil
+---@type string|nil
 local frameworkName = nil
 
+---@return table|nil, string|nil
 local function detectBridge()
     if bridgeCache then return bridgeCache, frameworkName end
 
@@ -27,11 +30,13 @@ local function detectBridge()
     return nil, nil
 end
 
+---@return string|nil
 function Core.GetFramework()
     local _, name = detectBridge()
     return name
 end
 
+---@param refreshAccess function
 function Core.RegisterAccessEvents(refreshAccess)
     local bridge = detectBridge()
     if bridge then

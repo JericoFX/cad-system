@@ -13,6 +13,7 @@ local ingestRateState = {}
 local traceGridEnabled = lib and lib.grid and type(lib.grid.addEntry) == 'function' and type(lib.grid.removeEntry) == 'function' and type(lib.grid.getNearbyEntries) == 'function'
 local traceGridEntries = {}
 
+---@return integer
 local function getNowMs()
     local gameTimer = GetGameTimer and GetGameTimer() or nil
     if type(gameTimer) == 'number' then
@@ -21,6 +22,7 @@ local function getNowMs()
     return math.floor(os.clock() * 1000)
 end
 
+---@return table
 local function getForensicsConfig()
     return Config.Forensics or {}
 end
@@ -57,7 +59,6 @@ local function removeTraceGridEntry(traceId)
         return
     end
 
-    -- Verified: Context7 /websites/coxdocs_dev ox_lib Grid Shared lib.grid.removeEntry(entry)
     lib.grid.removeEntry(entry)
     traceGridEntries[traceId] = nil
 end
@@ -81,7 +82,6 @@ local function upsertTraceGridEntry(trace)
 
     local oldEntry = traceGridEntries[traceId]
     if oldEntry then
-        -- Verified: Context7 /websites/coxdocs_dev ox_lib Grid Shared lib.grid.removeEntry(entry)
         lib.grid.removeEntry(oldEntry)
     end
 
@@ -93,11 +93,11 @@ local function upsertTraceGridEntry(trace)
         traceId = traceId,
     }
 
-    -- Verified: Context7 /websites/coxdocs_dev ox_lib Grid Shared lib.grid.addEntry(entry)
     lib.grid.addEntry(entry)
     traceGridEntries[traceId] = entry
 end
 
+---@return nil
 local function rebuildTraceGridEntries()
     if not traceGridEnabled then
         return
@@ -115,8 +115,9 @@ end
 
 rebuildTraceGridEntries()
 
+---@param sourceName string|nil
+---@return boolean
 local function canIngestNow(sourceName)
-    -- Limita la ingesta por recurso para reducir spam de trazas al servidor.
     local cfg = getForensicsConfig()
     local minIntervalMs = tonumber(cfg.WorldTraceMinIntervalMs) or 750
     if minIntervalMs <= 0 then
@@ -134,6 +135,8 @@ local function canIngestNow(sourceName)
     return true
 end
 
+---@param nowMs integer|nil
+---@return nil
 local function cleanupIngestRateState(nowMs)
     local cfg = getForensicsConfig()
     local minIntervalMs = tonumber(cfg.WorldTraceMinIntervalMs) or 750
@@ -151,10 +154,13 @@ local function cleanupIngestRateState(nowMs)
     end
 end
 
+---@return boolean
 local function isForensicsEnabled()
     return Config.IsFeatureEnabled('Forensics') and Config.ForensicLabs.Enabled ~= false
 end
 
+---@param source number
+---@return boolean
 local function isInLab(source)
     if not isForensicsEnabled() then
         return false
@@ -186,6 +192,8 @@ local function isInLab(source)
     return false
 end
 
+---@param source number
+---@return boolean
 local function canHandleWorldTrace(source)
     local officer = Auth.GetOfficerData(source)
     if not officer then
@@ -200,6 +208,8 @@ local function canHandleWorldTrace(source)
     return allowed[officer.job] == true
 end
 
+---@param resourceName string|nil
+---@return boolean
 local function shouldAcceptIngestFrom(resourceName)
     local cfg = getForensicsConfig()
     local invoking = tostring(resourceName or '')
@@ -221,6 +231,8 @@ local function shouldAcceptIngestFrom(resourceName)
     return lib.table.contains(allowed, invoking)
 end
 
+---@param payload any
+---@return table|nil, string|nil
 local function sanitizeTracePayload(payload)
     local tracePayload = type(payload) == 'table' and payload or {}
     local coords = tracePayload.coords
@@ -261,6 +273,8 @@ local function sanitizeTracePayload(payload)
     }, nil
 end
 
+---@param payload any
+---@return table|nil, string|nil
 local function ingestWorldTrace(payload)
     local trace, err = sanitizeTracePayload(payload)
     if not trace then
@@ -272,6 +286,7 @@ local function ingestWorldTrace(payload)
     return trace
 end
 
+---@return nil
 local function pruneExpiredWorldTraces()
     local now = os.time()
     for traceId, trace in pairs(worldTraces) do
@@ -295,13 +310,13 @@ local function pruneExpiredWorldTraces()
 end
 
 if lib and lib.cron and type(lib.cron.new) == 'function' then
-    -- Verified: Context7 /websites/coxdocs_dev ox_lib Cron Server lib.cron.new(expression, job, options)
     lib.cron.new('* * * * *', function()
         cleanupIngestRateState(getNowMs())
         pruneExpiredWorldTraces()
     end)
 end
 
+---@return table
 local function ensureSceneEvidenceState()
     local evidences = GlobalState.evidences
     local changed = false
@@ -335,10 +350,14 @@ local function ensureSceneEvidenceState()
     return evidences
 end
 
+---@param evidences table
+---@return nil
 local function syncSceneEvidenceState(evidences)
     GlobalState:set('evidences', evidences, true)
 end
 
+---@param value any
+---@return string
 local function normalizeSceneEvidenceType(value)
     local evidenceType = Fn.SanitizeString(value, 32):upper()
     if evidenceType == 'FINGERPRINTS' then
@@ -350,6 +369,8 @@ local function normalizeSceneEvidenceType(value)
     return evidenceType
 end
 
+---@param evidenceType string
+---@return string|nil
 local function getSceneEvidenceBucketKey(evidenceType)
     if evidenceType == 'BLOOD' then
         return 'blood'
@@ -366,6 +387,8 @@ local function getSceneEvidenceBucketKey(evidenceType)
     return nil
 end
 
+---@param value any
+---@return vector3|nil
 local function asVector3Coords(value)
     if type(value) == 'vector3' then
         return value
@@ -383,6 +406,8 @@ local function asVector3Coords(value)
     return nil
 end
 
+---@param entry table|nil
+---@return vector3|nil
 local function getFingerprintCoords(entry)
     local netId = tonumber(entry and (entry.entityNetId or entry.entity)) or 0
     if netId <= 0 or not NetworkDoesNetworkIdExist(netId) then
@@ -405,6 +430,9 @@ local function getFingerprintCoords(entry)
     return GetEntityCoords(entity)
 end
 
+---@param bucketKey string
+---@param entry table|nil
+---@return vector3|nil
 local function getSceneEvidenceCoords(bucketKey, entry)
     if bucketKey == 'fingerprints' then
         return getFingerprintCoords(entry)
@@ -413,6 +441,12 @@ local function getSceneEvidenceCoords(bucketKey, entry)
     return asVector3Coords(entry and entry.coords)
 end
 
+---@param evidences table
+---@param evidenceType string
+---@param reference any
+---@param radius number
+---@param source number
+---@return string|nil, table|nil, vector3|nil
 local function resolveSceneEvidence(evidences, evidenceType, reference, radius, source)
     local bucketKey = getSceneEvidenceBucketKey(evidenceType)
     if not bucketKey then
@@ -462,6 +496,12 @@ local function resolveSceneEvidence(evidences, evidenceType, reference, radius, 
     return nearestId, nearestEntry, nearestCoords
 end
 
+---@param evidenceType string
+---@param evidenceId string
+---@param entry table|nil
+---@param coords vector3|nil
+---@param officer table
+---@return table
 local function buildSceneEvidenceData(evidenceType, evidenceId, entry, coords, officer)
     local payload = {
         sourceEvidenceId = evidenceId,
@@ -492,6 +532,10 @@ local function buildSceneEvidenceData(evidenceType, evidenceId, entry, coords, o
     return payload
 end
 
+---@param source number
+---@param evidenceType string
+---@param data table
+---@return table|nil, string|nil
 local function addSceneEvidenceToStaging(source, evidenceType, data)
     local bucket = State.Evidence.Staging[source] or {}
     State.Evidence.Staging[source] = bucket
@@ -520,6 +564,8 @@ local function addSceneEvidenceToStaging(source, evidenceType, data)
     return staged, nil
 end
 
+---@param source number
+---@return boolean
 local function canUseSceneEvidenceActions(source)
     return canHandleWorldTrace(source)
 end
@@ -971,7 +1017,6 @@ lib.callback.register('cad:forensic:getNearbyWorldTraces', Auth.WithGuard('defau
 
     if traceGridEnabled then
         usedGrid = true
-        -- Verified: Context7 /websites/coxdocs_dev ox_lib Grid Shared lib.grid.getNearbyEntries(point, filter)
         local nearbyEntries = lib.grid.getNearbyEntries(coords, function(entry)
             if type(entry) ~= 'table' or type(entry.traceId) ~= 'string' then
                 return false

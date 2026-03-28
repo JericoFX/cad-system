@@ -5,16 +5,16 @@ export type MarkerType = 'dispatch' | 'unit' | 'vehicle' | 'custom';
 
 export interface MapMarker {
   id: string;
-  position: [number, number]; // [x, y] GTA coords
+  position: [number, number];
   type: MarkerType;
-  icon?: string; // Emoji o string
+  icon?: string;
   label?: string;
   tooltip?: string;
-  color?: string; // Color TuiCSS
+  color?: string;
   onClick?: () => void;
   onDblClick?: () => void;
   onRightClick?: () => void;
-  autoRemove?: number; // Tiempo en ms para auto-eliminar
+  autoRemove?: number;
 }
 
 export interface MapProps extends JSX.HTMLAttributes<HTMLDivElement> {

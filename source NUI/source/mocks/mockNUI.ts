@@ -742,7 +742,6 @@ const mockHandlers: Record<string, (data: unknown) => unknown> = {
     };
     mockStagingEvidence.push(evidence);
     cadActions.addStagingEvidence(evidence);
-    console.log(`[mockNUI] Added staging evidence: ${stagingId}, Total: ${mockStagingEvidence.length}`);
     return evidence;
   },
   
@@ -1472,7 +1471,6 @@ const mockHandlers: Record<string, (data: unknown) => unknown> = {
 };
 
 export function initializeMockNUI(): void {
-  // Hook simple para simular callbacks NUI en navegador.
   const originalFetch = window.fetch;
   
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -1483,7 +1481,6 @@ export function initializeMockNUI(): void {
       const handler = mockHandlers[eventName];
       
       if (handler) {
-        // Delay cortito para que se sienta mas real.
         await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 200));
         
         let data: unknown;
@@ -1524,18 +1521,6 @@ export function initializeMockNUI(): void {
     return originalFetch(input, init);
   };
   
-  console.log('[MOCK] NUI mock system initialized');
-  console.log('[MOCK] Available mock data:');
-  console.log(`  - Cases: ${Object.keys(mockCases).length}`);
-  console.log(`  - Staging Evidence: ${mockStagingEvidence.length}`);
-  console.log(`  - Dispatch Units: ${Object.keys(mockDispatchUnits).length}`);
-  console.log(`  - Dispatch Calls: ${Object.keys(mockDispatchCalls).length}`);
-  console.log(`  - Persons: ${mockPersons.length}`);
-  console.log(`  - Vehicles: ${mockVehicles.length}`);
-  console.log(`  - Warrants: ${mockWarrants.length}`);
-  console.log(`  - Criminal Records: ${mockCriminalRecords.length}`);
-  console.log(`  - BOLOs: ${mockBOLOs.length}`);
-  
   cadActions.setCases(mockCases);
   cadActions.setDispatchUnits(mockDispatchUnits);
   cadActions.setDispatchCalls(mockDispatchCalls);
@@ -1551,8 +1536,6 @@ export function initializeMockNUI(): void {
   cadActions.setWarrants(warrantsRecord);
   cadActions.setCriminalRecords(recordsRecord);
   cadActions.setBOLOs(bolosRecord);
-  
-  console.log('[MOCK] Synced all mock data to store');
 }
 
 export function setMockUser(userId: string, badge: string): void {

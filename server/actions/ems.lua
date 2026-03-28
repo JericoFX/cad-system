@@ -21,6 +21,7 @@ local BLOOD_REQUEST_STATUSES = {
 
 local bloodSampleStashRegistered = false
 
+---@return boolean
 local function isEmsEnabled()
     if Config.IsFeatureEnabled then
         return Config.IsFeatureEnabled('EMS')
@@ -29,10 +30,12 @@ local function isEmsEnabled()
     return true
 end
 
+---@return table
 local function emsDisabledResponse()
     return { ok = false, error = 'ems_disabled' }
 end
 
+---@return boolean
 local function isBloodSampleVirtualEnabled()
     local cfg = Config.Forensics and Config.Forensics.BloodSampleContainer or {}
     if cfg.enabled == false then
@@ -42,6 +45,7 @@ local function isBloodSampleVirtualEnabled()
     return Registry.Get("VirtualContainer") ~= nil
 end
 
+---@return table
 local function getBloodSampleContainerConfig()
     local forensics = Config.Forensics or {}
     local cfg = forensics.BloodSampleContainer or {}
@@ -57,6 +61,7 @@ local function getBloodSampleContainerConfig()
     }
 end
 
+---@return table|nil, string|nil
 local function ensureBloodSampleContainer()
     if not isBloodSampleVirtualEnabled() then
         return nil, 'blood_sample_virtual_disabled'
@@ -79,6 +84,8 @@ local function ensureBloodSampleContainer()
     return container
 end
 
+---@param container table|nil
+---@return integer|nil
 local function findContainerFreeSlot(container)
     if not container then
         return nil
@@ -93,10 +100,12 @@ local function findContainerFreeSlot(container)
     return nil
 end
 
+---@return integer
 local function getNowMs()
     return os.time() * 1000
 end
 
+---@return integer
 local function getBloodAnalysisDurationMs()
     local configured = tonumber(Config.Forensics and Config.Forensics.BloodAnalysisDurationMs) or 45000
     if configured < 1000 then
@@ -105,6 +114,7 @@ local function getBloodAnalysisDurationMs()
     return math.floor(configured)
 end
 
+---@return string
 local function getBloodPostAnalysisMode()
     local cfg = Config.Forensics and Config.Forensics.BloodPostAnalysis or {}
     local mode = tostring(cfg.mode or 'reminder'):lower()
@@ -114,6 +124,7 @@ local function getBloodPostAnalysisMode()
     return mode
 end
 
+---@return integer
 local function getBloodPostAnalysisTimeoutMs()
     local cfg = Config.Forensics and Config.Forensics.BloodPostAnalysis or {}
     local timeoutMs = tonumber(cfg.timeoutMs) or 120000
@@ -123,6 +134,7 @@ local function getBloodPostAnalysisTimeoutMs()
     return math.floor(timeoutMs)
 end
 
+---@return integer
 local function getBloodReminderIntervalMs()
     local cfg = Config.Forensics and Config.Forensics.BloodPostAnalysis or {}
     local intervalMs = tonumber(cfg.reminderIntervalMs) or 120000
@@ -132,6 +144,8 @@ local function getBloodReminderIntervalMs()
     return math.floor(intervalMs)
 end
 
+---@param request table|nil
+---@return table
 local function getBloodToxicologySnapshot(request)
     local snapshot = {
         testedAt = Utils.ToIso(),
@@ -174,6 +188,8 @@ local function getBloodToxicologySnapshot(request)
     return resolved
 end
 
+---@param caseId string|nil
+---@return boolean
 local function caseExists(caseId)
     if not caseId or caseId == '' then
         return false
@@ -182,10 +198,15 @@ local function caseExists(caseId)
     return State.Cases[caseId] ~= nil
 end
 
+---@param input any
+---@return any
 local function snapshotTable(input)
     return lib.table.deepclone(input)
 end
 
+---@param target table
+---@param snapshot table
+---@return nil
 local function restoreTable(target, snapshot)
     for key in pairs(target) do
         target[key] = nil
@@ -195,6 +216,8 @@ local function restoreTable(target, snapshot)
     end
 end
 
+---@param request table
+---@return table
 local function buildBloodRequestClientPayload(request)
     local analysisRemainingMs = nil
     local analysisReady = false
@@ -235,6 +258,8 @@ local function buildBloodRequestClientPayload(request)
     }
 end
 
+---@param request table
+---@return boolean, string|nil
 local function saveBloodRequestDb(request)
     if not request or not request.requestId then
         return false, 'invalid_request'
@@ -343,6 +368,7 @@ local function saveBloodRequestDb(request)
     return true
 end
 
+---@return boolean, string|nil
 local function ensureBloodSampleStash()
     local cfg = Config.Forensics and Config.Forensics.BloodSampleStash or nil
     if type(cfg) ~= 'table' or cfg.enabled == false then
@@ -378,6 +404,9 @@ local function ensureBloodSampleStash()
     return true
 end
 
+---@param request table
+---@param officer table
+---@return boolean, string|nil
 local function createBloodSampleItem(request, officer)
     local itemName = tostring(Config.Forensics and Config.Forensics.BloodSampleItemName or 'cad_blood_sample')
     local metadata = {
@@ -458,6 +487,8 @@ local function createBloodSampleItem(request, officer)
     return true
 end
 
+---@param request table
+---@return boolean, string|nil
 local function removeBloodSampleItem(request)
     if not request.sampleStashId or request.sampleStashId == '' then
         return true
@@ -537,6 +568,8 @@ local function removeBloodSampleItem(request)
     return true
 end
 
+---@param request table
+---@return boolean
 local function isAnalysisReady(request)
     if request.status ~= 'IN_PROGRESS' then
         return false
@@ -550,6 +583,10 @@ local function isAnalysisReady(request)
     return getNowMs() >= endsAtMs
 end
 
+---@param identifier string|nil
+---@param message string
+---@param notificationType string|nil
+---@return nil
 local function notifyOfficerByIdentifier(identifier, message, notificationType)
     if not identifier or identifier == '' then
         return
@@ -566,6 +603,10 @@ local function notifyOfficerByIdentifier(identifier, message, notificationType)
     end
 end
 
+---@param request table
+---@param officer table
+---@param notes string|nil
+---@return string|nil, string|nil
 local function appendBloodEvidenceToCase(request, officer, notes)
     if not request.caseId or request.caseId == '' then
         return nil, 'case_id_required'
@@ -659,6 +700,12 @@ local function appendBloodEvidenceToCase(request, officer, notes)
     return evidence
 end
 
+---@param request table
+---@param emsOfficer table
+---@param status string
+---@param notes string
+---@param evidenceId string|nil
+---@return nil
 local function pushCaseBloodNote(request, emsOfficer, status, notes, evidenceId)
     if not request.caseId or not caseExists(request.caseId) then
         return
@@ -688,6 +735,9 @@ local function pushCaseBloodNote(request, emsOfficer, status, notes, evidenceId)
     }
 end
 
+---@param payload table
+---@param officer table
+---@return table|nil, string|nil
 local function createBloodRequest(payload, officer)
     local request = {
         requestId = Utils.GenerateId('BLOODREQ'),
@@ -763,6 +813,10 @@ local function createBloodRequest(payload, officer)
     return request
 end
 
+---@param request table
+---@param officer table
+---@param notes string|nil
+---@return boolean, string|nil
 local function beginBloodAnalysis(request, officer, notes)
     if request.status == 'COMPLETED' then
         return false, 'already_completed'
@@ -811,6 +865,10 @@ local function beginBloodAnalysis(request, officer, notes)
     return true
 end
 
+---@param request table
+---@param officer table
+---@param notes string|nil
+---@return table|nil, string|nil, integer|nil
 local function finalizeBloodTransfer(request, officer, notes)
     if request.status ~= 'IN_PROGRESS' then
         return nil, 'analysis_not_in_progress'
@@ -851,6 +909,10 @@ local function finalizeBloodTransfer(request, officer, notes)
     return evidence
 end
 
+---@param request table
+---@param nowMs integer
+---@param reminderIntervalMs integer
+---@return boolean
 local function shouldSendReminder(request, nowMs, reminderIntervalMs)
     local lastReminderAtMs = tonumber(request.lastReminderAtMs) or 0
     if lastReminderAtMs <= 0 then
@@ -860,6 +922,7 @@ local function shouldSendReminder(request, nowMs, reminderIntervalMs)
     return (nowMs - lastReminderAtMs) >= reminderIntervalMs
 end
 
+---@return nil
 local function runBloodPostAnalysisPolicy()
     if Config.IsFeatureEnabled and not Config.IsFeatureEnabled('Forensics') then
         return
@@ -965,6 +1028,8 @@ local function runBloodPostAnalysisPolicy()
     end
 end
 
+---@param alert table
+---@return boolean, string|nil
 local function saveAlertDb(alert)
     local ok, err = pcall(function()
         MySQL.insert.await([[
@@ -992,6 +1057,12 @@ local function saveAlertDb(alert)
     return true
 end
 
+---@param title string
+---@param description string
+---@param severity string|nil
+---@param coords table|nil
+---@param createdBy string|nil
+---@return table|nil, string|nil
 createAlert = function(title, description, severity, coords, createdBy)
     local alert = {
         alertId = Utils.GenerateId('EMSALERT'),

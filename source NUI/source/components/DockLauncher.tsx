@@ -13,7 +13,7 @@ import { NotificationCenter } from './NotificationCenter';
 export function DockLauncher() {
   const [hoveredItem, setHoveredItem] = createSignal<string | null>(null);
   
-  const showLabels = () => uiPrefsState.showDockLabels || uiPrefsState.dockExpanded || uiPrefsState.navigationMode === 'dock';
+  const showLabels = (): boolean => uiPrefsState.showDockLabels || uiPrefsState.dockExpanded || uiPrefsState.navigationMode === 'dock';
   
   const isVisible = createMemo(() => {
     if (!dockState.isVisible) return false;
@@ -46,7 +46,7 @@ export function DockLauncher() {
     });
   });
 
-  const handleItemClick = (item: DockItem) => {
+  const handleItemClick = (item: DockItem): void => {
     dockActions.setActiveItem(item.id);
     
     if (item.id === 'help') {
@@ -59,7 +59,7 @@ export function DockLauncher() {
     }
   };
 
-  const getItemClass = (item: DockItem) => {
+  const getItemClass = (item: DockItem): string => {
     const classes = ['dock-item'];
     if (dockState.activeItem === item.id) {
       classes.push('active');

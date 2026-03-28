@@ -1,9 +1,5 @@
-// Extended types for mock system
-// These extend or complement the types in ~/stores/cadStore
-
 import type { DispatchUnit, SecurityCamera } from '~/stores/cadStore';
 
-// EMS Types
 export interface EMSUnit extends DispatchUnit {
   unitType: 'AMBULANCE' | 'EMS';
   crew?: string[];
@@ -51,7 +47,6 @@ export interface BloodSampleRequest {
   evidenceId?: string;
 }
 
-// Forensic Types
 export interface ForensicTrace {
   traceId: string;
   evidenceType: string;
@@ -75,7 +70,6 @@ export interface AnalysisResult {
   completedBy?: string;
 }
 
-// Scenario Types
 export interface Scenario {
   id: string;
   name: string;

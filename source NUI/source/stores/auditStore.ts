@@ -57,7 +57,7 @@ export const auditActions = {
       args,
       result,
       resultMessage,
-      officerId: 'OFF_001', // TODO: Get from userStore
+      officerId: 'OFF_001',
       officerName: 'Demo Officer',
       officerBadge: 'B-001',
       linkedCaseId: cadState.currentCase?.caseId,

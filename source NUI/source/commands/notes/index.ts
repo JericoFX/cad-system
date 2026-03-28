@@ -5,7 +5,7 @@ import { cadActions, cadState, type Note } from '~/stores/cadStore';
 const NOTE_TYPES = ['general', 'observation', 'interview', 'evidence'] as const;
 type NoteType = typeof NOTE_TYPES[number];
 
-export function registerNoteCommands() {
+export function registerNoteCommands(): void {
   createCommand({
     name: 'addnote',
     aliases: ['note-add', 'nadd'],

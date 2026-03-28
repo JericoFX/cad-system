@@ -161,6 +161,7 @@ CreateThread(function()
     end
 end)
 
+---@return boolean
 function IsRaining()
     return GetRainLevel() > 0.3
 end

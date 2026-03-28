@@ -3,8 +3,10 @@ local Utils = require 'modules.shared.utils'
 
 local QB = {}
 
+---@type table|nil
 local cachedQBObject = nil
 
+---@return table|nil
 function QB.GetObject()
     if cachedQBObject then return cachedQBObject end
     local ok, obj = pcall(function()
@@ -17,11 +19,16 @@ function QB.GetObject()
     return nil
 end
 
+---@return boolean
 function QB.IsAvailable()
     if GetResourceState('qb-core') ~= 'started' then return false end
     return QB.GetObject() ~= nil
 end
 
+---@param source integer
+---@param fallbackIdentifier string
+---@param getCallsignFn function|nil
+---@return table|nil
 function QB.ResolveIdentity(source, fallbackIdentifier, getCallsignFn)
     local qb = QB.GetObject()
     if not qb then return nil end
@@ -56,6 +63,9 @@ function QB.ResolveIdentity(source, fallbackIdentifier, getCallsignFn)
     }
 end
 
+---@param source integer
+---@param callsign string
+---@return boolean
 function QB.SaveCallsign(source, callsign)
     local qb = QB.GetObject()
     if not qb then return false end
@@ -65,6 +75,8 @@ function QB.SaveCallsign(source, callsign)
     return true
 end
 
+---@param source integer
+---@return number
 function QB.GetPlayerMoney(source)
     local qb = QB.GetObject()
     if not qb then return 0 end
@@ -73,6 +85,9 @@ function QB.GetPlayerMoney(source)
     return qbPlayer.PlayerData.money and qbPlayer.PlayerData.money.cash or 0
 end
 
+---@param source integer
+---@param amount number
+---@return boolean
 function QB.RemoveMoney(source, amount)
     local qb = QB.GetObject()
     if not qb then return false end

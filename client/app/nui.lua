@@ -2,6 +2,9 @@ local Config = require 'modules.shared.config'
 local Utils = require 'modules.shared.utils'
 local Registry = require 'modules.shared.registry'
 
+---@param name string
+---@param handler fun(data: table): table|nil
+---@return nil
 local function wrapNui(name, handler)
     RegisterNUICallback(name, function(data, cb)
         local ok, result = pcall(handler, data or {})
@@ -20,6 +23,8 @@ local function wrapNui(name, handler)
     end)
 end
 
+---@param serverEvent string
+---@return fun(payload: table): table|nil
 local function bridge(serverEvent)
     return function(payload)
         return lib.callback.await(serverEvent, false, payload)
@@ -180,28 +185,22 @@ wrapNui('cad:vehicle:playAlert', function(payload)
 end)
 
 local bridgedCallbacks = {
-    -- lookup
     'cad:lookup:searchPersons',
     'cad:lookup:searchVehicles',
-    -- phone
     'cad:phone:lookupByNumber',
     'cad:phone:lookupByImei',
     'cad:phone:setStolenPlaceholder',
-    -- entity notes
     'cad:entityNotes:list',
     'cad:entityNotes:add',
-    -- vehicle
     'cad:vehicle:quickSummary',
     'cad:vehicle:logStop',
     'cad:vehicle:getRecentStops',
-    -- cases
     'cad:createCase',
     'cad:getCase',
     'cad:searchCases',
     'cad:updateCase',
     'cad:closeCase',
     'cad:case:printReport',
-    -- evidence
     'cad:addEvidenceToStaging',
     'cad:getStagingEvidence',
     'cad:removeFromStaging',
@@ -210,7 +209,6 @@ local bridgedCallbacks = {
     'cad:evidence:container:list',
     'cad:evidence:container:store',
     'cad:evidence:container:pull',
-    -- photos
     'cad:photos:getCaptureConfig',
     'cad:photos:capturePolicePhoto',
     'cad:photos:captureNewsPhoto',
@@ -225,13 +223,11 @@ local bridgedCallbacks = {
     'cad:photos:getPhoto',
     'cad:photos:updateDescription',
     'cad:photos:deletePhoto',
-    -- news
     'cad:news:getArticles',
     'cad:news:published',
     'cad:news:updated',
     'cad:news:expired',
     'cad:news:deleted',
-    -- dispatch
     'cad:registerDispatchUnit',
     'cad:getDispatchUnits',
     'cad:updateUnitStatus',
@@ -244,21 +240,17 @@ local bridgedCallbacks = {
     'cad:getNearestUnit',
     'cad:setOfficerStatus',
     'cad:getOfficerStatus',
-    -- cameras
     'cad:cameras:getNextNumber',
     'cad:cameras:list',
     'cad:cameras:get',
     'cad:cameras:setStatus',
     'cad:cameras:remove',
-    -- jail
     'cad:police:getJailTransfers',
     'cad:police:logJailTransfer',
-    -- fines
     'cad:getFineCatalog',
     'cad:createFine',
     'cad:getFines',
     'cad:payFine',
-    -- ems
     'cad:ems:getUnits',
     'cad:ems:getAlerts',
     'cad:ems:createAlert',
@@ -269,7 +261,6 @@ local bridgedCallbacks = {
     'cad:ems:createBloodRequest',
     'cad:ems:getBloodRequests',
     'cad:ems:updateBloodRequest',
-    -- forensics
     'cad:forensic:checkInLab',
     'cad:forensic:getPendingEvidence',
     'cad:forensic:analyzeEvidence',
@@ -277,13 +268,11 @@ local bridgedCallbacks = {
     'cad:forensic:getAnalysisResults',
     'cad:forensic:compareEvidence',
     'cad:forensic:collectEvidence',
-    -- id reader
     'cad:idreader:read',
     'cad:idreader:listDocuments',
     'cad:idreader:insert',
     'cad:idreader:eject',
     'cad:idreader:getContainer',
-    -- callsign
     'cad:getCallsign',
     'cad:setCallsign',
 }
@@ -292,7 +281,6 @@ for _, name in ipairs(bridgedCallbacks) do
     wrapNui(name, bridge(name))
 end
 
--- NUI name differs from server event name; kept as individual registration
 wrapNui('cad:dispatch:createCall', bridge('cad:createDispatchCall'))
 
 wrapNui('cad:cameras:watch', function(payload)

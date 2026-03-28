@@ -11,13 +11,13 @@ export function createFiveMBridge(): FiveMBridge {
       }
       return fetchNui(eventName, data);
     },
-    
+
     emit: (eventName: string, data?: any) => {
       if (!isEnvBrowser()) {
         fetchNui(eventName, data).catch(console.error);
       }
     },
-    
+
     isBrowser: () => isEnvBrowser()
   };
 }
@@ -36,7 +36,7 @@ function simulateFiveMResponse(eventName: string, data?: any): Promise<any> {
           resolve({ success: true, id: Math.floor(Math.random() * 1000) });
           break;
         case 'deleteReport':
-          resolve({ success: true, message: 'Reporte eliminado' });
+          resolve({ success: true, message: 'Report deleted' });
           break;
         case 'getPlayerInfo':
           resolve(generateMockPlayer(data?.id));
@@ -80,7 +80,7 @@ function simulateFiveMResponse(eventName: string, data?: any): Promise<any> {
           resolve({ success: true, caseId: data });
           break;
         case 'cad:attachEvidence':
-          resolve({ 
+          resolve({
             evidenceId: `EVID_${Date.now()}`,
             caseId: data?.caseId,
             evidenceType: 'PHOTO',
@@ -95,9 +95,9 @@ function simulateFiveMResponse(eventName: string, data?: any): Promise<any> {
           break;
         default:
           console.warn(`[FiveM Bridge] Unhandled event in browser mode: ${eventName}`);
-          resolve({ error: `Evento no implementado en modo browser: ${eventName}` });
+          resolve({ error: `Event not implemented in browser mode: ${eventName}` });
       }
-    }, 300); // Simular latencia de red
+    }, 300);
   });
 }
 
@@ -110,31 +110,31 @@ function generateMockVehicles(filters?: any): any[] {
     { id: 5, name: 'Delivery Van', status: 'maintenance', location: 'Garage', driver: 'Unassigned', type: 'Commercial' },
     { id: 6, name: 'Police Motorcycle', status: 'active', location: 'Highway', driver: 'Officer Brown', type: 'Emergency' },
   ];
-  
+
   if (filters?.status && filters.status !== 'all') {
     return vehicles.filter(v => v.status === filters.status);
   }
-  
+
   if (filters?.location) {
     return vehicles.filter(v => v.location.toLowerCase().includes(filters.location.toLowerCase()));
   }
-  
+
   return vehicles;
 }
 
 function generateMockReports(filters?: any): any[] {
   const reports = [
-    { id: 101, title: 'Robo a mano armada', status: 'open', priority: 'high', date: '2026-01-29', location: 'Banco Central', officer: 'Smith' },
-    { id: 102, title: 'Accidente de tráfico', status: 'resolved', priority: 'medium', date: '2026-01-28', location: 'Main St & 5th', officer: 'Johnson' },
-    { id: 103, title: 'Vandalismo', status: 'open', priority: 'low', date: '2026-01-28', location: 'Parque Central', officer: 'Williams' },
-    { id: 104, title: 'Persona desaparecida', status: 'in_progress', priority: 'critical', date: '2026-01-27', location: 'Downtown', officer: 'Brown' },
-    { id: 105, title: 'Disturbio', status: 'resolved', priority: 'medium', date: '2026-01-26', location: 'Barrio Norte', officer: 'Davis' },
+    { id: 101, title: 'Armed robbery', status: 'open', priority: 'high', date: '2026-01-29', location: 'Central Bank', officer: 'Smith' },
+    { id: 102, title: 'Traffic accident', status: 'resolved', priority: 'medium', date: '2026-01-28', location: 'Main St & 5th', officer: 'Johnson' },
+    { id: 103, title: 'Vandalism', status: 'open', priority: 'low', date: '2026-01-28', location: 'Central Park', officer: 'Williams' },
+    { id: 104, title: 'Missing person', status: 'in_progress', priority: 'critical', date: '2026-01-27', location: 'Downtown', officer: 'Brown' },
+    { id: 105, title: 'Disturbance', status: 'resolved', priority: 'medium', date: '2026-01-26', location: 'North District', officer: 'Davis' },
   ];
-  
+
   if (filters?.status) {
     return reports.filter(r => r.status === filters.status);
   }
-  
+
   return reports;
 }
 
@@ -144,7 +144,7 @@ function generateMockPlayer(id?: number): any {
     { id: 2, name: 'Jane Smith', money: 12000, job: 'Medic', lastSeen: '15 min ago', health: 85, armor: 0 },
     { id: 3, name: 'Bob Johnson', money: 800, job: 'Taxi Driver', lastSeen: '1 hour ago', health: 100, armor: 0 },
   ];
-  
+
   return players.find(p => p.id === id) || null;
 }
 
@@ -154,7 +154,7 @@ export function createMockUser(): UserInfo {
     name: 'Admin User',
     roles: ['admin', 'user'],
     hasPermission: (permission: string) => {
-      return ['admin', 'mod', 'user'].some(role => 
+      return ['admin', 'mod', 'user'].some(role =>
         role.includes(permission)
       );
     }

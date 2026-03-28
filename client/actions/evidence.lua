@@ -1,7 +1,8 @@
--- This module was taken from other resource that i dont remember the name, SORRY
-
 local Config = require 'modules.shared.config'
 
+---@param evidenceType string
+---@param description string|nil
+---@return table|nil
 local function CollectEvidence(evidenceType, description)
     local payload = {
         evidenceType = evidenceType,

@@ -170,7 +170,6 @@ export function MediaPlayer() {
 
   const renderControls = () => (
     <>
-      {/* Progress Bar */}
       <div class='progress-container'>
         <span class='time-display'>{formatTime(currentTime())}</span>
         <div
@@ -188,7 +187,6 @@ export function MediaPlayer() {
         <span class='time-display'>{formatTime(duration())}</span>
       </div>
 
-      {/* Controls */}
       <div class='media-controls'>
         <Button.Root class='btn' onClick={() => seekRelative(-10)}>
           {'[<<]'}
@@ -207,7 +205,6 @@ export function MediaPlayer() {
         </button>
       </div>
 
-      {/* Volume */}
       <div class='volume-container'>
         <span>VOL:</span>
         <div
@@ -289,7 +286,6 @@ export function MediaPlayer() {
           </div>
         }
       >
-        {/* VIDEO PLAYER */}
         <div
           class='modal-content'
           onClick={(e) => e.stopPropagation()}

@@ -8,14 +8,14 @@ export interface PromptState {
   type: PromptType | null;
   question: string;
   options?: string[];
-  resolve: ((value: any) => void) | null;
+  resolve: ((value: string | boolean) => void) | null;
 }
 
 export const [isActive, setIsActive] = createSignal(false);
 export const [promptType, setPromptType] = createSignal<PromptType | null>(null);
 export const [question, setQuestion] = createSignal('');
 export const [options, setOptions] = createSignal<string[] | undefined>(undefined);
-let currentResolve: ((value: any) => void) | null = null;
+let currentResolve: ((value: string | boolean) => void) | null = null;
 
 export const promptState: PromptState = {
   get isActive() { return isActive(); },
@@ -40,11 +40,11 @@ export const promptActions = {
         currentResolve('');
       }
       
-      currentResolve = (value: string) => {
+      currentResolve = (value: string | boolean) => {
         resetState();
-        resolve(value);
+        resolve(value as string);
       };
-      
+
       setQuestion(q);
       setPromptType('text');
       setOptions(undefined);
@@ -58,9 +58,9 @@ export const promptActions = {
         currentResolve(false);
       }
       
-      currentResolve = (value: boolean) => {
+      currentResolve = (value: string | boolean) => {
         resetState();
-        resolve(value);
+        resolve(value as boolean);
       };
       
       setQuestion(q);
@@ -76,11 +76,11 @@ export const promptActions = {
         currentResolve('');
       }
       
-      currentResolve = (value: string) => {
+      currentResolve = (value: string | boolean) => {
         resetState();
-        resolve(value);
+        resolve(value as string);
       };
-      
+
       setQuestion(q);
       setPromptType('select');
       setOptions(opts);
@@ -88,7 +88,7 @@ export const promptActions = {
     });
   },
 
-  submit: (value: any) => {
+  submit: (value: string | boolean) => {
     if (!isActive()) {
       return;
     }
