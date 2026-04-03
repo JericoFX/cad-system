@@ -416,7 +416,10 @@ function Database.EnsureSchema()
         SET NEW.updated_at = DATE_FORMAT(NOW(), '%Y-%m-%dT%H:%i:%s.000Z')
     ]], 'tr_virtual_slots_updated_at')
 
-    executeOptional([[SET GLOBAL event_scheduler = ON]], 'event_scheduler')
+    local schedulerOk = executeOptional([[SELECT @@GLOBAL.event_scheduler AS es]], 'check_event_scheduler')
+    if not schedulerOk then
+        Utils.Log('warn', 'Could not check event_scheduler status. Ensure event_scheduler = ON in your MySQL config for cleanup events to work.')
+    end
 
     executeOptional([[
         CREATE EVENT IF NOT EXISTS ev_cleanup_stale_evidence

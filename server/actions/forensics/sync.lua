@@ -176,7 +176,7 @@ RegisterNetEvent('cad:forensic:sync', function(evidenceType, ownerId, ...)
             return
         end
 
-        local bloodId = 'BLOOD_' .. math.random(1000000)
+        local bloodId = Utils.GenerateId('BLOOD')
 
         evidences.blood[bloodId] = {
             id = bloodId,
@@ -212,7 +212,7 @@ RegisterNetEvent('cad:forensic:sync', function(evidenceType, ownerId, ...)
             return
         end
 
-        local fpId = 'FP_' .. math.random(1000000)
+        local fpId = Utils.GenerateId('FP')
 
         evidences.fingerprints[fpId] = {
             id = fpId,
@@ -236,7 +236,7 @@ RegisterNetEvent('cad:forensic:sync', function(evidenceType, ownerId, ...)
             return
         end
 
-        local casingId = 'CASING_' .. math.random(1000000)
+        local casingId = Utils.GenerateId('CASING')
 
         evidences.casings[casingId] = {
             id = casingId,

@@ -115,6 +115,10 @@ end
 
 rebuildTraceGridEntries()
 
+if getForensicsConfig().AllowAllIngestResources == true then
+    Utils.Log('warn', 'Forensics: AllowAllIngestResources is ON. Any resource can inject forensic traces. Disable this in production.')
+end
+
 ---@param sourceName string|nil
 ---@return boolean
 local function canIngestNow(sourceName)

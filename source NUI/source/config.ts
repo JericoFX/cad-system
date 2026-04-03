@@ -70,12 +70,11 @@ function parseRole(value: string | undefined, fallback: UserRole): UserRole {
 }
 
 const env = import.meta.env;
-const isProductionBuild = Boolean(env.PROD);
 
-const useMockData = parseBoolean(env.VITE_USE_MOCK_DATA, !isProductionBuild);
-const mockBypassRoleGuards = parseBoolean(
+const useMockData = import.meta.env.DEV && parseBoolean(env.VITE_USE_MOCK_DATA, true);
+const mockBypassRoleGuards = import.meta.env.DEV && parseBoolean(
   env.VITE_MOCK_BYPASS_ROLE_GUARDS,
-  useMockData && !isProductionBuild
+  useMockData
 );
 const dockOnly = parseBoolean(env.VITE_DOCK_ONLY, true);
 const configuredMode = parseMode(env.VITE_UI_MODE, 'dock');
@@ -117,12 +116,14 @@ export const CONFIG = {
     MIN_DURATION_MS: bootMinDurationMs,
   },
 
-  MOCK_USER: {
-    id: env.VITE_MOCK_USER_ID || 'OFFICER_101',
-    badge: env.VITE_MOCK_USER_BADGE || 'B-101',
-    name: env.VITE_MOCK_USER_NAME || 'Officer John Martinez',
-    role: parseRole(env.VITE_MOCK_USER_ROLE, 'police'),
-  },
+  MOCK_USER: import.meta.env.DEV
+    ? {
+        id: env.VITE_MOCK_USER_ID || 'OFFICER_101',
+        badge: env.VITE_MOCK_USER_BADGE || 'B-101',
+        name: env.VITE_MOCK_USER_NAME || 'Officer John Martinez',
+        role: parseRole(env.VITE_MOCK_USER_ROLE, 'police'),
+      }
+    : { id: '', badge: '', name: '', role: 'police' as UserRole },
 
   API_BASE_URL: env.VITE_API_URL || 'https://cad-system',
 
