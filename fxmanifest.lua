@@ -6,7 +6,7 @@ use_experimental_fxv2_oal 'yes'
 
 description 'C.A.D. Terminal System - Computer Aided Dispatch'
 author 'JericoFX'
-version '1.0.1'
+version '1.0.2'
 
 shared_scripts {
     '@ox_lib/init.lua',
